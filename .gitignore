@@ -1,0 +1,58 @@
+# Bytasm .gitignore
+# Rule of thumb: commit source, docs, and the committed fixtures; never commit
+# machine-specific settings, secrets, caches, or generated analysis output.
+
+# --- Secrets and credentials (never commit) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+credentials*.json
+
+# --- Local tool settings (machine-specific) ---
+# Claude Code settings, hooks, lock and marker files, at any depth.
+.claude/
+CLAUDE.local.md
+.vscode/
+.idea/
+
+# --- macOS ---
+.DS_Store
+._*
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+/backend/build/
+/backend/dist/
+
+# --- Test, lint, and type-check caches ---
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# --- Runtime data (future milestones) ---
+# Temporary uploads, stored blobs, and generated analysis or report output.
+uploads/
+tmp/
+blobs/
+analysis-output/
+reports-output/
+
+# --- Fixture build scratch ---
+# Only fixtures/bin/ (listed in MANIFEST.sha256) is committed.
+/fixtures/build/out/
+
+# --- Third-party design references (local only) ---
+# Redistribution rights not confirmed; see docs/PROJECT_BLUEPRINT.md §5.10.
+/docs/design/references/frontend-ref-*.png

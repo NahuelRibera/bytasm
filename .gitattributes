@@ -1,0 +1,5 @@
+# Fixture bytes must never be altered by Git (line-ending conversion would
+# change their SHA-256 and break the manifest allowlist).
+fixtures/bin/** binary
+fixtures/MANIFEST.sha256 text eol=lf
+*.png binary
