@@ -37,7 +37,15 @@ test("every screen fits a 360 px window", async ({ page }) => {
     await expectNoHorizontalPageScroll(page);
   }
 
+  // The project page again, now with a sample and its versions table.
+  await page.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link").click();
+  await expect(page.getByRole("region", { name: "Versions of narrow" })).toBeVisible();
+  await expectNoHorizontalPageScroll(page);
+  await expectNoAxeViolations(page);
+
   await page.goto(`${FIXTURES_URL}/`);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Projects table" })).toBeVisible();
   await expectNoHorizontalPageScroll(page);
+  await expectNoAxeViolations(page);
 });

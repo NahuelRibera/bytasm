@@ -41,38 +41,46 @@ export function ProjectPage({ projectId }: { projectId: string }) {
         {samples.data?.map((sample) => (
           <article className="card" key={sample.id} aria-label={`Sample ${sample.name}`}>
             <h3>{sample.name}</h3>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th scope="col">Version</th>
-                  <th scope="col">Format</th>
-                  <th scope="col">Architecture</th>
-                  <th scope="col">SHA-256</th>
-                  <th scope="col">Admitted under</th>
-                  <th scope="col">Imported</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sample.versions.map((version) => (
-                  <tr key={version.id}>
-                    <td>
-                      <Link to={`/versions/${version.id}`}>
-                        {version.version_label ?? "(unlabelled)"}
-                      </Link>
-                    </td>
-                    <td>{version.detected_format}</td>
-                    <td>{version.architecture}</td>
-                    <td>
-                      <code title={version.sha256}>{shortHash(version.sha256)}</code>
-                    </td>
-                    <td>
-                      <AdmittedPill value={version.admitted_under} />
-                    </td>
-                    <td className="muted">{formatDate(version.imported_at)}</td>
+            {/* Focusable so the table can be scrolled sideways from the keyboard. */}
+            <div
+              className="table-scroll"
+              tabIndex={0}
+              role="region"
+              aria-label={`Versions of ${sample.name}`}
+            >
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th scope="col">Version</th>
+                    <th scope="col">Format</th>
+                    <th scope="col">Architecture</th>
+                    <th scope="col">SHA-256</th>
+                    <th scope="col">Admitted under</th>
+                    <th scope="col">Imported</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {sample.versions.map((version) => (
+                    <tr key={version.id}>
+                      <td>
+                        <Link to={`/versions/${version.id}`}>
+                          {version.version_label ?? "(unlabelled)"}
+                        </Link>
+                      </td>
+                      <td>{version.detected_format}</td>
+                      <td>{version.architecture}</td>
+                      <td>
+                        <code title={version.sha256}>{shortHash(version.sha256)}</code>
+                      </td>
+                      <td>
+                        <AdmittedPill value={version.admitted_under} />
+                      </td>
+                      <td className="muted">{formatDate(version.imported_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </article>
         ))}
       </section>

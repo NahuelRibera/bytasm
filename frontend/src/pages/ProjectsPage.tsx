@@ -65,30 +65,33 @@ export function ProjectsPage() {
           <Empty>No projects yet. Create one above, then import one of Bytasm's fixtures.</Empty>
         )}
         {projects.data && projects.data.length > 0 && (
-          <table className="table">
-            <thead>
-              <tr>
-                <th scope="col">Name</th>
-                <th scope="col">Description</th>
-                <th scope="col" className="num">
-                  Samples
-                </th>
-                <th scope="col">Created</th>
-              </tr>
-            </thead>
-            <tbody>
-              {projects.data.map((project) => (
-                <tr key={project.id}>
-                  <td>
-                    <Link to={`/projects/${project.id}`}>{project.name}</Link>
-                  </td>
-                  <td className="muted">{project.description || "—"}</td>
-                  <td className="num">{project.sample_count}</td>
-                  <td className="muted">{formatDate(project.created_at)}</td>
+          // Focusable so the table can be scrolled sideways from the keyboard.
+          <div className="table-scroll" tabIndex={0} role="region" aria-label="Projects table">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th scope="col">Name</th>
+                  <th scope="col">Description</th>
+                  <th scope="col" className="num">
+                    Samples
+                  </th>
+                  <th scope="col">Created</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {projects.data.map((project) => (
+                  <tr key={project.id}>
+                    <td>
+                      <Link to={`/projects/${project.id}`}>{project.name}</Link>
+                    </td>
+                    <td className="muted">{project.description || "—"}</td>
+                    <td className="num">{project.sample_count}</td>
+                    <td className="muted">{formatDate(project.created_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
     </>
