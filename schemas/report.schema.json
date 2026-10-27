@@ -1,0 +1,654 @@
+{
+  "$defs": {
+    "Analysis": {
+      "additionalProperties": false,
+      "properties": {
+        "run": {
+          "$ref": "#/$defs/Run"
+        },
+        "tool_invocations": {
+          "items": {
+            "$ref": "#/$defs/ToolInvocation"
+          },
+          "title": "Tool Invocations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "run",
+        "tool_invocations"
+      ],
+      "title": "Analysis",
+      "type": "object"
+    },
+    "Authorization": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "const": "owned_or_built",
+          "title": "Basis",
+          "type": "string"
+        },
+        "notice": {
+          "title": "Notice",
+          "type": "string"
+        },
+        "recorded_at": {
+          "format": "date-time",
+          "title": "Recorded At",
+          "type": "string"
+        },
+        "statement": {
+          "title": "Statement",
+          "type": "string"
+        },
+        "terms_reference": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Terms Reference"
+        },
+        "type": {
+          "const": "self_attestation",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "basis",
+        "statement",
+        "terms_reference",
+        "recorded_at",
+        "notice"
+      ],
+      "title": "Authorization",
+      "type": "object"
+    },
+    "DeclaredFilename": {
+      "additionalProperties": false,
+      "properties": {
+        "trust": {
+          "const": "untrusted_as_uploaded",
+          "title": "Trust",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Value"
+        }
+      },
+      "required": [
+        "value",
+        "trust"
+      ],
+      "title": "DeclaredFilename",
+      "type": "object"
+    },
+    "DeclaredInHeader": {
+      "additionalProperties": false,
+      "properties": {
+        "architecture": {
+          "title": "Architecture",
+          "type": "string"
+        },
+        "bitness": {
+          "title": "Bitness",
+          "type": "integer"
+        },
+        "endianness": {
+          "title": "Endianness",
+          "type": "string"
+        },
+        "entry_point": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Entry Point"
+        },
+        "fields": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ]
+          },
+          "title": "Fields",
+          "type": "object"
+        }
+      },
+      "required": [
+        "architecture",
+        "bitness",
+        "endianness",
+        "entry_point",
+        "fields"
+      ],
+      "title": "DeclaredInHeader",
+      "type": "object"
+    },
+    "Entropy": {
+      "additionalProperties": false,
+      "properties": {
+        "computed_by": {
+          "title": "Computed By",
+          "type": "string"
+        },
+        "measured_over": {
+          "const": "section_bytes_in_file",
+          "title": "Measured Over",
+          "type": "string"
+        },
+        "method": {
+          "title": "Method",
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Note"
+        },
+        "unit": {
+          "const": "bits_per_byte",
+          "title": "Unit",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "maximum": 8.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Value"
+        }
+      },
+      "required": [
+        "value",
+        "unit",
+        "method",
+        "computed_by",
+        "measured_over",
+        "note"
+      ],
+      "title": "Entropy",
+      "type": "object"
+    },
+    "Generator": {
+      "additionalProperties": false,
+      "properties": {
+        "image_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Container image ID; null when run natively.",
+          "title": "Image Id"
+        },
+        "name": {
+          "const": "bytasm",
+          "title": "Name",
+          "type": "string"
+        },
+        "source_revision": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "`git describe --always --dirty` of the running checkout, or null.",
+          "title": "Source Revision"
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version",
+        "source_revision",
+        "image_id"
+      ],
+      "title": "Generator",
+      "type": "object"
+    },
+    "Imports": {
+      "additionalProperties": false,
+      "properties": {
+        "functions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Functions",
+          "type": "array"
+        },
+        "libraries": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Libraries",
+          "type": "array"
+        }
+      },
+      "required": [
+        "libraries",
+        "functions"
+      ],
+      "title": "Imports",
+      "type": "object"
+    },
+    "InputPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "admitted_under": {
+          "enum": [
+            "fixture_manifest",
+            "self_built_optin"
+          ],
+          "title": "Admitted Under",
+          "type": "string"
+        },
+        "manifest_entry": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Manifest Entry"
+        },
+        "notice": {
+          "title": "Notice",
+          "type": "string"
+        }
+      },
+      "required": [
+        "admitted_under",
+        "manifest_entry",
+        "notice"
+      ],
+      "title": "InputPolicy",
+      "type": "object"
+    },
+    "Metadata": {
+      "additionalProperties": false,
+      "properties": {
+        "declared_in_header": {
+          "$ref": "#/$defs/DeclaredInHeader"
+        },
+        "exports": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Exports",
+          "type": "array"
+        },
+        "imports": {
+          "$ref": "#/$defs/Imports"
+        },
+        "sections": {
+          "items": {
+            "$ref": "#/$defs/Section"
+          },
+          "title": "Sections",
+          "type": "array"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "declared_in_header",
+        "sections",
+        "imports",
+        "exports",
+        "warnings"
+      ],
+      "title": "Metadata",
+      "type": "object"
+    },
+    "Run": {
+      "additionalProperties": false,
+      "properties": {
+        "bytasm_version": {
+          "title": "Bytasm Version",
+          "type": "string"
+        },
+        "finished_at": {
+          "format": "date-time",
+          "title": "Finished At",
+          "type": "string"
+        },
+        "profile": {
+          "additionalProperties": true,
+          "title": "Profile",
+          "type": "object"
+        },
+        "started_at": {
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        },
+        "status": {
+          "const": "succeeded",
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "profile",
+        "bytasm_version",
+        "started_at",
+        "finished_at"
+      ],
+      "title": "Run",
+      "type": "object"
+    },
+    "SampleIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "blob_sha256_verified_at_export": {
+          "const": true,
+          "title": "Blob Sha256 Verified At Export",
+          "type": "boolean"
+        },
+        "declared_filename": {
+          "$ref": "#/$defs/DeclaredFilename"
+        },
+        "format": {
+          "enum": [
+            "ELF",
+            "PE"
+          ],
+          "title": "Format",
+          "type": "string"
+        },
+        "format_basis": {
+          "const": "identified_from_bytes_and_parsed",
+          "title": "Format Basis",
+          "type": "string"
+        },
+        "project_name": {
+          "title": "Project Name",
+          "type": "string"
+        },
+        "sample_name": {
+          "title": "Sample Name",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size_bytes": {
+          "minimum": 1,
+          "title": "Size Bytes",
+          "type": "integer"
+        },
+        "version_label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Version Label"
+        }
+      },
+      "required": [
+        "project_name",
+        "sample_name",
+        "version_label",
+        "sha256",
+        "size_bytes",
+        "format",
+        "format_basis",
+        "declared_filename",
+        "blob_sha256_verified_at_export"
+      ],
+      "title": "SampleIdentity",
+      "type": "object"
+    },
+    "Section": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes_in_file": {
+          "title": "Bytes In File",
+          "type": "integer"
+        },
+        "declared_size": {
+          "title": "Declared Size",
+          "type": "integer"
+        },
+        "entropy": {
+          "$ref": "#/$defs/Entropy"
+        },
+        "file_offset": {
+          "title": "File Offset",
+          "type": "integer"
+        },
+        "flags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Flags",
+          "type": "array"
+        },
+        "index": {
+          "title": "Index",
+          "type": "integer"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Type"
+        },
+        "virtual_address": {
+          "title": "Virtual Address",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "index",
+        "name",
+        "type",
+        "file_offset",
+        "bytes_in_file",
+        "virtual_address",
+        "declared_size",
+        "flags",
+        "entropy"
+      ],
+      "title": "Section",
+      "type": "object"
+    },
+    "ToolInvocation": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter": {
+          "title": "Adapter",
+          "type": "string"
+        },
+        "adapter_version": {
+          "title": "Adapter Version",
+          "type": "string"
+        },
+        "duration_ms": {
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "execution": {
+          "const": "separate_resource_limited_process",
+          "title": "Execution",
+          "type": "string"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "result_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Result Sha256",
+          "type": "string"
+        },
+        "status": {
+          "const": "succeeded",
+          "title": "Status",
+          "type": "string"
+        },
+        "step_index": {
+          "title": "Step Index",
+          "type": "integer"
+        },
+        "tool": {
+          "title": "Tool",
+          "type": "string"
+        },
+        "tool_version": {
+          "title": "Tool Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "step_index",
+        "tool",
+        "tool_version",
+        "adapter",
+        "adapter_version",
+        "status",
+        "exit_code",
+        "duration_ms",
+        "result_sha256",
+        "execution"
+      ],
+      "title": "ToolInvocation",
+      "type": "object"
+    }
+  },
+  "$id": "https://github.com/NahuelRibera/bytasm/blob/main/schemas/report.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "analysis": {
+      "$ref": "#/$defs/Analysis"
+    },
+    "authorization": {
+      "$ref": "#/$defs/Authorization"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "generator": {
+      "$ref": "#/$defs/Generator"
+    },
+    "input_policy": {
+      "$ref": "#/$defs/InputPolicy"
+    },
+    "labels": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Labels",
+      "type": "object"
+    },
+    "limitations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Limitations",
+      "type": "array"
+    },
+    "metadata": {
+      "$ref": "#/$defs/Metadata"
+    },
+    "report_kind": {
+      "const": "bytasm.sample_version_report",
+      "title": "Report Kind",
+      "type": "string"
+    },
+    "sample": {
+      "$ref": "#/$defs/SampleIdentity"
+    },
+    "schema_version": {
+      "const": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "report_kind",
+    "schema_version",
+    "generated_at",
+    "generator",
+    "sample",
+    "input_policy",
+    "authorization",
+    "analysis",
+    "metadata",
+    "labels",
+    "limitations"
+  ],
+  "title": "Bytasm sample version report",
+  "type": "object"
+}

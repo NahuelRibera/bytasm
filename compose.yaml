@@ -1,0 +1,64 @@
+# Bytasm v0.1, local only. Start with `make compose-up`, open
+# http://127.0.0.1:8000/. Security-relevant settings are asserted by
+# `make compose-check` (scripts/check_compose.py); keep the two in step.
+#
+# These settings are defence in depth. They are NOT a sandbox: the LIEF parser
+# runs in this same container, as the same user as the API, with the same data
+# volume and the same (unrestricted outbound) network. That is why v0.1 only
+# parses Bytasm's own fixtures here (blueprint 5.4.1, 8.2; SECURITY.md).
+#
+# One service: SQLite replaces the blueprint's `db` service and the API serves
+# the built UI (ADR-0002).
+name: bytasm
+
+services:
+  api:
+    build:
+      context: .
+      args:
+        BYTASM_SOURCE_REVISION: ${BYTASM_SOURCE_REVISION:-}
+    image: bytasm-local:v0.1
+    # Fixtures-only. Container mode refuses self_built (its listener is not
+    # loopback inside the container); there is no API or UI switch either.
+    environment:
+      BYTASM_INPUT_POLICY: fixtures
+    # Published on the host's loopback only. Docker-published ports can bypass
+    # host firewalls, so never use a bare "8000:8000" here.
+    ports:
+      - "127.0.0.1:8000:8000"
+    # An init process forwards signals and reaps processes, so adapter children
+    # do not outlive the container (blueprint 5.7, Q2/Q4 backstop).
+    init: true
+    user: "10001:10001"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    # Docker applies no resource limits by default. These bound exhaustion;
+    # they do not restrict file, secret or network access.
+    mem_limit: 2g
+    memswap_limit: 2g
+    cpus: 2
+    pids_limit: 128
+    # The only writable paths: the named data volume (database, blobs, reports,
+    # upload temp directories) and a small, non-executable /tmp.
+    volumes:
+      - type: volume
+        source: bytasm-data
+        target: /data
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request as u; u.urlopen(u.Request('http://127.0.0.1:8000/api/v1/health', headers={'Host': '127.0.0.1:8000'}), timeout=3)"
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: "no"
+
+volumes:
+  bytasm-data:

@@ -1,0 +1,12 @@
+# The image needs backend/{pyproject.toml,uv.lock,src}, fixtures/MANIFEST.sha256
+# and frontend/dist only. Everything else stays out of the build context,
+# in particular local settings, data, caches and the fixture binaries.
+*
+!backend/pyproject.toml
+!backend/uv.lock
+!backend/src/
+!fixtures/MANIFEST.sha256
+!frontend/dist/
+**/__pycache__
+**/*.py[cod]
+**/.DS_Store

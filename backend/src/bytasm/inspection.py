@@ -4,33 +4,40 @@
 2. Compute its SHA-256.
 3. Input policy: refuse the file unless that hash is in the fixture manifest.
 4. Identify the format from magic bytes and basic header sanity checks.
-5. Only now import LIEF and parse the *same bytes* that were hashed. Parsing the
-   in-memory bytes (rather than re-opening the path) means the file cannot be
-   swapped between the hash check and the parse.
+5. Only now hand the *same bytes* that were hashed to the LIEF adapter, which
+   runs in a separate, resource-limited child process (bytasm.runner). The
+   bytes are written to a fresh private directory, and the child re-checks
+   their SHA-256 before parsing, so the parser never sees anything but the
+   admitted bytes. LIEF is never loaded in this process.
 
 Bytasm never executes the file.
 """
 
+import asyncio
 import hashlib
+import tempfile
 from pathlib import Path
 from typing import Any
 
 from bytasm import __version__
-from bytasm.adapters.entropy import METHOD as ENTROPY_METHOD
 from bytasm.errors import (
     EMPTY_FILE,
     FILE_NOT_FOUND,
     FILE_TOO_LARGE,
     UNKNOWN_HASH,
     InspectError,
+    outcome_error,
 )
 from bytasm.intake.identify import identify_format
 from bytasm.intake.manifest import Manifest
+from bytasm.runner import workspace
+from bytasm.runner.limits import MAX_INPUT_BYTES
+from bytasm.runner.supervisor import AdapterOutcome, metadata_adapter_command, run_adapter
 
 REPORT_KIND = "bytasm.inspect"
 SCHEMA_VERSION = 1
 # Provisional v0.1 size limit (ADR-0001, D4), reviewed after M1 measurements.
-MAX_FILE_SIZE = 64 * 1024 * 1024
+MAX_FILE_SIZE = MAX_INPUT_BYTES
 
 NOTES = (
     "Bytasm did not execute this file.",
@@ -71,22 +78,24 @@ def inspect_file(path: Path, manifest: Manifest) -> dict[str, Any]:
 
     file_format = identify_format(data)
 
-    # Imported here, after the policy check, so that a refused file never even
-    # causes LIEF to be loaded.
-    from bytasm.adapters import metadata_lief
-
-    metadata = metadata_lief.extract_metadata(data, file_format)
+    outcome = run_metadata_adapter(data, sha256)
+    if outcome.result is None:
+        raise outcome_error(outcome.status, outcome.reason)
+    result = outcome.result
+    metadata = result.metadata.model_dump(mode="json")
+    if metadata["format"] != file_format:
+        raise outcome_error("rejected", "parse_failed")
 
     return {
         "report_kind": REPORT_KIND,
         "schema_version": SCHEMA_VERSION,
         "bytasm_version": __version__,
         "adapter": {
-            "name": metadata_lief.ADAPTER_NAME,
-            "version": metadata_lief.ADAPTER_VERSION,
-            "parser": "lief",
-            "parser_version": metadata_lief.lief_version(),
-            "entropy_method": ENTROPY_METHOD,
+            "name": result.adapter,
+            "version": result.adapter_version,
+            "parser": result.tool,
+            "parser_version": result.tool_version,
+            "entropy_method": result.entropy_method,
         },
         "input_policy": {
             "mode": "fixtures",
@@ -97,3 +106,14 @@ def inspect_file(path: Path, manifest: Manifest) -> dict[str, Any]:
         **metadata,
         "notes": list(NOTES),
     }
+
+
+def run_metadata_adapter(data: bytes, sha256: str) -> AdapterOutcome:
+    """Run the LIEF adapter child on `data` in a private temporary directory."""
+    root = Path(tempfile.gettempdir()) / "bytasm-inspect"
+    workdir = workspace.create_workdir(root)
+    try:
+        workspace.write_input(workdir, data)
+        return asyncio.run(run_adapter(metadata_adapter_command(), workdir, sha256))
+    finally:
+        workspace.remove_workdir(workdir)

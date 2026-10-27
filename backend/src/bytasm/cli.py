@@ -1,13 +1,17 @@
-"""Command-line entry point: `bytasm inspect <fixture-path>`.
+"""Command-line entry points: `bytasm inspect <fixture-path>` and `bytasm serve`.
 
 Output is deterministic JSON on stdout (sorted keys, no timestamps, no
 absolute paths), so inspecting the same fixture twice gives identical bytes.
 
-Exit codes:
+`inspect` exit codes:
   0  success, report on stdout
   1  operational problem (file missing, manifest unreadable), JSON error on stdout
   2  input refused (unknown hash, unsupported or malformed file, parse failure),
      JSON error on stdout; also used by argparse for usage errors (text on stderr)
+
+`serve` reads its configuration from the environment only (see bytasm.config)
+and refuses to start on a non-loopback address. It exits 1 on a configuration
+error.
 """
 
 import argparse
@@ -39,11 +43,54 @@ def _build_parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command", required=True)
     inspect = commands.add_parser("inspect", help="print metadata for a committed fixture")
     inspect.add_argument("path", type=Path, help="path to a fixture listed in the manifest")
+    commands.add_parser(
+        "serve",
+        help="run the local web app on 127.0.0.1 (configuration: BYTASM_* environment variables)",
+    )
     return parser
+
+
+def serve() -> int:
+    import logging
+
+    import uvicorn
+
+    from bytasm.api.app import create_app
+    from bytasm.config import ConfigError, Settings
+    from bytasm.runner.hardening import make_non_dumpable
+
+    try:
+        settings = Settings.from_env()
+    except ConfigError as error:
+        sys.stderr.write(f"bytasm serve: {error}\n")
+        return 1
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
+    make_non_dumpable()
+    where = (
+        f"container mode, published by Compose on http://127.0.0.1:{settings.port}/"
+        if settings.container
+        else f"http://{settings.host}:{settings.port}/"
+    )
+    sys.stderr.write(
+        f"Bytasm {__version__} on {where} "
+        f"(input policy: {settings.input_policy}; data: {settings.data_dir})\n"
+    )
+    uvicorn.run(
+        create_app(settings),
+        host=settings.host,
+        port=settings.port,
+        workers=1,  # the parser slot is in-process: exactly one server process
+        proxy_headers=False,
+        server_header=False,
+        log_level="info",
+    )
+    return 0
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
+    if args.command == "serve":
+        return serve()
 
     try:
         manifest = Manifest.load(default_manifest_path())

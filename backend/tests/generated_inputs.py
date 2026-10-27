@@ -135,3 +135,39 @@ def with_elf64_shoff(data: bytes, new_shoff: int) -> bytes:
     patched = bytearray(data)
     struct.pack_into("<Q", patched, 0x28, new_shoff)
     return bytes(patched)
+
+
+def with_elf64_section_renamed(data: bytes, old_name: bytes, new_name: bytes) -> bytes:
+    """Return a copy of a little-endian ELF64 file with one section renamed.
+
+    The section-name string table (.shstrtab) is copied to the end of the file
+    with `new_name` appended, and the section header now points at it. Used to
+    give a fixture copy an HTML-like section name for the UI and report escaping
+    tests (blueprint 9.1 "UI escaping"). PE section names are limited to 8
+    bytes, which is why an ELF is used.
+    """
+    patched = bytearray(data)
+    (shoff,) = struct.unpack_from("<Q", data, 0x28)
+    shentsize, shnum, shstrndx = struct.unpack_from("<HHH", data, 0x3A)
+
+    def header(index: int) -> int:
+        return int(shoff + index * shentsize)
+
+    str_offset, str_size = struct.unpack_from("<QQ", data, header(shstrndx) + 0x18)
+    strtab = data[str_offset : str_offset + str_size]
+    target = None
+    for index in range(shnum):
+        (name_offset,) = struct.unpack_from("<I", data, header(index))
+        if strtab[name_offset:].split(b"\x00", 1)[0] == old_name:
+            target = index
+            break
+    if target is None:
+        raise ValueError(f"no section named {old_name!r}")
+
+    new_strtab = strtab + new_name + b"\x00"
+    padding = (-len(patched)) % 8
+    new_offset = len(patched) + padding
+    patched += b"\x00" * padding + new_strtab
+    struct.pack_into("<QQ", patched, header(shstrndx) + 0x18, new_offset, len(new_strtab))
+    struct.pack_into("<I", patched, header(target), len(strtab))
+    return bytes(patched)

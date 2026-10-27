@@ -56,3 +56,15 @@ reports-output/
 # --- Third-party design references (local only) ---
 # Redistribution rights not confirmed; see docs/PROJECT_BLUEPRINT.md §5.10.
 /docs/design/references/frontend-ref-*.png
+
+# --- Bytasm runtime data (bytasm serve) ---
+# SQLite database, content-addressed blobs, outputs, reports, temp uploads.
+/data/
+
+# --- Frontend ---
+/frontend/node_modules/
+/frontend/dist/
+/frontend/playwright-report/
+/frontend/test-results/
+/frontend/.e2e-data/
+*.tsbuildinfo
