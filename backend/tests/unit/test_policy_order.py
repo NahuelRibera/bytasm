@@ -1,7 +1,8 @@
 """The manifest check happens before identification and before LIEF.
 
 These tests are the evidence for the fixtures-only rule: a file whose hash is
-not listed never reaches the parser.
+not listed never reaches the parser. Since M2 the parser runs in a child
+process, so the spy sits on the function that would start that child.
 """
 
 import subprocess
@@ -12,7 +13,6 @@ import pytest
 from conftest import ALL_FIXTURES, ELF_AARCH64, PE_X86_64_DLL, run_cli
 
 import bytasm.inspection
-from bytasm.adapters import metadata_lief
 from bytasm.errors import UNKNOWN_HASH, InspectError
 from bytasm.intake.manifest import Manifest
 
@@ -23,7 +23,7 @@ def _fail_if_called(*_args: object, **_kwargs: object) -> None:
 
 @pytest.fixture
 def parser_spies(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(metadata_lief, "extract_metadata", _fail_if_called)
+    monkeypatch.setattr(bytasm.inspection, "run_metadata_adapter", _fail_if_called)
     monkeypatch.setattr(bytasm.inspection, "identify_format", _fail_if_called)
 
 

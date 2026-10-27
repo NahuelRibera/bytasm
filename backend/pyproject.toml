@@ -6,17 +6,27 @@ requires-python = ">=3.12"
 authors = [{ name = "Bytasm contributors" }]
 classifiers = ["Private :: Do Not Upload"]
 dependencies = [
+    "alembic>=1.20.1,<1.21",
+    "fastapi>=0.162.0,<0.163",
     "lief>=1.0.0,<1.1",
+    "sqlalchemy>=2.1.6,<2.2",
+    "uvicorn>=0.54.0,<0.55",
 ]
 
 [project.scripts]
 bytasm = "bytasm.cli:main"
 
 [dependency-groups]
+audit = [
+    "pip-audit>=2.9,<3",
+]
 dev = [
+    "httpx>=0.28.1",
+    "jsonschema>=4.26.0",
     "mypy>=2.4.0",
     "pytest>=9.1.1",
     "ruff>=0.17.2",
+    "types-jsonschema>=4.26.0.20261006",
 ]
 
 [build-system]
@@ -36,8 +46,9 @@ target-version = "py312"
 select = ["E", "F", "I", "B", "UP", "S", "SIM"]
 
 [tool.ruff.lint.per-file-ignores]
-# Tests use assert, and run the CLI via subprocess with fixed argv lists.
-"tests/**" = ["S101", "S603"]
+# Tests use assert, run the CLI via subprocess with fixed argv lists, and use
+# all-interfaces addresses to check that the server refuses them.
+"tests/**" = ["S101", "S603", "S104"]
 
 [tool.mypy]
 python_version = "3.12"

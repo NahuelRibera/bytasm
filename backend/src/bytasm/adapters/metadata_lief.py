@@ -3,22 +3,33 @@
 Only call this with bytes that already passed the input policy (manifest check)
 and `identify_format`. The caller, not this module, is responsible for that.
 
-In M1 this runs inside the CLI process. From M2 it will run in a separate,
-resource-limited subprocess. Neither is a security sandbox: the input policy
+The CLI and the API never call `extract_metadata` in their own process. They
+run this module as a child process (`python -I -m bytasm.adapters.metadata_lief`,
+see bytasm.runner), whose `main` lowers its own resource limits *before* LIEF
+is imported. That is why LIEF is imported inside `extract_metadata` rather
+than at module level. The child is not a security sandbox: the input policy
 is what keeps untrusted files away from LIEF.
 
 Everything read from headers (architecture, entry point, timestamps, flags) is
 what the file *declares*. Bytasm does not verify it.
 """
 
+from __future__ import annotations
+
+import json
+import sys
+from collections.abc import Sequence
 from importlib.metadata import version
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import lief
-
+from bytasm.adapters.entropy import METHOD as ENTROPY_METHOD
 from bytasm.adapters.entropy import shannon_entropy
 from bytasm.errors import PARSE_FAILED, InspectError
-from bytasm.intake.identify import Format
+from bytasm.intake.identify import Format, identify_format
+from bytasm.runner import child
+
+if TYPE_CHECKING:
+    import lief
 
 ADAPTER_NAME = "metadata_lief"
 ADAPTER_VERSION = "0.1.0"
@@ -42,6 +53,8 @@ def extract_metadata(data: bytes, expected_format: Format) -> dict[str, Any]:
     Raises InspectError(PARSE_FAILED) if LIEF cannot parse the bytes, or if it
     disagrees with the format identified from the magic bytes.
     """
+    import lief
+
     lief.logging.disable()  # LIEF otherwise writes warnings to stderr.
     try:
         binary = lief.parse(data)
@@ -73,6 +86,8 @@ def _common_header(binary: lief.Binary) -> dict[str, Any]:
 
 
 def _elf_metadata(binary: lief.ELF.Binary) -> dict[str, Any]:
+    import lief  # already loaded by extract_metadata
+
     header = binary.header
     file_type = header.file_type.name
     # Relocatable objects (.o) have no entry point; 0 also means "none".
@@ -185,3 +200,54 @@ def _add_entropy(section: dict[str, Any], data: bytes, warnings: list[str]) -> N
         return
     section["entropy"] = shannon_entropy(data[start : start + size])
     section["entropy_note"] = None
+
+
+def build_result(data: bytes, sha256: str, limits: dict[str, int | None]) -> dict[str, Any]:
+    """Identify and parse `data`; return the adapter result document."""
+    file_format = identify_format(data)
+    return {
+        "schema_version": 1,
+        "adapter": ADAPTER_NAME,
+        "adapter_version": ADAPTER_VERSION,
+        "tool": "lief",
+        "tool_version": lief_version(),
+        "entropy_method": ENTROPY_METHOD,
+        "input": {"sha256": sha256, "size_bytes": len(data)},
+        "resource_limits": limits,
+        "metadata": extract_metadata(data, file_format),
+    }
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """Child entry point. The order of steps is part of the contract.
+
+    1. Lower this process's resource limits (LIEF is not imported yet).
+    2. Read the input and confirm its SHA-256 is the one the parent admitted.
+    3. Identify and parse it, then write result.json.
+
+    A refused input exits 2 and prints one reason code from a fixed list.
+    Anything else that goes wrong is a failure (non-zero exit, no result).
+    """
+    args = child.parse_child_args(argv)
+    try:
+        limits = child.apply_resource_limits(args)
+    except child.LimitsNotApplied:
+        return child.EXIT_LIMITS_NOT_APPLIED
+    try:
+        data = child.read_admitted_input(args)
+    except (OSError, ValueError):
+        return child.EXIT_INPUT_MISMATCH
+
+    try:
+        document = build_result(data, args.expected_sha256, limits)
+    except InspectError as error:
+        sys.stdout.write(error.code + "\n")
+        return child.EXIT_REJECTED
+
+    payload = json.dumps(document, sort_keys=True, ensure_ascii=True).encode("ascii")
+    child.write_result(args.out, payload)
+    return child.EXIT_OK
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

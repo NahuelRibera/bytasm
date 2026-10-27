@@ -33,6 +33,29 @@ _KNOWN_UNSUPPORTED: Final = (
 )
 
 
+# Enough leading bytes to tell PE/ELF from the formats above.
+SIGNATURE_BYTES: Final = 8
+
+
+def check_signature(prefix: bytes) -> None:
+    """Early check on the first bytes of an upload, before the rest arrives.
+
+    Raises InspectError(UNSUPPORTED_FORMAT) unless the bytes start like an ELF
+    or MZ file. The full header checks happen in `identify_format`.
+    """
+    if prefix.startswith(_ELF_MAGIC) or prefix.startswith(_MZ_MAGIC):
+        return
+    for magic, description in _KNOWN_UNSUPPORTED:
+        if prefix.startswith(magic):
+            raise InspectError(
+                UNSUPPORTED_FORMAT,
+                f"This file looks like {description}. Only PE and ELF are supported.",
+            )
+    raise InspectError(
+        UNSUPPORTED_FORMAT, "Unrecognised file format. Only PE and ELF are supported."
+    )
+
+
 def identify_format(data: bytes) -> Format:
     """Return "ELF" or "PE", or raise InspectError explaining why not."""
     if data.startswith(_ELF_MAGIC):
