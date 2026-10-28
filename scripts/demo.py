@@ -1,4 +1,4 @@
-"""Reproducible v0.1 demo (blueprint 13.8), as a script.
+"""Reproducible v0.1 + v0.2 demo (blueprint 13.8), as a script.
 
   make demo                                  # throwaway native server
   make demo DEMO_ARGS="--keep-running"       # ... and leave it up to browse
@@ -9,14 +9,16 @@ committed fixture bin/hello_v1-x86_64.exe (after checking its SHA-256 against
 fixtures/MANIFEST.sha256 locally); show that bytes outside the manifest are
 refused before parsing; print the metadata the UI shows; export the JSON
 report, validate it against schemas/report.schema.json and check that a
-second export differs only in `generated_at`.
+second export differs only in `generated_at`; then (v0.2) start a YARA-X run
+with Bytasm's bundled rules, wait for the worker to finish it, and check that
+every reported byte range matches the fixture's bytes.
 
 Nothing is executed: the fixture is read as bytes and uploaded. Only
 127.0.0.1 is contacted; no external service is called.
 
-Cleanup: by default the script starts its own `bytasm serve` on port 8765 with
-a new temporary data directory, and on exit stops that server and deletes
-that directory only. With --url it uses an existing server and deletes
+Cleanup: by default the script starts its own `bytasm serve` and `bytasm
+worker` on port 8765 with a new temporary data directory, and on exit stops
+both and deletes that directory only. With --url it uses an existing server and deletes
 nothing; the project it created ("Demo <timestamp>") stays in that server's
 data, like any other project.
 """
@@ -229,7 +231,61 @@ def run_demo(client: Client) -> str:
     if without_generated_at(second) != without_generated_at(report):
         raise DemoError("two exports differ in more than generated_at")
     print("   a second export differs only in generated_at")
-    return f"{client.base_url}/versions/{version_id}"
+
+    step("7. Analysis run (v0.2): strings, then YARA-X with Bytasm's bundled rules")
+    run = client.json(
+        "POST", f"/api/v1/sample-versions/{version_id}/runs", {"profile_id": "default-static"}
+    )
+    print(f"   run {run['id']} queued with {run['rule_set']['label']}")
+    deadline = time.monotonic() + 60
+    while run["status"] in ("queued", "running"):
+        if time.monotonic() > deadline:
+            raise DemoError("the run did not finish within 60 s; is `bytasm worker` running?")
+        time.sleep(0.5)
+        run = client.json("GET", f"/api/v1/runs/{run['id']}")
+    if run["status"] != "succeeded":
+        raise DemoError(f"the run ended {run['status']}: {run['failure_message']}")
+    findings = client.json("GET", f"/api/v1/runs/{run['id']}/findings")
+    by_tool = {item["tool"]: item for item in run["steps"]}
+    print(f"   steps: {', '.join(f'{s['tool']} {s['status']}' for s in run['steps'])}")
+    strings = client.json(
+        "GET", f"/api/v1/sample-versions/{version_id}/strings?query=example.invalid"
+    )
+    for item in strings["items"]:
+        raw = data[item["offset"] : item["offset"] + item["byte_length"]]
+        if raw.decode("latin-1")[: len(item["value"])] != item["value"]:
+            raise DemoError("an extracted string does not match the fixture's bytes")
+    print(
+        f"   strings: {run['counts']['strings']} recorded; "
+        f"{strings['matched']} contain 'example.invalid', offsets checked against the fixture"
+    )
+    print(
+        f"   YARA-X {by_tool['yara-x']['tool_version']}, "
+        f"rule set sha256 {run['rule_set']['sha256']}"
+    )
+    for finding in findings["findings"]:
+        for item in finding["evidence"]:
+            start = item["file_offset"]
+            if data[start : start + min(item["length"], 32)].hex() != item["excerpt_hex"]:
+                raise DemoError("an evidence excerpt does not match the fixture's bytes")
+            print(
+                f"   matched {finding['rule_id']} {item['pattern_id']} at offset "
+                f"{start:#x}, {item['length']} bytes"
+            )
+    if all_keys(findings) & FORBIDDEN_KEYS:
+        raise DemoError("findings contain verdict-like fields")
+    print("   every byte range matches the fixture; a match is an observation, not a verdict")
+
+    step("8. JSON report with the run's findings (schema version 2)")
+    report, _ = export_report(client, version_id)
+    analysis = report["pattern_analysis"]
+    if analysis is None or analysis["run"]["id"] != run["id"]:
+        raise DemoError("the report does not include the analysis run")
+    print(
+        f"   pattern_analysis: run {analysis['run']['status']}, "
+        f"{len(analysis['findings'])} findings, string counts only (values not exported)"
+    )
+    return f"{client.base_url}/runs/{run['id']}"
 
 
 def wait_for_health(client: Client, process: subprocess.Popen[bytes]) -> None:
@@ -262,7 +318,7 @@ def main() -> int:
         except (DemoError, jsonschema.ValidationError, OSError) as error:
             print(f"\nDEMO FAILED: {error}", file=sys.stderr)
             return 1
-        print(f"\nOpen {page} to see the same metadata in the UI.")
+        print(f"\nOpen {page} to see the run and its findings in the UI.")
         print("Nothing was deleted. The demo project stays in this server's data.")
         return 0
 
@@ -283,6 +339,7 @@ def main() -> int:
     env.pop("BYTASM_HOST", None)
     client = Client(f"http://127.0.0.1:{DEMO_PORT}")
     server: subprocess.Popen[bytes] | None = None
+    worker: subprocess.Popen[bytes] | None = None
     try:
         server = subprocess.Popen(  # noqa: S603 - fixed argv, no shell
             [sys.executable, "-m", "bytasm", "serve"],
@@ -291,9 +348,15 @@ def main() -> int:
             stderr=subprocess.DEVNULL,
         )
         wait_for_health(client, server)
+        worker = subprocess.Popen(  # noqa: S603 - fixed argv, no shell
+            [sys.executable, "-m", "bytasm", "worker"],
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
         print(f"Started a throwaway bytasm serve on {client.base_url} (data: {data_dir})")
         page = run_demo(client)
-        print(f"\nThe UI shows this sample version at {page}")
+        print(f"\nThe UI shows this run and its findings at {page}")
         if args.keep_running:
             input("Open it in a browser, then press Enter to stop the demo server... ")
         return 0
@@ -301,16 +364,18 @@ def main() -> int:
         print(f"\nDEMO FAILED: {error}", file=sys.stderr)
         return 1
     finally:
-        if server is not None:
-            server.terminate()
+        for process in (worker, server):
+            if process is None:
+                continue
+            process.terminate()
             try:
-                server.wait(timeout=10)
+                process.wait(timeout=10)
             except subprocess.TimeoutExpired:
-                server.kill()
-                server.wait()
+                process.kill()
+                process.wait()
         # Delete only the directory this run created.
         shutil.rmtree(data_dir, ignore_errors=True)
-        print(f"Stopped the demo server and deleted {data_dir}.")
+        print(f"Stopped the demo server and worker and deleted {data_dir}.")
 
 
 if __name__ == "__main__":

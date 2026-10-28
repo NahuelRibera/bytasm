@@ -46,6 +46,7 @@ class AppContext:
     outputs: ContentStore
     reports: ContentStore
     adapter_command: list[str]
+    yara_command: list[str]
     generator: Generator
     parser_slot: ParserSlot = field(default_factory=ParserSlot)
 

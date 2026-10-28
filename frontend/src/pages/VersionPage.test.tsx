@@ -2,7 +2,17 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { App } from "../App";
-import { HOSTILE, VERSION_ID, health, installFetch, json, sections, version } from "../test/fakeApi";
+import {
+  HOSTILE,
+  RUN_ID,
+  VERSION_ID,
+  health,
+  installFetch,
+  json,
+  sections,
+  stringsPage,
+  version,
+} from "../test/fakeApi";
 import { renderWithClient } from "../test/render";
 
 function openVersion(v = version(), s = sections(), mode: "fixtures" | "self_built" = "fixtures") {
@@ -14,6 +24,10 @@ function openVersion(v = version(), s = sections(), mode: "fixtures" | "self_bui
     [`GET /api/v1/sample-versions/${VERSION_ID}/imports`]: () =>
       json({ libraries: ["KERNEL32.dll"], functions: [HOSTILE, "puts"] }),
     [`GET /api/v1/sample-versions/${VERSION_ID}/exports`]: () => json({ functions: [] }),
+    [`GET /api/v1/sample-versions/${VERSION_ID}/strings?limit=1`]: () => json(stringsPage()),
+    [`GET /api/v1/sample-versions/${VERSION_ID}/strings?offset=0&limit=100`]: () => json(stringsPage()),
+    [`GET /api/v1/sample-versions/${VERSION_ID}/strings?query=example&offset=0&limit=100`]: () =>
+      json(stringsPage({ query: "example", matched: 1, items: stringsPage().items.slice(0, 1) })),
   });
   return renderWithClient(<App />);
 }
@@ -78,6 +92,41 @@ describe("Sample version overview", () => {
     expect(await screen.findByText(/self_built mode is on/)).toBeTruthy();
     expect(screen.getByText(/Input policy: fixtures \+ self-built/)).toBeTruthy();
     expect(screen.getAllByText("Self-built (operator attestation)").length).toBeGreaterThan(0);
+  });
+
+  it("lists strings as untrusted text with offsets, search and truncation notes", async () => {
+    const user = userEvent.setup();
+    const { container } = openVersion();
+    const tab = await screen.findByRole("tab", { name: /Strings/ });
+    expect(within(tab).getByText("2")).toBeTruthy();
+    await user.click(tab);
+    const table = await screen.findByRole("table", { name: /Strings found/ });
+    expect(within(table).getByText("0x200")).toBeTruthy();
+    expect(within(table).getByText("bytasm fixture v1: https://example.invalid/help")).toBeTruthy();
+    expect(within(table).getByText(/^<img src=x onerror=alert\(1\)>W+$/)).toBeTruthy();
+    expect(within(table).getByText("first 256 of 300 characters shown")).toBeTruthy();
+    expect(container.querySelector("img")).toBeNull();
+    expect(screen.getByRole("link", { name: "this run" }).getAttribute("href")).toBe(`/runs/${RUN_ID}`);
+    expect(screen.getByText("Strings are observations, not findings.")).toBeTruthy();
+    await user.type(screen.getByLabelText("Search strings"), "example{Enter}");
+    expect(await screen.findByText("Showing 1–1 of 1.")).toBeTruthy();
+  });
+
+  it("explains that strings come from an analysis run", async () => {
+    const user = userEvent.setup();
+    window.history.pushState({}, "", `/versions/${VERSION_ID}`);
+    installFetch({
+      "GET /api/v1/health": () => json(health()),
+      [`GET /api/v1/sample-versions/${VERSION_ID}`]: () => json(version()),
+      [`GET /api/v1/sample-versions/${VERSION_ID}/sections`]: () => json(sections()),
+      [`GET /api/v1/sample-versions/${VERSION_ID}/strings?limit=1`]: () =>
+        json(stringsPage({ run_id: null, summary: null, items: [], matched: 0 })),
+      [`GET /api/v1/sample-versions/${VERSION_ID}/strings?offset=0&limit=100`]: () =>
+        json(stringsPage({ run_id: null, summary: null, items: [], matched: 0 })),
+    });
+    renderWithClient(<App />);
+    await user.click(await screen.findByRole("tab", { name: /Strings/ }));
+    expect(await screen.findByText(/No strings yet/)).toBeTruthy();
   });
 
   it("shows no banner in the default fixtures mode", async () => {

@@ -4,16 +4,17 @@ UV := uv --directory backend
 NPM := npm --prefix frontend
 
 .PHONY: help install format lint typecheck test check verify-fixtures fixtures check-linux measure \
-	web-install web-build web-check e2e serve schemas \
+	web-install web-build web-check e2e serve worker schemas \
 	compose-check compose-build compose-up compose-down demo audit
 
 help:
 	@echo "make install          create backend/.venv from uv.lock and frontend/node_modules from package-lock.json"
-	@echo "make serve            build the UI and run Bytasm natively on http://127.0.0.1:8000 (fixtures-only)"
+	@echo "make serve            build the UI and run Bytasm + its worker natively on http://127.0.0.1:8000 (fixtures-only)"
+	@echo "make worker           run only the analysis worker (for a separately started bytasm serve)"
 	@echo "make compose-up       build the image and run Bytasm in the hardened container on 127.0.0.1:8000"
 	@echo "make compose-down     stop the container (keeps the bytasm-data volume)"
 	@echo "make compose-check    assert the security settings of the resolved compose.yaml"
-	@echo "make demo             scripted demo: import a fixture, check metadata, export + validate the report"
+	@echo "make demo             scripted demo: import a fixture, check metadata, export the report, run YARA-X"
 	@echo "make audit            audit locked Python (pip-audit) and npm dependencies for known vulnerabilities"
 	@echo "make format           format Python code with ruff"
 	@echo "make lint             check formatting and lint rules (ruff)"
@@ -61,8 +62,15 @@ web-build:
 e2e:
 	$(NPM) run e2e
 
+# The server and the v0.2 analysis worker share one data directory; stopping
+# the server (Ctrl-C) also stops the worker.
 serve: web-build
+	@$(UV) run --no-sync bytasm worker & worker=$$!; \
+	trap 'kill $$worker 2>/dev/null; wait $$worker 2>/dev/null' EXIT INT TERM; \
 	$(UV) run --no-sync bytasm serve
+
+worker:
+	$(UV) run --no-sync bytasm worker
 
 schemas:
 	$(UV) run --no-sync python -m bytasm.reports.model > schemas/report.schema.json

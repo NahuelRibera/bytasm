@@ -12,7 +12,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.body_limit import RequestBodyLimitMiddleware
 
 from bytasm import __version__
-from bytasm.api import imports, reports, routes
+from bytasm.api import analysis, imports, reports, routes
 from bytasm.api.context import AppContext
 from bytasm.api.guards import LocalOnlyGuard
 from bytasm.api.maintenance import startup_sweep
@@ -23,13 +23,17 @@ from bytasm.db.session import create_sqlite_engine, session_factory, upgrade_to_
 from bytasm.intake.manifest import Manifest, default_manifest_path
 from bytasm.intake.policy import InputPolicy
 from bytasm.provenance import current_generator
-from bytasm.runner.supervisor import metadata_adapter_command
+from bytasm.runner.supervisor import metadata_adapter_command, yara_adapter_command
 from bytasm.storage import ContentStore
 
 log = logging.getLogger("bytasm.api")
 
 
-def build_context(settings: Settings, adapter_command: Sequence[str] | None = None) -> AppContext:
+def build_context(
+    settings: Settings,
+    adapter_command: Sequence[str] | None = None,
+    yara_command: Sequence[str] | None = None,
+) -> AppContext:
     settings.validate()
     for directory in (
         settings.data_dir,
@@ -50,16 +54,21 @@ def build_context(settings: Settings, adapter_command: Sequence[str] | None = No
         outputs=ContentStore(settings.outputs_dir),
         reports=ContentStore(settings.reports_dir),
         adapter_command=list(adapter_command or metadata_adapter_command()),
+        yara_command=list(yara_command or yara_adapter_command()),
         generator=current_generator(),
     )
 
 
-def create_app(settings: Settings, adapter_command: Sequence[str] | None = None) -> FastAPI:
-    """`adapter_command` replaces the LIEF adapter in tests (fake adapters)."""
+def create_app(
+    settings: Settings,
+    adapter_command: Sequence[str] | None = None,
+    yara_command: Sequence[str] | None = None,
+) -> FastAPI:
+    """`adapter_command` / `yara_command` replace the adapters in tests (fakes)."""
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        ctx = build_context(settings, adapter_command)
+        ctx = build_context(settings, adapter_command, yara_command)
         swept = startup_sweep(ctx)
         log.info(
             json.dumps(
@@ -91,6 +100,7 @@ def create_app(settings: Settings, adapter_command: Sequence[str] | None = None)
     app.include_router(routes.router, prefix="/api/v1")
     app.include_router(imports.router, prefix="/api/v1")
     app.include_router(reports.router, prefix="/api/v1")
+    app.include_router(analysis.router, prefix="/api/v1")
     add_web_routes(app, settings.web_dist)
 
     @app.exception_handler(RequestValidationError)

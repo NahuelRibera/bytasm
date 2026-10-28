@@ -11,6 +11,7 @@ dependencies = [
     "lief>=1.0.0,<1.1",
     "sqlalchemy>=2.1.6,<2.2",
     "uvicorn>=0.54.0,<0.55",
+    "yara-x>=1.22.1,<1.23",
 ]
 
 [project.scripts]

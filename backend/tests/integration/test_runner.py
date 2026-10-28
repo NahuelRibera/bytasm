@@ -18,6 +18,7 @@ import pytest
 from conftest import ELF_AARCH64, PE_X86_64_EXE, sha256_of
 from generated_inputs import truncated
 
+from bytasm.adapters.result import AdapterResult
 from bytasm.runner import workspace
 from bytasm.runner.limits import ParserLimits
 from bytasm.runner.supervisor import (
@@ -51,7 +52,7 @@ def workdir(tmp_path: Path) -> Path:
 
 def run_fake(
     behaviour: str, workdir: Path, limits: ParserLimits = FAST, sha: str | None = None
-) -> AdapterOutcome:
+) -> AdapterOutcome[AdapterResult]:
     expected = sha or sha256_of(workspace.input_path(workdir).read_bytes())
     return asyncio.run(run_adapter(fake(behaviour), workdir, expected, limits))
 

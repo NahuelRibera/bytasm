@@ -1,0 +1,6 @@
+{
+  "name": "bytasm-rules",
+  "version": "0.2.0",
+  "tool": "yara-x",
+  "source": "bytasm-repo"
+}

@@ -264,7 +264,7 @@ def test_request_headers_cannot_switch_the_policy(
 
 
 def test_no_endpoint_can_change_the_input_policy(client: TestClient) -> None:
-    """The complete v0.1 API surface. Nothing in it touches configuration."""
+    """The complete v0.1 + v0.2 API surface. Nothing in it touches configuration."""
     spec = client.get("/api/openapi.json").json()
     routes = {(path, method) for path, item in spec["paths"].items() for method in item}
     assert routes == {
@@ -280,6 +280,19 @@ def test_no_endpoint_can_change_the_input_policy(client: TestClient) -> None:
         ("/api/v1/sample-versions/{version_id}/exports", "get"),
         ("/api/v1/sample-versions/{version_id}/reports", "post"),
         ("/api/v1/reports/{report_id}/download", "get"),
+        # v0.2: the bundled rule set is read-only; runs and findings.
+        ("/api/v1/rule-sets/current", "get"),
+        ("/api/v1/rule-sets/current/validation", "post"),
+        ("/api/v1/rule-sets/{rule_set_id}", "get"),
+        ("/api/v1/sample-versions/{version_id}/runs", "post"),
+        ("/api/v1/sample-versions/{version_id}/runs", "get"),
+        ("/api/v1/runs/{run_id}", "get"),
+        ("/api/v1/runs/{run_id}/cancel", "post"),
+        ("/api/v1/runs/{run_id}/findings", "get"),
+        ("/api/v1/runs/{run_id}/log", "get"),
+        # v0.2: read-only views of stored results.
+        ("/api/v1/sample-versions/{version_id}/strings", "get"),
+        ("/api/v1/invocations/{invocation_id}/raw", "get"),
     }
 
 

@@ -27,7 +27,14 @@ make demo                       # throwaway native server on 127.0.0.1:8765
 6. exports the JSON report, checks the downloaded file's SHA-256, validates it
    against [`schemas/report.schema.json`](../schemas/report.schema.json), checks
    that it has no verdict or score fields, and checks that a second export
-   differs only in `generated_at`.
+   differs only in `generated_at`;
+7. (v0.2) starts an analysis run (strings, then YARA-X with Bytasm's bundled
+   rules), waits for the worker to finish both steps, checks a searched string
+   and every reported byte range against the fixture's bytes. The throwaway
+   mode starts its own `bytasm worker`; with `--url`, the server needs one
+   (`make serve` and `make compose-up` start it);
+8. (v0.2) exports the report again and checks that `pattern_analysis`
+   (schema version 2) holds that run's findings.
 
 It exits non-zero if any step does not behave as described.
 
@@ -68,6 +75,11 @@ It exits non-zero if any step does not behave as described.
    Compose checks. Say plainly: "The subprocess limits handle parser bugs. They
    are not a sandbox, and neither is the container. That's why v0.1 only parses
    self-authored files, and accepting other files needs an isolation gate."
-7. `make compose-down`.
+7. (v0.2) **Run pattern matching…** → confirm → both steps succeed. Inspect
+   `url_reference`: offset, length, the bytes `https://`, and the rule text.
+   Say: "A match is an observation, not a verdict; no match would not mean
+   safe." Open **Search the strings**, search `example.invalid`, and point at
+   the offset.
+8. `make compose-down`.
 
 The recording itself is not in the repository yet (a release-gate item).

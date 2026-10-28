@@ -1,4 +1,9 @@
-"""The v0.1 JSON report: schema (as Pydantic models) and its fixed texts.
+"""The JSON report: schema (as Pydantic models) and its fixed texts.
+
+Schema version 2 (v0.2) keeps every version-1 field unchanged and adds
+`pattern_analysis`: the newest succeeded or partial analysis run of the
+version (steps, rule set, string counts, findings with byte evidence), or
+null if there is none.
 
 The committed JSON Schema, `schemas/report.schema.json`, is generated from
 these models (`make schemas`), and a test keeps the two identical.
@@ -13,7 +18,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 REPORT_KIND = "bytasm.sample_version_report"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 SCHEMA_ID = "https://github.com/NahuelRibera/bytasm/blob/main/schemas/report.schema.json"
 
 LABELS: dict[str, str] = {
@@ -36,6 +41,11 @@ LABELS: dict[str, str] = {
         "come from the file or the uploader. Treat them as untrusted text."
     ),
     "generated_at": "The only field that differs between two exports of the same data.",
+    "pattern_analysis": (
+        "The newest analysis run of this version that kept results (succeeded or partial), "
+        "or null. Findings are YARA-X rule matches with the exact byte ranges matched: "
+        "observations, not verdicts. Strings appear as counts only."
+    ),
 }
 
 
@@ -152,6 +162,87 @@ class Metadata(_Model):
     warnings: list[str]
 
 
+class PatternRun(_Model):
+    id: str
+    status: Literal["succeeded", "partial"]
+    failure_reason: str | None
+    status_message: str | None = Field(
+        description="For a partial run, which steps did not complete and what that means."
+    )
+    profile: dict[str, Any]
+    bytasm_version: str
+    queued_at: datetime
+    started_at: datetime
+    finished_at: datetime
+
+
+class PatternStep(_Model):
+    index: int
+    tool: str
+    adapter: str
+    status: Literal["succeeded", "failed", "timed_out", "cancelled", "skipped"]
+    message: str | None
+    tool_version: str | None
+    adapter_version: str | None
+    duration_ms: int | None
+    result_sha256: str | None = Field(pattern=r"^[0-9a-f]{64}$")
+    execution: Literal["separate_resource_limited_process"]
+
+
+class PatternRuleSet(_Model):
+    tool: Literal["yara-x"]
+    name: str
+    version: str
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source: Literal["bytasm-repo"]
+    rule_count: int
+
+
+class StringsCounts(_Model):
+    encodings: list[Literal["ascii", "utf-16le"]]
+    min_length: int
+    total_found: int
+    found_by_encoding: dict[str, int]
+    stored: int
+    truncated: bool
+    values_included: Literal[False]
+
+
+class PatternEvidence(_Model):
+    kind: Literal["byte_range"]
+    pattern_id: str
+    file_offset: int = Field(ge=0)
+    length: int = Field(ge=0)
+    xor_key: int | None
+    excerpt_hex: str = Field(pattern=r"^([0-9a-f]{2}){0,32}$")
+    excerpt_truncated: bool
+    raw_json_pointer: str
+
+
+class PatternFinding(_Model):
+    kind: Literal["yara_match"]
+    tool: Literal["yara-x"]
+    tool_version: str
+    rule_id: str
+    rule_namespace: str
+    title: str
+    tags: list[str]
+    metadata: list[tuple[str, str | int | float | bool]]
+    fingerprint: str = Field(pattern=r"^[0-9a-f]{64}$")
+    match_count: int
+    evidence_truncated: bool
+    evidence: list[PatternEvidence] = Field(min_length=1)
+
+
+class PatternAnalysis(_Model):
+    run: PatternRun
+    steps: list[PatternStep]
+    rule_set: PatternRuleSet | None
+    strings: StringsCounts | None
+    findings: list[PatternFinding]
+    notices: list[str]
+
+
 class Report(_Model):
     model_config = ConfigDict(
         extra="forbid",
@@ -160,7 +251,7 @@ class Report(_Model):
     )
 
     report_kind: Literal["bytasm.sample_version_report"]
-    schema_version: Literal[1]
+    schema_version: Literal[2]
     generated_at: datetime
     generator: Generator
     sample: SampleIdentity
@@ -168,6 +259,7 @@ class Report(_Model):
     authorization: Authorization
     analysis: Analysis
     metadata: Metadata
+    pattern_analysis: PatternAnalysis | None
     labels: dict[str, str]
     limitations: list[str]
 

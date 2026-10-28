@@ -1,4 +1,4 @@
-"""Command-line entry points: `bytasm inspect <fixture-path>` and `bytasm serve`.
+"""Command-line entry points: `bytasm inspect <fixture-path>`, `bytasm serve`, `bytasm worker`.
 
 Output is deterministic JSON on stdout (sorted keys, no timestamps, no
 absolute paths), so inspecting the same fixture twice gives identical bytes.
@@ -12,6 +12,10 @@ absolute paths), so inspecting the same fixture twice gives identical bytes.
 `serve` reads its configuration from the environment only (see bytasm.config)
 and refuses to start on a non-loopback address. It exits 1 on a configuration
 error.
+
+`worker` (v0.2) reads the same configuration, processes queued analysis runs
+from the same data directory, and listens on no port. Run exactly one next to
+`bytasm serve`; a second one exits 1.
 """
 
 import argparse
@@ -47,7 +51,37 @@ def _build_parser() -> argparse.ArgumentParser:
         "serve",
         help="run the local web app on 127.0.0.1 (configuration: BYTASM_* environment variables)",
     )
+    commands.add_parser(
+        "worker",
+        help="process queued analysis runs (YARA-X) for the same data directory as `serve`",
+    )
     return parser
+
+
+def worker() -> int:
+    import logging
+
+    from bytasm.config import ConfigError, Settings
+    from bytasm.jobs.worker import WorkerError, run_worker
+    from bytasm.runner.hardening import make_non_dumpable
+
+    try:
+        settings = Settings.from_env()
+    except ConfigError as error:
+        sys.stderr.write(f"bytasm worker: {error}\n")
+        return 1
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
+    make_non_dumpable()
+    sys.stderr.write(
+        f"Bytasm {__version__} worker (input policy: {settings.input_policy}; "
+        f"data: {settings.data_dir})\n"
+    )
+    try:
+        run_worker(settings)
+    except WorkerError as error:
+        sys.stderr.write(f"bytasm worker: {error}\n")
+        return 1
+    return 0
 
 
 def serve() -> int:
@@ -91,6 +125,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     if args.command == "serve":
         return serve()
+    if args.command == "worker":
+        return worker()
 
     try:
         manifest = Manifest.load(default_manifest_path())

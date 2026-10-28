@@ -7,13 +7,20 @@ measurements (such as per-section entropy). It never runs the file.
 
 It is a local web app (on `127.0.0.1` only, natively or in a hardened Docker
 container) and a command-line tool (`bytasm inspect`). You import a binary, see its SHA-256 and LIEF
-metadata, and export a reproducible JSON report.
+metadata, export a reproducible JSON report, and (v0.2, in review) run an
+analysis that extracts its strings and matches Bytasm's own YARA-X rules
+against it, then inspect each match's byte evidence.
 
 > **Status:** v0.1 milestones M0–M5 are implemented, with a hardened local
 > Compose setup, a dependency audit and a scripted demo (see
 > [`docs/milestones/v0.1-m2-m5.md`](docs/milestones/v0.1-m2-m5.md)). v0.1.0 is
 > **not tagged**: the release gate still needs green hosted CI and a recorded
-> demo. Not suitable for real-world analysis.
+> demo. The v0.2 scope (strings extractor, YARA-X pattern matching, a
+> background worker with multi-step runs, `partial` and cancel, findings in the
+> JSON report) is implemented on branch `feat/v0.2-yara-x-rules`, not merged
+> and not reviewed; see
+> [`docs/milestones/v0.2-pattern-matching.md`](docs/milestones/v0.2-pattern-matching.md).
+> Not suitable for real-world analysis.
 
 ## Supported inputs and security limits
 
@@ -33,6 +40,13 @@ Read this before using Bytasm.
   timeout). That limits the damage from parser *bugs* such as crashes, hangs,
   or memory blow-ups. The child runs as the same user with the same file and
   network access, so it does **not** contain a parser *exploit*.
+- **The v0.2 analysis tools run the same way.** Before each step (strings,
+  then YARA-X) the worker re-checks the input policy and the stored file's
+  SHA-256, then runs the tool in a separate, resource-limited child process.
+  That is not a sandbox either.
+- **A rule match is not a verdict.** It means a rule's pattern was found in
+  the bytes. It needs interpretation and does not show a file is malicious; no
+  match does not show a file is safe.
 - **Docker Compose is not a sandbox either.** The container runs as a
   non-root user with no capabilities, a read-only root filesystem, and memory,
   CPU and process limits. The parser still shares that container, its user,
@@ -78,15 +92,16 @@ Then start Bytasm in **one** of two ways. Both serve http://127.0.0.1:8000/ in
 fixtures-only mode.
 
 ```sh
-make compose-up    # recommended: the hardened Linux container (memory limit enforced)
-make compose-down  # stop it; data stays in the `bytasm-data` volume
+make compose-up    # recommended: the hardened Linux containers (memory limit enforced)
+make compose-down  # stop them; data stays in the `bytasm-data` volume
 
-make serve         # or natively (Ctrl+C to stop); on macOS without the memory limit
+make serve         # or natively: server + worker (Ctrl+C stops both); on macOS without the memory limit
 ```
 
 `make compose-up` builds the UI on the host, builds the image (its Python
 dependencies come from `uv.lock`), checks the Compose settings, starts the
-container and checks the settings the kernel applied.
+containers (`api`, and the v0.2 `worker`, which publishes no port) and checks
+the settings the kernel applied.
 
 Then open http://127.0.0.1:8000/ and follow these steps:
 
@@ -98,6 +113,10 @@ Then open http://127.0.0.1:8000/ and follow these steps:
    ("declared in file"), the input policy that admitted the file, sections with
    entropy, imports, and exports.
 4. Click **Export JSON report** to download the report.
+5. **Run pattern matching…**, confirm, and watch the run finish. Inspect a
+   finding to see the matched bytes (offset, length, hex, printable text) and
+   the exact rule text. **Rules** in the top bar shows the bundled rule set and
+   validates it.
 
 A file that is not in the manifest is refused with "The file was not parsed
 or stored." A renamed ZIP is refused by its content.
@@ -130,8 +149,9 @@ make demo DEMO_ARGS="--url http://127.0.0.1:8000"   # against `make compose-up` 
 The script imports `fixtures/bin/hello_v1-x86_64.exe` (after checking its hash
 against the manifest), shows the input-policy refusals, prints the metadata the
 UI shows and its URL, and exports the JSON report and validates it against the
-schema. It only reads the fixture; it never runs it and never calls an external
-service. Cleanup and the 2-minute walkthrough are in
+schema, then starts a YARA-X run and checks every reported byte range against
+the fixture. It only reads the fixture; it never runs it and never calls an
+external service. Cleanup and the 2-minute walkthrough are in
 [`docs/demo.md`](docs/demo.md).
 
 ## Features in v0.1
@@ -155,8 +175,36 @@ service. Cleanup and the 2-minute walkthrough are in
   [`docs/report-format.md`](docs/report-format.md) and
   [`schemas/report.schema.json`](schemas/report.schema.json).
 
+## Analysis runs (v0.2)
+
+- **Steps.** A run of the default profile has two steps, in order: the
+  built-in **strings** extractor (printable ASCII and UTF-16LE runs of at
+  least 6 characters, with file offsets; at most 5,000 kept, each value cut
+  to 256 characters) and **YARA-X** with the bundled rules. Header metadata
+  comes from the import and is not repeated.
+- **Statuses.** `queued → running → succeeded | partial | failed | cancelled`.
+  `partial`: at least one step kept results and another did not (failed,
+  timed out, or not run); the run page, the findings and the report say which.
+  `failed`: no step kept results. Cancel stops the current step's process;
+  steps that had finished keep their results. Processed by `bytasm worker`
+  (one per data directory).
+- **Bundled rules.** `rules/yara/` holds Bytasm's own descriptive rules (one
+  rule per file, five today), shipped with the code and the image. They are
+  read-only in the UI; changing them is a code change. Each rule set is
+  identified by the SHA-256 of its exact text, and every run keeps a copy.
+- **Findings and evidence.** Each matching rule is a finding with byte ranges
+  (offset, length, up to 32 bytes) that Bytasm checks against the stored file.
+  No severity, score, or verdict. Strings are observations, never findings.
+- **Where to look.** The run page (steps, partial banner, technical log, a
+  text search over findings, the raw JSON output of each finished step), the
+  **Strings** tab of a sample version (search, encoding filter, paging), and
+  the JSON report (schema version 2: findings with evidence, string counts).
+- Details and API shapes:
+  [`docs/milestones/v0.2-pattern-matching.md`](docs/milestones/v0.2-pattern-matching.md);
+  decisions: [ADR-0003](docs/adr/0003-v0.2-pattern-matching.md) (proposed).
+
 The HTTP API (`/api/v1/...`, OpenAPI at `/api/openapi.json`) is described in
-blueprint §7.2. Errors are problem-details JSON with fixed messages. Text from
+blueprint §7.2 and, for v0.2, the milestone record. Errors are problem-details JSON with fixed messages. Text from
 the parser process is never shown.
 
 ## `bytasm inspect` (CLI)
@@ -191,6 +239,12 @@ browser (SPA, same origin) ──HTTP──► bytasm serve (FastAPI, 1 process,
                                       │                    re-hashes its input, writes result.json)
                                       ├─► SQLite (data/bytasm.sqlite3)
                                       └─► data/{blobs,outputs,reports}/sha256/…
+
+bytasm worker (v0.2, same data directory, no port)
+  claims a queued run; for each step: re-checks input policy and blob SHA-256
+  ├─spawn/wait/kill─► python -I -m bytasm.adapters.strings_extract (same runner and limits)
+  ├─spawn/wait/kill─► python -I -m bytasm.adapters.yara_x_scan     (+ rule-set SHA-256)
+  └─► each step's validated rows (strings, or findings + evidence), one transaction per step
 ```
 
 The adapter contract and the lifecycle are in blueprint §5.4.1 and §5.6. The
@@ -216,16 +270,22 @@ These are the outcomes of the implementation questions Q1–Q8. Details are in
 - **Same-user access (Q6).** On Linux the server hides its environment from the
   child (`PR_SET_DUMPABLE`), but a same-user process can still read the
   database and stored files.
-- **One import at a time.** A second import gets "busy, try again" (HTTP 503).
+- **One import at a time.** A second import (or a rule validation) gets
+  "busy, try again" (HTTP 503).
+- **v0.2 runs need the worker.** Without `bytasm worker`, runs stay queued; the
+  run page warns about it. One run per sample version at a time.
+- **SQLite holds the job queue** (ADR-0003, proposed): one worker per data
+  directory, polling every 0.5 s. Tested for one local user; not designed for
+  several workers or hosts.
 - **Header values are declared, not verified.** Timestamps and other header
   fields can be forged or zeroed.
 - **The container shares everything with the parser.** Inside it, the server
   listens on the container's own interface; the host-side binding to
   `127.0.0.1` is Docker's port publishing, and outbound network access is not
   restricted ([ADR-0002](docs/adr/0002-v0.1-implementation-choices.md)).
-- **Single platform tested locally.** The container and `make check-linux` were
+- **Single platform tested locally.** The containers and `make check-linux` were
   run on linux/arm64 only. linux/amd64 is covered by CI configuration, which
-  has not run for this branch yet.
+  has not run for the v0.2 branch yet.
 
 ## Troubleshooting
 
@@ -239,6 +299,8 @@ These are the outcomes of the implementation questions Q1–Q8. Details are in
 | `self_built mode requires Linux` / `is refused in container mode` | Expected: `self_built` only works natively on Linux. |
 | `make e2e` cannot find Chromium | Run `npx --prefix frontend playwright install chromium` once. |
 | `make compose-up` fails on `docker compose` | Docker with Compose v2 must be running. `make compose-check` validates the file without starting anything. |
+| A run stays "Queued" | No worker is running for this data directory: use `make serve` / `make compose-up`, or run `make worker` next to a separately started server. |
+| `another bytasm worker is already using this data directory` | Expected: only one worker per data directory. |
 | An error panel shows a request ID | Find that ID in the server output (`docker compose logs api` for Compose). Logs contain IDs, hashes and codes, never file contents. |
 
 
@@ -270,6 +332,7 @@ make e2e               # Playwright end-to-end tests against real local servers
 make audit             # pip-audit (locked) over uv.lock, npm audit over package-lock.json
 make compose-check     # assert compose.yaml's security settings (no container started)
 make demo              # scripted demo (see above)
+make worker            # only the analysis worker, next to a separately started `bytasm serve`
 make verify-fixtures   # check fixture bytes against MANIFEST.sha256
 make check-linux       # backend checks in a linux/arm64 container (PLATFORM=amd64 also)
 make schemas           # regenerate schemas/report.schema.json
@@ -282,22 +345,25 @@ missing, run `npx --prefix frontend playwright install chromium` once.
 
 CI (`.github/workflows/ci.yml`) runs the manifest check and the backend checks
 on Python 3.12 and 3.14, the frontend checks with `npm audit`, and the
-Playwright suite. It never rebuilds fixtures. Running `make audit` and the
-Compose checks in CI is still to be added (see the milestone record).
+Playwright suite (with a worker), `make audit`, and a Compose job that checks
+both containers and runs the demo against them. It never rebuilds fixtures.
 
 Repository layout:
 
 ```
 backend/src/bytasm/
-  api/        FastAPI app, request guards, import and report endpoints, static UI
+  api/        FastAPI app, request guards, import, report, rule/run/finding endpoints, static UI
+  jobs/       v0.2 run lifecycle, YARA-X step, background worker
   runner/     adapter child: limits, supervision, timeouts, cleanup
-  adapters/   LIEF metadata adapter, entropy, result schema
+  adapters/   LIEF metadata and YARA-X adapters, entropy, result schemas
+  rules.py    bundled rule set loader and snapshot
   intake/     manifest, input policy, identification, streaming upload, persistence
   db/         SQLAlchemy models and Alembic migrations
   reports/    report model (schema source) and generator
 backend/tests/  unit, integration (runner, API, live uvicorn), fake adapters
 frontend/       React + TypeScript UI (src/), Playwright tests (e2e/)
 schemas/        report.schema.json
+rules/yara/     Bytasm's own YARA-X rules (shipped in the image)
 scripts/        Linux check, Compose and container checks, demo, measurements
 compose.yaml, Dockerfile   the local container (fixtures-only)
 fixtures/       self-authored sources, committed binaries, MANIFEST.sha256
@@ -306,16 +372,18 @@ docs/           blueprint, scope review, ADRs, milestone record, report format
 
 ## Roadmap
 
-Next: close the v0.1 release gate (green hosted CI including the dependency
-audit and Compose checks, a recorded demo), then v0.2 pattern matching (strings, YARA-X, a
-background worker). Everything beyond that is possible, not promised
-(blueprint §3–§4).
+Next: close the v0.1 release gate (green hosted CI, a recorded demo), then
+review v0.2 (ADR-0003, hosted CI on the branch). Deferred from v0.2:
+`activity_event`, a findings review-state filter (review states need v0.3
+annotations), and a positive fixture for the UPX-style rule. Everything beyond
+that is possible, not promised (blueprint §3–§4).
 
 ## Licence
 
 Not chosen yet. Licensing is an open decision in the blueprint (§13.2), so this
 repository has no `LICENSE` file for now.
 
-Third-party: [LIEF](https://lief.re) (Apache-2.0), FastAPI, Starlette, Uvicorn,
+Third-party: [LIEF](https://lief.re) (Apache-2.0),
+[YARA-X](https://virustotal.github.io/yara-x/) (BSD-3-Clause), FastAPI, Starlette, Uvicorn,
 SQLAlchemy, Alembic, Pydantic, React, TanStack Query, Vite (see the lock
 files for versions).
