@@ -1,6 +1,6 @@
 // A fetch stand-in for UI unit tests: routes requests to canned responses.
 import { vi } from "vitest";
-import type { Health, SampleVersion, Sections } from "../api";
+import type { Findings, Health, RuleSet, Run, RunStep, SampleVersion, Sections, StringsPage } from "../api";
 
 export type Handler = (init: RequestInit | undefined, url: string) => Response | Promise<Response>;
 
@@ -39,6 +39,8 @@ export function health(mode: "fixtures" | "self_built" = "fixtures"): Health {
     parser_timeout_seconds: 30,
     platform: "linux",
     parser_memory_limit_enforced: true,
+    yara_x_version: "1.22.1",
+    worker_last_seen_seconds: 1,
   };
 }
 
@@ -115,5 +117,171 @@ export function sections(names: string[] = [".text", ".bss"]): Sections {
       entropy: index === names.length - 1 ? null : 5.123456,
       entropy_note: index === names.length - 1 ? "no file data" : null,
     })),
+  };
+}
+
+export const RUN_ID = "e".repeat(32);
+export const RULE_SET_ID = "f".repeat(32);
+export const URL_RULE_TEXT =
+  'rule url_reference {\n  strings:\n    $https = "https://" ascii\n  condition:\n    $https\n}\n';
+
+export function ruleSet(overrides: Partial<RuleSet> = {}): RuleSet {
+  return {
+    id: RULE_SET_ID,
+    tool: "yara-x",
+    name: "bytasm-rules",
+    version: "0.2.0",
+    label: "bytasm-rules@0.2.0",
+    sha256: "9".repeat(64),
+    source: "bytasm-repo",
+    current: true,
+    rule_count: 1,
+    files: [{ name: "url_reference.yar", identifier: "url_reference", text: URL_RULE_TEXT }],
+    installed_yara_x_version: "1.22.1",
+    ...overrides,
+  };
+}
+
+export function run(overrides: Partial<Run> = {}): Run {
+  return {
+    id: RUN_ID,
+    status: "succeeded",
+    failure_reason: null,
+    failure_message: null,
+    cancel_requested: false,
+    queued_at: "2026-10-27T10:00:00.123456Z",
+    started_at: "2026-10-27T10:00:01Z",
+    finished_at: "2026-10-27T10:00:02Z",
+    bytasm_version: "0.0.1",
+    profile_id: "default-static",
+    profile_name: "Default static profile (v0.2)",
+    rule_set: { id: RULE_SET_ID, label: "bytasm-rules@0.2.0", sha256: "9".repeat(64) },
+    sample: {
+      project_id: PROJECT_ID,
+      project_name: "Demo",
+      sample_id: SAMPLE_ID,
+      sample_name: "hello",
+      version_id: VERSION_ID,
+      version_label: "v1",
+      sha256: "71f62a001edac210d19897a84c8b1217fa34ca5d3f94e1cc96e537ca1e4423c1",
+      size_bytes: 14336,
+      detected_format: "PE",
+      admitted_under: "fixture_manifest",
+    },
+    steps: [step("strings"), step("yara-x")],
+    counts: { findings: 1, evidence: 1, strings: 12 },
+    ...overrides,
+  };
+}
+
+export const STRINGS_INVOCATION_ID = "a".repeat(32);
+export const YARA_INVOCATION_ID = "b".repeat(32);
+
+export function step(tool: "strings" | "yara-x", overrides: Partial<RunStep> = {}): RunStep {
+  const strings = tool === "strings";
+  return {
+    index: strings ? 0 : 1,
+    tool,
+    adapter: strings ? "strings_extract" : "yara_x_scan",
+    status: "succeeded",
+    message: null,
+    invocation_id: strings ? STRINGS_INVOCATION_ID : YARA_INVOCATION_ID,
+    tool_version: strings ? "bytasm 0.0.1" : "1.22.1",
+    adapter_version: "0.1.0",
+    started_at: "2026-10-27T10:00:01Z",
+    finished_at: "2026-10-27T10:00:02Z",
+    duration_ms: strings ? 30 : 42,
+    timeout_seconds: 30,
+    failure_reason: null,
+    raw_output_sha256: (strings ? "7" : "8").repeat(64),
+    strings: strings
+      ? { total_found: 12, found_by_encoding: { ascii: 11, "utf-16le": 1 }, stored: 12, truncated: false }
+      : null,
+    warnings: [],
+    ...overrides,
+  };
+}
+
+export function stringsPage(overrides: Partial<StringsPage> = {}): StringsPage {
+  return {
+    version_id: VERSION_ID,
+    run_id: RUN_ID,
+    run_status: "succeeded",
+    invocation_id: STRINGS_INVOCATION_ID,
+    tool_version: "bytasm 0.0.1",
+    min_length: 6,
+    encodings: ["ascii", "utf-16le"],
+    summary: { total_found: 2, found_by_encoding: { ascii: 1, "utf-16le": 1 }, stored: 2, truncated: false },
+    query: null,
+    encoding: null,
+    matched: 2,
+    offset: 0,
+    limit: 100,
+    items: [
+      {
+        offset: 512,
+        encoding: "ascii",
+        length_chars: 47,
+        byte_length: 47,
+        value: "bytasm fixture v1: https://example.invalid/help",
+        value_truncated: false,
+      },
+      {
+        offset: 640,
+        encoding: "utf-16le",
+        length_chars: 300,
+        byte_length: 600,
+        value: "<img src=x onerror=alert(1)>" + "W".repeat(228),
+        value_truncated: true,
+      },
+    ],
+    notices: ["Strings are observations, not findings."],
+    ...overrides,
+  };
+}
+
+export const NOTICES = [
+  "A match means a rule's pattern was found in the file's bytes. It is an observation that needs human interpretation, not a conclusion.",
+  "No match does not show that a file is safe: it only means none of these rules matched.",
+];
+
+export function findings(items: Findings["findings"] | null = null): Findings {
+  return {
+    run_id: RUN_ID,
+    run_status: "succeeded",
+    run_message: null,
+    total: items ? items.length : 1,
+    filters: { tool: null, kind: null, q: null },
+    available_tools: ["yara-x"],
+    available_kinds: ["yara_match"],
+    notices: NOTICES,
+    findings: items ?? [
+      {
+        id: "1".repeat(32),
+        kind: "yara_match",
+        title: "Contains text that looks like the start of a URL",
+        rule_id: "url_reference",
+        rule_namespace: "default",
+        rule_set_id: RULE_SET_ID,
+        tags: [],
+        metadata: [["description", "Contains text that looks like the start of a URL"]],
+        fingerprint: "2".repeat(64),
+        match_count: 1,
+        evidence_truncated: false,
+        evidence: [
+          {
+            id: 1,
+            kind: "byte_range",
+            pattern_id: "$https",
+            file_offset: 7699,
+            length: 8,
+            xor_key: null,
+            excerpt_hex: "68747470733a2f2f",
+            excerpt_truncated: false,
+            raw_json_pointer: "/scan/matching_rules/0/patterns/1/matches/0",
+          },
+        ],
+      },
+    ],
   };
 }

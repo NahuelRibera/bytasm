@@ -3,7 +3,7 @@
 ## Project status
 
 Bytasm is in early development (v0.1, milestones M0–M5 implemented; v0.1.0
-not tagged). It is not released, not hosted anywhere, and not meant for
+not tagged; v0.2 strings extraction and YARA-X pattern matching are implemented on a branch and under review). It is not released, not hosted anywhere, and not meant for
 real-world analysis yet.
 
 ## Responsible use
@@ -31,13 +31,39 @@ real-world analysis yet.
   user with the same file and network access, so a crafted file that
   exploited LIEF could read your files, the Bytasm database and stored files,
   and make network connections.
+- **YARA-X (v0.2) is handled like LIEF.** The worker re-checks the input
+  policy and re-verifies the stored file's SHA-256 and size before every scan;
+  YARA-X then runs in a separate child process with the same limits, a 20 s
+  scan timeout under the 30 s kill, a per-pattern match cap, and capped
+  output. The child re-hashes the sample and the rule snapshot before
+  compiling. Its result is schema-validated, and every reported byte range is
+  checked against the stored file before anything is saved. The worker holds
+  the database and runs as the same user, so this is **not** a sandbox and
+  **not** gate I1.
+- **The strings extractor (v0.2) is handled the same way.** It is Bytasm's
+  own code, run as a separate child process with the same limits, after the
+  same admission checks, before every step. It re-hashes its input, only
+  matches byte patterns, keeps at most 5,000 strings of at most 256
+  characters, and its result is checked string by string against the stored
+  file. String values are untrusted text: shown escaped, never logged, and
+  not exported in the JSON report (counts only).
+- **Rules are code.** The rule set (`rules/yara/`) is bundled and read-only:
+  no API, UI, environment variable or request can add rules or point at other
+  files. `include` is disabled in the compiler. Rule text, metadata and
+  compiler messages are shown as escaped text, and compiler diagnostics are
+  reduced to code, title and position.
+- **Findings are observations.** A match says a pattern occurred in the bytes;
+  it is not a verdict, and no match does not mean safe. Bytasm stores no
+  severity or score. Logs record run IDs, hashes, counts and codes, never
+  sample bytes, matched bytes or rule text.
 - **The container is not a sandbox either.** `compose.yaml` runs Bytasm as a
   non-root user (UID 10001) with all capabilities dropped,
   `no-new-privileges`, Docker's default seccomp profile, a read-only root
   filesystem, a `noexec` `/tmp`, explicit memory/CPU/process limits, an init
   process, only its own named data volume, no Docker socket and no host
   mounts. That limits what a compromised parser could do to the *host*.
-  Inside the container, the parser still shares the API's user, data volume
+  The v0.2 `worker` service has the same settings and publishes no port.
+  Inside the containers, the parsers still share the API's user, data volume
   (database, stored files) and network, and outbound connections are not
   restricted. The container shares the host kernel. A real analysis boundary
   is isolation gate I1 (blueprint §5.4.3), not v0.1.
@@ -76,7 +102,9 @@ real-world analysis yet.
 The tested answers to the implementation questions are in
 `docs/milestones/v0.1-m2-m5.md`. The full threat model is in
 `docs/PROJECT_BLUEPRINT.md` §8, and the accepted decisions are in
-`docs/adr/0001-stack.md` and `docs/adr/0002-v0.1-implementation-choices.md`.
+`docs/adr/0001-stack.md` and `docs/adr/0002-v0.1-implementation-choices.md`;
+the v0.2 decisions (proposed) are in `docs/adr/0003-v0.2-pattern-matching.md`
+and `docs/milestones/v0.2-pattern-matching.md`.
 
 ## Reporting a vulnerability
 

@@ -56,6 +56,9 @@ class Settings:
     max_upload_bytes: int = MAX_INPUT_BYTES
     limits: ParserLimits = DEFAULT_LIMITS
     web_dist: Path | None = field(default_factory=lambda: REPO_ROOT / "frontend" / "dist")
+    # Bytasm's bundled YARA-X rules (bytasm.rules). Not configurable from the
+    # environment: the rule set ships with the code. Tests pass another path.
+    rules_dir: Path = field(default_factory=lambda: REPO_ROOT / "rules" / "yara")
     # Temp directories and unreferenced stored files older than this are
     # removed by the start-up sweep.
     sweep_age_seconds: float = 3600.0

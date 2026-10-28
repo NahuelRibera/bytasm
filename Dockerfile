@@ -1,5 +1,7 @@
-# Bytasm v0.1 local image: the API, the LIEF adapter it starts as a child
-# process, and the built UI. Run it only through compose.yaml, which applies
+# Bytasm local image: the API, the LIEF adapter it starts as a child process,
+# the built UI, and (v0.2) the analysis worker with its YARA-X adapter and
+# Bytasm's bundled rule set. compose.yaml runs the API and the worker as two
+# services from this one image. Run it only through compose.yaml, which applies
 # the container settings (non-root, read-only root, no capabilities, limits).
 #
 # Build with `make compose-build`: it builds frontend/dist on the host first,
@@ -32,6 +34,8 @@ RUN uv sync --locked --no-dev --no-install-project \
 
 COPY backend/src ./src
 COPY fixtures/MANIFEST.sha256 /app/fixtures/MANIFEST.sha256
+# The rule set is part of the image: there is no way to load other rules at run time.
+COPY rules/yara /app/rules/yara
 COPY frontend/dist /app/frontend/dist
 RUN /app/.venv/bin/python -m compileall -q /app/backend/src \
     && install -d -m 0700 -o 10001 -g 10001 /data

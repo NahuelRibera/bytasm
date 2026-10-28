@@ -23,6 +23,11 @@ Classification never uses partial output: only exit code 0 with a present,
 size-capped, schema-valid result file is a success. Exit code 2 with exactly
 one known reason code is a rejection. Everything else is a failure.
 
+Cancellation (v0.2 worker): `run_child` polls an optional `should_cancel`
+callback while the child runs. When it returns True, the process group gets
+SIGTERM, then SIGKILL after the grace period, exactly as on timeout, and the
+outcome is "cancelled". Output of a cancelled child is never read.
+
 Known limitation (Q4): a descendant that calls setsid()/setpgid() leaves the
 process group, so the group kill cannot reach it. If it keeps an output pipe
 open, the run is classified as failed (`output_not_closed`); if it closes its
@@ -37,7 +42,7 @@ import signal
 import stat
 import sys
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, Literal
@@ -60,26 +65,28 @@ REJECTION_CODES: Final = frozenset(
 # ignore PYTHON* variables, the user site directory, and the current directory.
 CHILD_ENV: Final = {"PATH": "/usr/bin:/bin", "LC_ALL": "C"}
 
-Status = Literal["succeeded", "rejected", "failed", "timed_out"]
+Status = Literal["succeeded", "rejected", "failed", "timed_out", "cancelled"]
+# How often `should_cancel` is polled while a child runs.
+CANCEL_POLL_SECONDS: Final = 0.25
 
 
 @dataclass(frozen=True)
-class AdapterOutcome:
+class AdapterOutcome[R]:
     """What happened to one adapter run.
 
     `reason` is a fixed code: for "rejected" the adapter's reason code; for
     "failed" one of nonzero_exit, killed_by_signal, invalid_output,
     output_overflow, orphan_processes, output_not_closed; "timeout" for
-    "timed_out"; "ok" for "succeeded". `stdout`/`stderr` are capped excerpts
-    with control characters removed, for tests and debugging only. They must
-    never be shown to users or logged.
+    "timed_out"; "cancel_requested" for "cancelled"; "ok" for "succeeded".
+    `stdout`/`stderr` are capped excerpts with control characters removed, for
+    tests and debugging only. They must never be shown to users or logged.
     """
 
     status: Status
     reason: str
     exit_code: int | None
     duration_ms: int
-    result: AdapterResult | None = None
+    result: R | None = None
     result_bytes: bytes | None = None
     stdout: str = ""
     stderr: str = ""
@@ -92,6 +99,14 @@ def adapter_command(module: str) -> list[str]:
 
 def metadata_adapter_command() -> list[str]:
     return adapter_command("bytasm.adapters.metadata_lief")
+
+
+def yara_adapter_command() -> list[str]:
+    return adapter_command("bytasm.adapters.yara_x_scan")
+
+
+def strings_adapter_command() -> list[str]:
+    return adapter_command("bytasm.adapters.strings_extract")
 
 
 def sanitize(data: bytes) -> str:
@@ -127,7 +142,15 @@ def _signal_group(pgid: int, sig: signal.Signals) -> bool:
     return True
 
 
-async def _wait_exit(process: asyncio.subprocess.Process, timeout: float) -> None:
+class CancelRequested(Exception):
+    """`should_cancel` returned True while the child was running."""
+
+
+async def _wait_exit(
+    process: asyncio.subprocess.Process,
+    timeout: float,
+    should_cancel: Callable[[], bool] | None = None,
+) -> None:
     """Wait until the child itself has exited, or raise TimeoutError.
 
     `Process.wait()` is not used: on some Python versions (observed on 3.12)
@@ -136,9 +159,15 @@ async def _wait_exit(process: asyncio.subprocess.Process, timeout: float) -> Non
     as asyncio has reaped the child.
     """
     deadline = time.monotonic() + timeout
+    next_poll = time.monotonic() + CANCEL_POLL_SECONDS
     while process.returncode is None:
-        if time.monotonic() >= deadline:
+        now = time.monotonic()
+        if now >= deadline:
             raise TimeoutError
+        if should_cancel is not None and now >= next_poll:
+            next_poll = now + CANCEL_POLL_SECONDS
+            if should_cancel():
+                raise CancelRequested
         await asyncio.sleep(0.01)
 
 
@@ -188,18 +217,28 @@ def _read_result(workdir: Path, cap: int) -> bytes | None:
     return data if len(data) <= cap else None
 
 
-def _classify_exit(
+def parse_metadata_result(raw: bytes, expected_sha256: str) -> AdapterResult | None:
+    """Validate the LIEF adapter's result; None if it is not acceptable."""
+    try:
+        result = AdapterResult.model_validate_json(raw)
+    except ValidationError:
+        return None
+    return result if result.input.sha256 == expected_sha256 else None
+
+
+def _classify_exit[R](
     exit_code: int,
     stdout: bytes,
     workdir: Path,
-    expected_sha256: str,
     limits: ParserLimits,
-) -> tuple[Status, str, AdapterResult | None, bytes | None]:
+    rejection_codes: frozenset[str],
+    parse_result: Callable[[bytes], R | None],
+) -> tuple[Status, str, R | None, bytes | None]:
     if exit_code < 0:
         return "failed", "killed_by_signal", None, None
     if exit_code == 2:
         code = stdout.decode("ascii", errors="replace").strip()
-        if code in REJECTION_CODES and stdout in (code.encode(), code.encode() + b"\n"):
+        if code in rejection_codes and stdout in (code.encode(), code.encode() + b"\n"):
             return "rejected", code, None, None
         return "failed", "invalid_output", None, None
     if exit_code != 0:
@@ -208,11 +247,8 @@ def _classify_exit(
     raw = _read_result(workdir, limits.result_bytes)
     if raw is None:
         return "failed", "invalid_output", None, None
-    try:
-        result = AdapterResult.model_validate_json(raw)
-    except ValidationError:
-        return "failed", "invalid_output", None, None
-    if result.input.sha256 != expected_sha256:
+    result = parse_result(raw)
+    if result is None:
         return "failed", "invalid_output", None, None
     return "succeeded", "ok", result, raw
 
@@ -222,13 +258,12 @@ async def run_adapter(
     workdir: Path,
     expected_sha256: str,
     limits: ParserLimits = DEFAULT_LIMITS,
-) -> AdapterOutcome:
-    """Run one adapter on `workdir/upload.bin` and classify the outcome.
+) -> AdapterOutcome[AdapterResult]:
+    """Run the metadata adapter on `workdir/upload.bin` and classify the outcome.
 
     The caller owns `workdir` (a private directory) and deletes it afterwards.
     """
     argv = [
-        *command,
         "--input",
         INPUT_NAME,
         "--out",
@@ -244,6 +279,29 @@ async def run_adapter(
         "--rlimit-fsize",
         str(limits.file_size_bytes),
     ]
+    return await run_child(
+        [*command, *argv],
+        workdir,
+        limits,
+        parse_result=lambda raw: parse_metadata_result(raw, expected_sha256),
+        rejection_codes=REJECTION_CODES,
+    )
+
+
+async def run_child[R](
+    argv: Sequence[str],
+    workdir: Path,
+    limits: ParserLimits,
+    *,
+    parse_result: Callable[[bytes], R | None],
+    rejection_codes: frozenset[str] = frozenset(),
+    should_cancel: Callable[[], bool] | None = None,
+) -> AdapterOutcome[R]:
+    """Run one adapter child with the full `argv` (no shell) in `workdir`.
+
+    `parse_result` validates the raw `result.json` (already size-capped) and
+    returns None to reject it. `should_cancel` is polled while the child runs.
+    """
     started = time.monotonic()
     process = await asyncio.create_subprocess_exec(
         *argv,
@@ -260,13 +318,15 @@ async def run_adapter(
     err_task = asyncio.create_task(_drain(process.stderr, cap))
 
     timed_out = False
+    cancelled = False
     orphans = False
     pipes_closed = True
     try:
         try:
-            await _wait_exit(process, limits.timeout_seconds)
-        except TimeoutError:
-            timed_out = True
+            await _wait_exit(process, limits.timeout_seconds, should_cancel)
+        except (TimeoutError, CancelRequested) as stop:
+            timed_out = isinstance(stop, TimeoutError)
+            cancelled = not timed_out
             _signal_group(pgid, signal.SIGTERM)
             await _wait_quietly(process, limits.kill_grace_seconds)
             _signal_group(pgid, signal.SIGKILL)
@@ -297,9 +357,9 @@ async def run_adapter(
     def outcome(
         status: Status,
         reason: str,
-        result: AdapterResult | None = None,
+        result: R | None = None,
         raw: bytes | None = None,
-    ) -> AdapterOutcome:
+    ) -> AdapterOutcome[R]:
         return AdapterOutcome(
             status=status,
             reason=reason,
@@ -311,6 +371,8 @@ async def run_adapter(
             stderr=sanitize(stderr),
         )
 
+    if cancelled:
+        return outcome("cancelled", "cancel_requested")
     if timed_out:
         return outcome("timed_out", "timeout")
     if orphans:
@@ -321,4 +383,6 @@ async def run_adapter(
         return outcome("failed", "output_overflow")
     if exit_code is None:  # not reachable: the child was awaited or killed above
         return outcome("failed", "nonzero_exit")
-    return outcome(*_classify_exit(exit_code, stdout, workdir, expected_sha256, limits))
+    return outcome(
+        *_classify_exit(exit_code, stdout, workdir, limits, rejection_codes, parse_result)
+    )

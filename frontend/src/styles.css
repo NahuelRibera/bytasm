@@ -553,6 +553,7 @@ input[type="radio"] {
 
 .tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-1);
   border-bottom: 1px solid var(--border);
   margin-bottom: var(--space-4);
@@ -608,4 +609,186 @@ input[type="radio"] {
   justify-items: end;
   gap: var(--space-1);
   max-width: 420px;
+}
+
+/* v0.2: navigation, run states, rules and evidence. */
+.topbar-nav {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.topbar-nav a {
+  color: var(--text-muted);
+  font-weight: 600;
+  text-decoration: none;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-small);
+}
+
+.topbar-nav a:hover,
+.topbar-nav a[aria-current="page"] {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.pill-neutral {
+  color: var(--text-muted);
+  background: var(--surface-2);
+}
+
+.pill-info {
+  color: var(--accent);
+  background: var(--surface-2);
+}
+
+.pill-danger {
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+
+.notice ul {
+  margin: 0;
+  padding-left: var(--space-5);
+}
+
+.notice h3 {
+  margin-top: 0;
+}
+
+.card > .notice,
+.card > .empty {
+  margin-bottom: var(--space-4);
+}
+
+.confirm {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-small);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+  background: var(--surface-2);
+}
+
+.confirm h3 {
+  margin-top: 0;
+}
+
+.code-block {
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-small);
+  padding: var(--space-3) var(--space-4);
+  margin: 0 0 var(--space-4);
+  /* Long rule lines scroll inside the block, never the page. */
+  overflow-x: auto;
+  max-width: 100%;
+  white-space: pre;
+}
+
+.rule-source h3,
+.rule-source h4 {
+  margin-bottom: var(--space-2);
+}
+
+.diagnostics {
+  padding-left: var(--space-5);
+  overflow-wrap: anywhere;
+}
+
+.validation {
+  margin-top: var(--space-4);
+}
+
+.tool-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: var(--radius-small);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+
+.table tr.row-selected td {
+  background: var(--surface-2);
+}
+
+.table tr.row-muted td {
+  color: var(--text-muted);
+}
+
+.evidence-panel {
+  margin-top: var(--space-5);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius-small);
+  padding: var(--space-4);
+  min-width: 0;
+}
+
+.evidence-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.evidence-header h3 {
+  margin: 0;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.run-grid > .card {
+  min-width: 0;
+}
+
+.page-header h1 {
+  overflow-wrap: anywhere;
+}
+
+/* v0.2: multi-step runs, strings, filters */
+
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  flex-wrap: wrap;
+  margin: var(--space-3) 0;
+}
+
+.filter-row input[type="search"] {
+  min-width: 0;
+  flex: 1 1 12rem;
+  max-width: 28rem;
+}
+
+.step-message {
+  margin-top: var(--space-1);
+  color: var(--warn);
+  overflow-wrap: anywhere;
+}
+
+.run-log {
+  margin: var(--space-3) 0;
+  padding-left: var(--space-5);
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+details.card > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+/* Values can be long untrusted text: wrap anywhere, never widen the page. */
+.strings-table .string-value {
+  display: block;
+  max-width: 48rem;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }

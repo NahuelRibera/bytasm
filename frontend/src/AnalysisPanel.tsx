@@ -1,0 +1,160 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRef, useState } from "react";
+import { ApiError, api, type SampleVersion } from "./api";
+import { ErrorPanel, Loading, StatusPill, formatDate } from "./components";
+import { Link, navigate } from "./router";
+
+/**
+ * Sample-version section for v0.2 analysis: start a run (strings, then YARA-X)
+ * after a confirmation that names the sample and the rule set, and list earlier runs.
+ */
+export function AnalysisPanel({ version }: { version: SampleVersion }) {
+  const client = useQueryClient();
+  const runs = useQuery({
+    queryKey: ["runs", version.id],
+    queryFn: () => api.runs(version.id),
+    refetchInterval: (query) =>
+      query.state.data?.runs.some((run) => run.status === "queued" || run.status === "running") ? 2000 : false,
+  });
+  const rules = useQuery({ queryKey: ["rule-set", "current"], queryFn: api.currentRuleSet });
+  const [confirming, setConfirming] = useState(false);
+  const startButton = useRef<HTMLButtonElement>(null);
+  const create = useMutation({
+    mutationFn: () => api.createRun(version.id),
+    onSuccess: (run) => {
+      void client.invalidateQueries({ queryKey: ["runs", version.id] });
+      navigate(`/runs/${run.id}`);
+    },
+  });
+
+  const active = runs.data?.runs.find((run) => run.status === "queued" || run.status === "running");
+  const conflictRun =
+    create.error instanceof ApiError && create.error.problem.code === "run_active"
+      ? create.error.problem.run_id
+      : undefined;
+  const sampleLabel = `${version.sample_name} ${version.version_label ?? "(unlabelled version)"}`;
+
+  const cancelConfirm = () => {
+    setConfirming(false);
+    create.reset();
+    startButton.current?.focus();
+  };
+
+  return (
+    <section className="card" aria-labelledby="pattern-matching">
+      <h2 id="pattern-matching">Analysis runs: strings and pattern matching (YARA-X)</h2>
+      <p>
+        A run extracts the file's strings, then matches Bytasm's bundled rules against its stored
+        bytes. The file is not executed. A match is an observation to interpret, not a verdict; no
+        match does not mean the file is safe. <Link to="/rules">See the rules</Link>.
+      </p>
+
+      {!confirming && (
+        <div className="actions">
+          <button
+            ref={startButton}
+            type="button"
+            className="button button-primary"
+            onClick={() => setConfirming(true)}
+            disabled={Boolean(active)}
+          >
+            Run pattern matching…
+          </button>
+          {active && (
+            <span className="status-text">
+              A run is already {active.status}. <Link to={`/runs/${active.id}`}>Open it</Link>
+            </span>
+          )}
+        </div>
+      )}
+
+      {confirming && (
+        <div className="confirm" role="group" aria-labelledby="confirm-heading">
+          <h3 id="confirm-heading">Start a run?</h3>
+          {rules.isPending && <Loading label="Loading the rule set…" />}
+          {rules.isError && <ErrorPanel error={rules.error} title="The rule set could not be loaded" />}
+          {rules.data && (
+            <p>
+              Step 1 extracts ASCII and UTF-16LE strings. Step 2: YARA-X{" "}
+              {rules.data.installed_yara_x_version} will match{" "}
+              <strong>{rules.data.label}</strong> ({rules.data.rule_count} rules, SHA-256{" "}
+              <code className="hash">{rules.data.sha256.slice(0, 16)}…</code>) against{" "}
+              <strong className="untrusted">{sampleLabel}</strong> (SHA-256{" "}
+              <code className="hash">{version.sha256.slice(0, 16)}…</code>).
+            </p>
+          )}
+          <div className="actions">
+            <button
+              type="button"
+              className="button button-primary"
+              onClick={() => create.mutate()}
+              disabled={create.isPending || !rules.data}
+              autoFocus
+            >
+              {create.isPending ? "Starting…" : "Start run"}
+            </button>
+            <button type="button" className="button" onClick={cancelConfirm} disabled={create.isPending}>
+              Back
+            </button>
+          </div>
+          {create.isError && (
+            <>
+              <ErrorPanel error={create.error} title="The run was not started" />
+              {conflictRun && (
+                <p>
+                  <Link to={`/runs/${conflictRun}`}>Open the run in progress</Link>
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      <h3>Runs</h3>
+      {runs.isPending && <Loading label="Loading runs…" />}
+      {runs.isError && <ErrorPanel error={runs.error} title="Runs could not be loaded" />}
+      {runs.data && runs.data.runs.length === 0 && (
+        <p className="muted">No analysis runs yet for this version.</p>
+      )}
+      {runs.data && runs.data.runs.length > 0 && (
+        <div className="table-scroll" tabIndex={0} role="region" aria-label="Runs of this version">
+          <table className="table">
+            <caption className="sr-only">Analysis runs, newest first</caption>
+            <thead>
+              <tr>
+                <th scope="col">Queued</th>
+                <th scope="col">Status</th>
+                <th scope="col">Rule set</th>
+                <th scope="col" className="num">Rules matched</th>
+                <th scope="col">Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              {runs.data.runs.map((run) => (
+                <tr key={run.id} className={run.status === "cancelled" ? "row-muted" : undefined}>
+                  <td>{run.queued_at ? formatDate(run.queued_at) : "—"}</td>
+                  <td>
+                    <StatusPill status={run.status} />
+                  </td>
+                  <td>
+                    <code>{run.rule_set.label}</code>
+                  </td>
+                  <td className="num">
+                    {run.steps.find((step) => step.tool === "yara-x")?.status === "succeeded"
+                      ? run.counts.findings
+                      : "—"}
+                  </td>
+                  <td>
+                    <Link to={`/runs/${run.id}`} aria-label={`Open run queued ${run.queued_at ?? ""}`}>
+                      Open run
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}

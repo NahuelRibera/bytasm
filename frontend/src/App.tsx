@@ -4,7 +4,10 @@ import { SelfBuiltBanner } from "./components";
 import { ImportPage } from "./pages/ImportPage";
 import { ProjectPage } from "./pages/ProjectPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
+import { RulesPage } from "./pages/RulesPage";
+import { RunPage } from "./pages/RunPage";
 import { VersionPage } from "./pages/VersionPage";
+import { AnalysisPanel } from "./AnalysisPanel";
 import { ExportReportButton } from "./ExportReportButton";
 import { Link, useRoute } from "./router";
 
@@ -25,6 +28,14 @@ export function App() {
           </span>
           Bytasm
         </Link>
+        <nav className="topbar-nav" aria-label="Main">
+          <Link to="/" aria-current={route.name === "projects" ? "page" : undefined}>
+            Projects
+          </Link>
+          <Link to="/rules" aria-current={route.name === "rules" ? "page" : undefined}>
+            Rules
+          </Link>
+        </nav>
         <span className="topbar-meta">
           local · static analysis only
           {health.data && <> · v{health.data.bytasm_version}</>}
@@ -43,8 +54,11 @@ export function App() {
           <VersionPage
             versionId={route.versionId}
             actions={<ExportReportButton versionId={route.versionId} />}
+            analysis={(version) => <AnalysisPanel version={version} />}
           />
         )}
+        {route.name === "rules" && <RulesPage key={route.ruleSetId ?? "current"} ruleSetId={route.ruleSetId} />}
+        {route.name === "run" && <RunPage key={route.runId} runId={route.runId} />}
         {route.name === "not_found" && (
           <div className="empty">
             <h1>Not found</h1>
@@ -55,9 +69,9 @@ export function App() {
         )}
       </main>
       <footer className="footer">
-        Bytasm never runs the files it imports. v0.1 is for self-authored binaries only and is not
+        Bytasm never runs the files it imports. It is for self-authored binaries only and is not
         safe for downloaded, received, third-party, or suspicious files. Resource limits are not a
-        sandbox.
+        sandbox. Rule matches are observations, not verdicts.
       </footer>
     </div>
   );

@@ -11,6 +11,7 @@ from bytasm.api.schemas import (
     SampleVersionOut,
     VersionSummary,
 )
+from bytasm.db.imported import import_record
 from bytasm.db.models import Project, Sample, SampleVersion, Section, ToolInvocation
 from bytasm.notices import AUTHORIZATION_NOTICE
 
@@ -29,19 +30,19 @@ def project_out(session: Session, project: Project) -> ProjectOut:
 
 
 def invocation_of(version: SampleVersion) -> ToolInvocation:
-    """The v0.1 metadata invocation: first step of the version's (only) run."""
-    return version.runs[0].invocations[0]
+    """The v0.1 metadata invocation of the version's import run."""
+    return import_record(version).invocation
 
 
 def version_summary(version: SampleVersion) -> VersionSummary:
-    invocation = invocation_of(version)
+    record = import_record(version)
     return VersionSummary(
         id=version.id,
         version_label=version.version_label,
         sha256=version.sha256,
         size_bytes=version.size_bytes,
         detected_format=version.detected_format,
-        architecture=str(invocation.header["architecture"]),
+        architecture=str(record.header["architecture"]),
         admitted_under=version.admitted_under,
         imported_at=version.imported_at,
     )
@@ -56,7 +57,8 @@ def sample_out(sample: Sample) -> SampleOut:
 
 
 def sample_version_out(version: SampleVersion) -> SampleVersionOut:
-    invocation = invocation_of(version)
+    record = import_record(version)
+    invocation = record.invocation
     authorization = version.authorization
     sample = version.sample
     imports = sum(1 for s in invocation.symbols if s.direction == "import")
@@ -87,16 +89,16 @@ def sample_version_out(version: SampleVersion) -> SampleVersionOut:
             adapter=invocation.adapter_name,
             adapter_version=invocation.adapter_version,
             status=invocation.status,
-            exit_code=invocation.exit_code,
+            exit_code=record.exit_code,
             duration_ms=invocation.duration_ms,
-            result_sha256=invocation.raw_output_sha256,
-            entropy_method=invocation.entropy_method,
+            result_sha256=record.raw_output_sha256,
+            entropy_method=record.entropy_method,
         ),
-        header=dict(invocation.header),
+        header=dict(record.header),
         warnings=list(invocation.warnings),
         counts={
             "sections": len(invocation.sections),
-            "imported_libraries": len(invocation.header.get("imported_libraries", [])),
+            "imported_libraries": len(record.header.get("imported_libraries", [])),
             "imported_functions": imports,
             "exports": len(invocation.symbols) - imports,
         },

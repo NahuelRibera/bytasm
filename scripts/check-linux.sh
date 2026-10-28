@@ -1,7 +1,8 @@
 #!/bin/sh
 # Run the backend check suite (ruff, mypy, pytest) inside a Linux container,
-# to confirm the locked LIEF wheel installs and behaves the same on Linux, and
-# that the runner's resource limits (RLIMIT_AS etc.) are enforced there.
+# to confirm the locked LIEF and yara-x wheels install and behave the same on
+# Linux, and that the runner's resource limits (RLIMIT_AS etc.) are enforced
+# there.
 #
 # Usage: scripts/check-linux.sh <linux/arm64|linux/amd64> [3.12|3.14] [measure]
 #
@@ -34,11 +35,12 @@ docker run --rm --platform "$PLATFORM" \
   "$IMAGE" sh -eu -c '
     mkdir /work
     tar -C /repo -cf - --exclude=.venv --exclude="*_cache" --exclude=__pycache__ \
-      backend fixtures schemas scripts | tar -C /work -xf -
+      backend fixtures rules schemas scripts | tar -C /work -xf -
     cd /work/backend
     echo "platform: $(uname -sm), $(python3 --version)"
     uv sync --locked --quiet
     uv run --no-sync python -c "import lief, platform; print(\"lief\", lief.__version__, platform.machine())"
+    uv run --no-sync python -c "import importlib.metadata as m; print(\"yara-x\", m.version(\"yara-x\"))"
     if [ "$MODE" = measure ]; then
       uv run --no-sync python ../scripts/measure_parse.py --rlimit-as 1024
       exit 0

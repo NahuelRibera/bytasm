@@ -108,17 +108,22 @@ def read_admitted_input(args: ChildArgs) -> bytes:
     Re-hashing here means the parser only ever sees those bytes: if the file
     changed in between, the child refuses to parse it.
     """
-    fd = os.open(args.input, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    return read_verified_file(args.input, args.max_input_bytes, args.expected_sha256)
+
+
+def read_verified_file(path: str, max_bytes: int, expected_sha256: str) -> bytes:
+    """Read a regular file (no symlink) of at most `max_bytes` with this SHA-256."""
+    fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
     try:
         if not stat.S_ISREG(os.fstat(fd).st_mode):
             raise ValueError("input is not a regular file")
         with os.fdopen(fd, "rb", closefd=False) as handle:
-            data = handle.read(args.max_input_bytes + 1)
+            data = handle.read(max_bytes + 1)
     finally:
         os.close(fd)
-    if len(data) > args.max_input_bytes:
+    if len(data) > max_bytes:
         raise ValueError("input is larger than the admitted size limit")
-    if hashlib.sha256(data).hexdigest() != args.expected_sha256:
+    if hashlib.sha256(data).hexdigest() != expected_sha256:
         raise ValueError("input does not match the admitted SHA-256")
     return data
 

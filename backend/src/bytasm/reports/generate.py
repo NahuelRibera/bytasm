@@ -1,6 +1,7 @@
 """Build and export a report for one sample version (blueprint 2 J9).
 
-Order: verify the stored file's SHA-256 (and the stored adapter result's),
+Order: verify the stored file's SHA-256 (and the stored adapter results':
+the import's, and those of the analysis run the report includes),
 build the report from the database rows, validate it against the schema,
 serialise it canonically, store it by its own SHA-256, and record it. If a
 hash does not match, nothing is generated.
@@ -17,10 +18,20 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from bytasm.db.models import Report, SampleVersion
-from bytasm.notices import AUTHORIZATION_NOTICE, INPUT_POLICY_NOTICE, REPORT_LIMITATIONS
+from bytasm.adapters.yara_result import MAX_EXCERPT_BYTES
+from bytasm.db.imported import import_record
+from bytasm.db.models import AnalysisRun, Finding, Report, RuleSet, SampleVersion
+from bytasm.jobs import runs, summary
+from bytasm.notices import (
+    AUTHORIZATION_NOTICE,
+    FINDING_NOTICES,
+    INPUT_POLICY_NOTICE,
+    PATTERN_REPORT_LIMITATIONS,
+    REPORT_LIMITATIONS,
+)
 from bytasm.provenance import Generator
 from bytasm.reports import model
 from bytasm.storage import ContentStore
@@ -34,12 +45,131 @@ def _iso(value: datetime) -> str:
     return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
+def pattern_run(version: SampleVersion) -> AnalysisRun | None:
+    """The newest analysis run of the version that kept results (blueprint J8, J9)."""
+    candidates = [
+        run for run in version.runs if run.kind == "analysis" and run.status in runs.WITH_RESULTS
+    ]
+    return max(candidates, key=lambda r: (r.queued_at or r.started_at, r.id), default=None)
+
+
+def _pattern_analysis(session: Session, run: AnalysisRun | None) -> dict[str, Any] | None:
+    if run is None:
+        return None
+    assert run.queued_at and run.started_at and run.finished_at  # noqa: S101 - finished run
+    views = summary.step_views(run)
+    rule_step = runs.rule_set_step(run.profile_snapshot)
+    rule_set = session.get(RuleSet, rule_step["rule_set"]["id"]) if rule_step else None
+    strings_inv = summary.strings_invocation(run)
+    strings_params: dict[str, Any] = next(
+        (v.step.get("params", {}) for v in views if v.tool == runs.STRINGS_TOOL), {}
+    )
+    yara_versions = {inv.id: inv.tool_version for inv in run.invocations}
+    findings = sorted(
+        (f for inv in run.invocations for f in _findings_of(session, inv.id)),
+        key=lambda f: (f.rule_namespace, f.rule_id),
+    )
+    return {
+        "run": {
+            "id": run.id,
+            "status": run.status,
+            "failure_reason": run.failure_reason,
+            "status_message": summary.run_message(run, views),
+            "profile": run.profile_snapshot,
+            "bytasm_version": run.bytasm_version,
+            "queued_at": _iso(run.queued_at),
+            "started_at": _iso(run.started_at),
+            "finished_at": _iso(run.finished_at),
+        },
+        "steps": [
+            {
+                "index": view.index,
+                "tool": view.tool,
+                "adapter": view.adapter,
+                "status": view.status,
+                "message": view.message,
+                "tool_version": view.invocation.tool_version if view.invocation else None,
+                "adapter_version": view.invocation.adapter_version if view.invocation else None,
+                "duration_ms": view.invocation.duration_ms if view.invocation else None,
+                "result_sha256": view.invocation.raw_output_sha256 if view.invocation else None,
+                "execution": "separate_resource_limited_process",
+            }
+            for view in views
+        ],
+        "rule_set": (
+            {
+                "tool": "yara-x",
+                "name": rule_set.name,
+                "version": rule_set.version,
+                "sha256": rule_set.sha256,
+                "source": rule_set.source,
+                "rule_count": rule_set.rule_count,
+            }
+            if rule_set
+            else None
+        ),
+        "strings": (
+            {
+                "encodings": list(strings_params.get("encodings", [])),
+                "min_length": strings_params.get("min_length"),
+                **(strings_inv.summary or {}),
+                "values_included": False,
+            }
+            if strings_inv is not None and strings_inv.summary is not None
+            else None
+        ),
+        "findings": [
+            {
+                "kind": finding.kind,
+                "tool": "yara-x",
+                "tool_version": yara_versions[finding.invocation_id],
+                "rule_id": finding.rule_id,
+                "rule_namespace": finding.rule_namespace,
+                "title": finding.title,
+                "tags": [str(t) for t in finding.tool_reported_attributes.get("tags", [])],
+                "metadata": [
+                    [str(k), v] for k, v in finding.tool_reported_attributes.get("metadata", [])
+                ],
+                "fingerprint": finding.fingerprint,
+                "match_count": finding.match_count,
+                "evidence_truncated": finding.evidence_truncated,
+                "evidence": [
+                    {
+                        "kind": item.kind,
+                        "pattern_id": item.pattern_id,
+                        "file_offset": item.file_offset,
+                        "length": item.length,
+                        "xor_key": item.xor_key,
+                        "excerpt_hex": item.excerpt_hex,
+                        "excerpt_truncated": item.length > MAX_EXCERPT_BYTES,
+                        "raw_json_pointer": item.raw_json_pointer,
+                    }
+                    for item in sorted(
+                        finding.evidence,
+                        key=lambda e: (e.file_offset, e.pattern_id, e.raw_json_pointer),
+                    )
+                ],
+            }
+            for finding in findings
+        ],
+        "notices": list(FINDING_NOTICES),
+    }
+
+
+def _findings_of(session: Session, invocation_id: str) -> list[Finding]:
+    return list(session.scalars(select(Finding).where(Finding.invocation_id == invocation_id)))
+
+
 def build_report(
-    version: SampleVersion, generator: Generator, generated_at: datetime
+    version: SampleVersion,
+    generator: Generator,
+    generated_at: datetime,
+    session: Session,
 ) -> dict[str, Any]:
-    run = version.runs[0]
-    invocation = run.invocations[0]
-    header = invocation.header
+    record = import_record(version)
+    run = record.run
+    invocation = record.invocation
+    header = record.header
     computed_by = f"bytasm {invocation.adapter_name} {invocation.adapter_version}"
     sample = version.sample
     authorization = version.authorization
@@ -84,8 +214,8 @@ def build_report(
                 "status": run.status,
                 "profile": run.profile_snapshot,
                 "bytasm_version": run.bytasm_version,
-                "started_at": _iso(run.started_at),
-                "finished_at": _iso(run.finished_at),
+                "started_at": _iso(record.started_at),
+                "finished_at": _iso(record.finished_at),
             },
             "tool_invocations": [
                 {
@@ -124,7 +254,7 @@ def build_report(
                     "entropy": {
                         "value": section.entropy,
                         "unit": "bits_per_byte",
-                        "method": invocation.entropy_method,
+                        "method": record.entropy_method,
                         "computed_by": computed_by,
                         "measured_over": "section_bytes_in_file",
                         "note": section.entropy_note,
@@ -139,8 +269,9 @@ def build_report(
             "exports": sorted(s.name for s in invocation.symbols if s.direction == "export"),
             "warnings": list(invocation.warnings),
         },
+        "pattern_analysis": _pattern_analysis(session, pattern_run(version)),
         "labels": dict(model.LABELS),
-        "limitations": list(REPORT_LIMITATIONS),
+        "limitations": list(REPORT_LIMITATIONS) + list(PATTERN_REPORT_LIMITATIONS),
     }
     model.Report.model_validate(document)  # never export something off-schema
     return document
@@ -162,11 +293,16 @@ def export_report(
     try:
         version = session.get_one(SampleVersion, version_id)
         blobs.verify(version.sha256)
-        for invocation in version.runs[0].invocations:
-            outputs.verify(invocation.raw_output_sha256)
+        outputs.verify(import_record(version).raw_output_sha256)
+        analysis = pattern_run(version)
+        if analysis is not None:
+            # The findings and string counts came from these stored outputs.
+            for invocation in analysis.invocations:
+                if invocation.raw_output_sha256 is not None:
+                    outputs.verify(invocation.raw_output_sha256)
 
         generated_at = datetime.now(UTC).replace(microsecond=0)
-        data = canonical_json(build_report(version, generator, generated_at))
+        data = canonical_json(build_report(version, generator, generated_at, session))
         sha256 = hashlib.sha256(data).hexdigest()
         if reports.put_bytes(data, sha256, scratch_dir):
             created = sha256

@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 
 from bytasm.api.context import AppContext
-from bytasm.db.models import Report, SampleVersion, ToolInvocation
+from bytasm.db.models import Report, RuleSet, SampleVersion, ToolInvocation
 
 
 @dataclass(frozen=True)
@@ -39,9 +39,16 @@ def startup_sweep(ctx: AppContext) -> SweepResult:
                 temp_dirs += 1
 
     with ctx.sessions() as session:
-        referenced = {
+        outputs = {
+            sha
+            for sha in session.scalars(select(ToolInvocation.raw_output_sha256))
+            if sha is not None
+        }
+        # Rule-set snapshots live in the outputs store too (bytasm.rules).
+        outputs |= set(session.scalars(select(RuleSet.sha256)))
+        referenced: dict[str, set[str]] = {
             "blobs": set(session.scalars(select(SampleVersion.sha256))),
-            "outputs": set(session.scalars(select(ToolInvocation.raw_output_sha256))),
+            "outputs": outputs,
             "reports": set(session.scalars(select(Report.sha256))),
         }
     removed = {}

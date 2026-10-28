@@ -1,5 +1,6 @@
 // Shared presentational components. Every value derived from a file (names,
-// strings, hashes) is rendered as a React text child, so React escapes it.
+// strings, hashes) or a rule (text, metadata, identifiers) is rendered as a
+// React text child, so React escapes it.
 import { useState, type ReactNode } from "react";
 import { ApiError, type Health } from "./api";
 
@@ -126,5 +127,65 @@ export function SelfBuiltBanner({ health }: { health: Health | undefined }) {
       binaries you say you compiled from source you wrote. It cannot verify that, and it is not a
       sandbox. Never import downloaded, received, third-party, or suspicious files.
     </div>
+  );
+}
+
+// v0.2 run and step states. Colour is never the only signal: dot + text.
+const STATUS_LABELS: Record<string, string> = {
+  queued: "Queued",
+  running: "Running",
+  succeeded: "Succeeded",
+  partial: "Partial",
+  failed: "Failed",
+  timed_out: "Timed out",
+  cancelled: "Cancelled",
+  skipped: "Skipped",
+};
+
+const STATUS_TONES: Record<string, string> = {
+  queued: "neutral",
+  running: "info",
+  succeeded: "ok",
+  partial: "warn",
+  failed: "danger",
+  timed_out: "danger",
+  cancelled: "neutral",
+  skipped: "neutral",
+};
+
+export function StatusPill({ status }: { status: string }) {
+  return (
+    <span className={`pill pill-${STATUS_TONES[status] ?? "neutral"}`} data-testid="status">
+      <span className="pill-dot" aria-hidden="true" />
+      {STATUS_LABELS[status] ?? status}
+    </span>
+  );
+}
+
+/** Printable ASCII for a hex excerpt; every other byte shows as "·". */
+export function asciiPreview(excerptHex: string): string {
+  let text = "";
+  for (let index = 0; index + 1 < excerptHex.length; index += 2) {
+    const byte = Number.parseInt(excerptHex.slice(index, index + 2), 16);
+    text += byte >= 0x20 && byte < 0x7f ? String.fromCharCode(byte) : "·";
+  }
+  return text;
+}
+
+export function spacedHex(excerptHex: string): string {
+  return excerptHex.match(/.{1,2}/g)?.join(" ") ?? "";
+}
+
+/** What a YARA-X result means and does not mean (blueprint 7.5, 10). */
+export function FindingsMeaning({ notices }: { notices: string[] }) {
+  return (
+    <section className="notice" aria-labelledby="meaning">
+      <h3 id="meaning">What these results mean</h3>
+      <ul>
+        {notices.map((notice) => (
+          <li key={notice}>{notice}</li>
+        ))}
+      </ul>
+    </section>
   );
 }

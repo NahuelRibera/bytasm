@@ -45,7 +45,8 @@ test("import → metadata (UI and API) → JSON report export", async ({ page, r
 
   const report = JSON.parse(text);
   expect(report.report_kind).toBe("bytasm.sample_version_report");
-  expect(report.schema_version).toBe(1);
+  expect(report.schema_version).toBe(2);
+  expect(report.pattern_analysis).toBeNull();
   expect(report.sample.sha256).toBe(sha256);
   expect(report.sample.sample_name).toBe("entropy-demo");
   expect(report.input_policy.admitted_under).toBe("fixture_manifest");

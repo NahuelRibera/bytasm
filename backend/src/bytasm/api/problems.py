@@ -104,6 +104,30 @@ _PROBLEMS: Final[dict[str, tuple[int, str, str]]] = {
         "Could not parse",
         "The metadata parser process failed on this file. It was not imported.",
     ),
+    # Analysis runs and rules (v0.2)
+    "run_active": (
+        409,
+        "A run is already in progress",
+        "This sample version already has a queued or running analysis. Wait for it to finish "
+        "or cancel it before starting another.",
+    ),
+    "run_finished": (
+        409,
+        "Run already finished",
+        "This run has already finished, so there is nothing to cancel.",
+    ),
+    "rules_unavailable": (
+        500,
+        "Rule set unavailable",
+        "Bytasm could not read its bundled YARA-X rule set (rules/yara). Nothing was started. "
+        "Check that the rule files are intact; the server log names the problem.",
+    ),
+    "rule_check_failed": (
+        500,
+        "Rule check failed",
+        "The YARA-X process that compiles the rules failed. Try again; if it happens again, "
+        "find this request ID in the server log.",
+    ),
     # Stored data
     "integrity_error": (
         409,

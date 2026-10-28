@@ -1,6 +1,8 @@
 """Read and create endpoints for projects, samples and sample versions (blueprint 7.2)."""
 
 import sys
+import time
+from pathlib import Path
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
@@ -29,7 +31,10 @@ from bytasm.api.views import (
     sections_of,
     symbols_of,
 )
+from bytasm.db.imported import import_record
 from bytasm.db.models import Project, Sample, SampleVersion
+from bytasm.jobs.scan import yara_x_installed_version
+from bytasm.jobs.worker import heartbeat_path
 
 router = APIRouter()
 
@@ -59,7 +64,17 @@ def health(request: Request) -> HealthOut:
         parser_timeout_seconds=settings.limits.timeout_seconds,
         platform=sys.platform,
         parser_memory_limit_enforced=sys.platform == "linux",
+        yara_x_version=yara_x_installed_version(),
+        worker_last_seen_seconds=_worker_last_seen(settings.data_dir),
     )
+
+
+def _worker_last_seen(data_dir: Path) -> float | None:
+    try:
+        modified = heartbeat_path(data_dir).stat().st_mtime
+    except OSError:
+        return None
+    return round(max(0.0, time.time() - modified), 1)
 
 
 @router.get("/projects", response_model=list[ProjectOut])
@@ -113,10 +128,10 @@ def get_sections(request: Request, version_id: str) -> SectionsOut | JSONRespons
         version = session.get(SampleVersion, version_id)
         if version is None:
             return _not_found(request, "sample version")
-        invocation = invocation_of(version)
+        record = import_record(version)
         return SectionsOut(
-            entropy_method=invocation.entropy_method,
-            sections=[SectionOut.model_validate(s) for s in sections_of(invocation)],
+            entropy_method=record.entropy_method,
+            sections=[SectionOut.model_validate(s) for s in sections_of(record.invocation)],
         )
 
 
@@ -126,10 +141,10 @@ def get_imports(request: Request, version_id: str) -> ImportsOut | JSONResponse:
         version = session.get(SampleVersion, version_id)
         if version is None:
             return _not_found(request, "sample version")
-        invocation = invocation_of(version)
+        record = import_record(version)
         return ImportsOut(
-            libraries=list(invocation.header.get("imported_libraries", [])),
-            functions=symbols_of(invocation, "import"),
+            libraries=list(record.header.get("imported_libraries", [])),
+            functions=symbols_of(record.invocation, "import"),
         )
 
 

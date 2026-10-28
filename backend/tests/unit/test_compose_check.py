@@ -1,5 +1,5 @@
-"""compose.yaml keeps the v0.1 container settings (blueprint 12.1), and the
-checker that asserts them refuses each weakening."""
+"""compose.yaml keeps the container settings (blueprint 12.1) for the API and
+the v0.2 worker, and the checker that asserts them refuses each weakening."""
 
 import copy
 import importlib.util
@@ -147,6 +147,23 @@ def test_repository_compose_file_passes() -> None:
     config = json.loads(resolved.stdout)
     assert checker.check_config(config) == []
     service = config["services"]["api"]
-    # Not covered by the generic checks: exactly one service, one port.
-    assert list(config["services"]) == ["api"]
+    # Not covered by the generic checks: exactly these services, one port.
+    assert sorted(config["services"]) == ["api", "worker"]
     assert [(port["host_ip"], port["target"]) for port in service["ports"]] == [("127.0.0.1", 8000)]
+    worker = config["services"]["worker"]
+    assert worker["command"] == ["python", "-m", "bytasm", "worker"]
+    assert worker["image"] == service["image"]
+    assert "ports" not in worker
+
+
+def test_only_the_api_may_publish_a_port() -> None:
+    config = copy.deepcopy(GOOD)
+    worker = copy.deepcopy(config["services"]["api"])
+    del worker["ports"]
+    config["services"]["worker"] = worker
+    assert checker.check_config(config) == []
+    worker["volumes_from"] = ["api"]
+    worker["ports"] = [{"host_ip": "127.0.0.1", "target": 9000}]
+    failures = checker.check_config(config)
+    assert any("only the api service may publish a port" in f for f in failures), failures
+    assert any("volumes_from" in f for f in failures), failures

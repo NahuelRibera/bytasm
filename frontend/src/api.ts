@@ -1,4 +1,4 @@
-// Typed client for the Bytasm v0.1 local API (backend/src/bytasm/api/schemas.py).
+// Typed client for the Bytasm local API, v0.1 + v0.2 (backend/src/bytasm/api/schemas.py).
 //
 // Every state-changing request carries `X-Bytasm-Request: 1`; the API refuses
 // mutations without it. Error bodies are RFC 9457-style problem details whose
@@ -14,6 +14,9 @@ export interface Health {
   parser_timeout_seconds: number;
   platform: string;
   parser_memory_limit_enforced: boolean;
+  yara_x_version: string;
+  // Seconds since `bytasm worker` last checked in; null if it never ran here.
+  worker_last_seen_seconds: number | null;
 }
 
 export interface Project {
@@ -133,6 +136,7 @@ export interface Problem {
   request_id?: string;
   existing_version_id?: string;
   sample_id?: string;
+  run_id?: string;
 }
 
 export class ApiError extends Error {
@@ -161,6 +165,21 @@ async function parse<T>(response: Response): Promise<T> {
     };
   }
   throw new ApiError(problem);
+}
+
+/** "?a=1&b=x" from the defined, non-empty values (or ""). */
+export function queryString(params: Record<string, string | number | undefined>): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== "") search.set(key, String(value));
+  }
+  const text = search.toString();
+  return text ? `?${text}` : "";
+}
+
+/** Attachment URL of a tool invocation's stored, validated result document. */
+export function rawOutputUrl(invocationId: string): string {
+  return `/api/v1/invocations/${encodeURIComponent(invocationId)}/raw`;
 }
 
 async function get<T>(path: string): Promise<T> {
@@ -208,7 +227,239 @@ export const api = {
     );
     return parse<ReportCreated>(response);
   },
+
+  // v0.2: the bundled rule set, analysis runs, findings.
+  currentRuleSet: () => get<RuleSet>("/api/v1/rule-sets/current"),
+  ruleSet: (id: string) => get<RuleSet>(`/api/v1/rule-sets/${encodeURIComponent(id)}`),
+  runs: (versionId: string) =>
+    get<{ runs: Run[] }>(`/api/v1/sample-versions/${encodeURIComponent(versionId)}/runs`),
+  run: (id: string) => get<Run>(`/api/v1/runs/${encodeURIComponent(id)}`),
+  findings: (runId: string, filters: FindingFilters = {}) =>
+    get<Findings>(`/api/v1/runs/${encodeURIComponent(runId)}/findings${queryString(filters)}`),
+  runLog: (runId: string) => get<RunLog>(`/api/v1/runs/${encodeURIComponent(runId)}/log`),
+  strings: (versionId: string, params: StringsQuery = {}) =>
+    get<StringsPage>(
+      `/api/v1/sample-versions/${encodeURIComponent(versionId)}/strings${queryString(params)}`,
+    ),
+
+  async validateRules(): Promise<RuleValidation> {
+    const response = await fetch("/api/v1/rule-sets/current/validation", {
+      method: "POST",
+      headers: MUTATION_HEADERS,
+    });
+    return parse<RuleValidation>(response);
+  },
+
+  async createRun(versionId: string): Promise<Run> {
+    const response = await fetch(`/api/v1/sample-versions/${encodeURIComponent(versionId)}/runs`, {
+      method: "POST",
+      headers: { ...MUTATION_HEADERS, "Content-Type": "application/json" },
+      body: JSON.stringify({ profile_id: "default-static" }),
+    });
+    return parse<Run>(response);
+  },
+
+  async cancelRun(runId: string): Promise<Run> {
+    const response = await fetch(`/api/v1/runs/${encodeURIComponent(runId)}/cancel`, {
+      method: "POST",
+      headers: MUTATION_HEADERS,
+    });
+    return parse<Run>(response);
+  },
 };
+
+export interface RuleFile {
+  name: string;
+  identifier: string;
+  text: string;
+}
+
+export interface RuleSet {
+  id: string | null;
+  tool: "yara-x";
+  name: string;
+  version: string;
+  label: string;
+  sha256: string;
+  source: string;
+  current: boolean;
+  rule_count: number;
+  files: RuleFile[];
+  installed_yara_x_version: string;
+}
+
+export interface Diagnostic {
+  code: string;
+  title: string;
+  file: string | null;
+  line: number | null;
+  column: number | null;
+}
+
+export interface RuleValidation {
+  rule_set_sha256: string;
+  label: string;
+  yara_x_version: string;
+  compiled: boolean;
+  rule_identifiers: string[];
+  problems: string[];
+  errors: Diagnostic[];
+  warnings: Diagnostic[];
+  duration_ms: number;
+}
+
+export type RunStatus = "queued" | "running" | "succeeded" | "partial" | "failed" | "cancelled";
+export type StepStatus =
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "timed_out"
+  | "cancelled"
+  | "skipped";
+
+export interface StringsSummary {
+  total_found: number;
+  found_by_encoding: Record<string, number>;
+  stored: number;
+  truncated: boolean;
+}
+
+export interface RunStep {
+  index: number;
+  tool: string;
+  adapter: string;
+  status: StepStatus;
+  message: string | null;
+  invocation_id: string | null;
+  tool_version: string | null;
+  adapter_version: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  duration_ms: number | null;
+  timeout_seconds: number;
+  failure_reason: string | null;
+  raw_output_sha256: string | null;
+  strings: StringsSummary | null;
+  warnings: string[];
+}
+
+export interface Run {
+  id: string;
+  status: RunStatus;
+  failure_reason: string | null;
+  failure_message: string | null;
+  cancel_requested: boolean;
+  queued_at: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  bytasm_version: string;
+  profile_id: string;
+  profile_name: string;
+  rule_set: { id: string; label: string; sha256: string };
+  sample: {
+    project_id: string;
+    project_name: string;
+    sample_id: string;
+    sample_name: string;
+    version_id: string;
+    version_label: string | null;
+    sha256: string;
+    size_bytes: number;
+    detected_format: string;
+    admitted_under: string;
+  };
+  steps: RunStep[];
+  counts: { findings: number; evidence: number; strings: number };
+}
+
+export interface Evidence {
+  id: number;
+  kind: "byte_range";
+  pattern_id: string;
+  file_offset: number;
+  length: number;
+  xor_key: number | null;
+  excerpt_hex: string;
+  excerpt_truncated: boolean;
+  raw_json_pointer: string;
+}
+
+export interface Finding {
+  id: string;
+  kind: "yara_match";
+  title: string;
+  rule_id: string;
+  rule_namespace: string;
+  rule_set_id: string;
+  tags: string[];
+  metadata: Array<[string, string | number | boolean]>;
+  fingerprint: string;
+  match_count: number;
+  evidence_truncated: boolean;
+  evidence: Evidence[];
+}
+
+export interface FindingFilters {
+  tool?: string;
+  kind?: string;
+  q?: string;
+  [key: string]: string | undefined;
+}
+
+export interface Findings {
+  run_id: string;
+  run_status: string;
+  run_message: string | null;
+  total: number;
+  filters: { tool: string | null; kind: string | null; q: string | null };
+  available_tools: string[];
+  available_kinds: string[];
+  findings: Finding[];
+  notices: string[];
+}
+
+export interface RunLog {
+  run_id: string;
+  entries: Array<{ seq: number; at: string | null; step_index: number | null; message: string }>;
+  next_cursor: number;
+  complete: boolean;
+}
+
+export interface StringsQuery {
+  query?: string;
+  encoding?: "ascii" | "utf-16le";
+  offset?: number;
+  limit?: number;
+  [key: string]: string | number | undefined;
+}
+
+export interface ExtractedString {
+  offset: number;
+  encoding: "ascii" | "utf-16le";
+  length_chars: number;
+  byte_length: number;
+  value: string;
+  value_truncated: boolean;
+}
+
+export interface StringsPage {
+  version_id: string;
+  run_id: string | null;
+  run_status: string | null;
+  invocation_id: string | null;
+  tool_version: string | null;
+  min_length: number;
+  encodings: string[];
+  summary: StringsSummary | null;
+  query: string | null;
+  encoding: string | null;
+  matched: number;
+  offset: number;
+  limit: number;
+  items: ExtractedString[];
+  notices: string[];
+}
 
 export interface ImportMetadata {
   sample_id?: string;

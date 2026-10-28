@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from bytasm import __version__
+from bytasm.adapters.result import AdapterResult
 from bytasm.errors import (
     EMPTY_FILE,
     FILE_NOT_FOUND,
@@ -108,7 +109,7 @@ def inspect_file(path: Path, manifest: Manifest) -> dict[str, Any]:
     }
 
 
-def run_metadata_adapter(data: bytes, sha256: str) -> AdapterOutcome:
+def run_metadata_adapter(data: bytes, sha256: str) -> AdapterOutcome[AdapterResult]:
     """Run the LIEF adapter child on `data` in a private temporary directory."""
     root = Path(tempfile.gettempdir()) / "bytasm-inspect"
     workdir = workspace.create_workdir(root)

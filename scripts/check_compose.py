@@ -76,6 +76,8 @@ def check_service(name: str, service: Mapping[str, Any]) -> list[str]:
     if not isinstance(pids, int) or not 0 < pids <= MAX_PIDS:
         fail(f"pids_limit must be set (1..{MAX_PIDS}), not {pids!r}")
 
+    if name != "api" and service.get("ports"):
+        fail("only the api service may publish a port")
     for port in service.get("ports", []):
         if port.get("host_ip") != "127.0.0.1":
             fail(f"port {port.get('target')} must be published on 127.0.0.1 only")
@@ -103,6 +105,8 @@ def check_service(name: str, service: Mapping[str, Any]) -> list[str]:
             fail(f"environment variable {key} is not allowed")
     if service.get("env_file"):
         fail("env_file is not allowed (no secrets in the container)")
+    if service.get("volumes_from"):
+        fail("volumes_from is not allowed")
     return failures
 
 

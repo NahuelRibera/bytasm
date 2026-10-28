@@ -1,6 +1,6 @@
 #!/bin/sh
-# Check the running Compose container really has the settings compose.yaml
-# asks for (run after `make compose-up`). `make compose-check` checks the
+# Check the running Compose containers (api, and the v0.2 worker) really have
+# the settings compose.yaml asks for (run after `make compose-up`). `make compose-check` checks the
 # configuration; this checks what the kernel applied. It only runs `sh`,
 # `grep`, `cat` and `touch` inside the container; no fixture is executed.
 set -eu
@@ -8,7 +8,9 @@ set -eu
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT"
 
-docker compose exec -T api sh -eu -c '
+for service in api worker; do
+echo "$service:"
+docker compose exec -T "$service" sh -eu -c '
   fail() { echo "FAIL $*"; exit 1; }
   [ "$(id -u)" != 0 ] || fail "runs as root"
   for field in CapPrm CapEff CapBnd CapAmb; do
@@ -26,6 +28,14 @@ docker compose exec -T api sh -eu -c '
   echo "container OK: uid $(id -u), no capabilities, no-new-privileges, seccomp, read-only root,"
   echo "  pids.max $(cat /sys/fs/cgroup/pids.max), memory.max $(cat /sys/fs/cgroup/memory.max), cpu.max $(cat /sys/fs/cgroup/cpu.max)"
 '
+done
+
+# The worker publishes no port (the image EXPOSEs 8000 for the API only).
+bindings=$(docker inspect --format '{{json .HostConfig.PortBindings}}' "$(docker compose ps -q worker)")
+case "$bindings" in
+  "{}"|"null") echo "worker: no published ports" ;;
+  *) echo "FAIL the worker publishes ports: $bindings"; exit 1 ;;
+esac
 
 # Published on the host loopback only.
 ports=$(docker compose port api 8000)
