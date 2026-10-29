@@ -94,7 +94,7 @@ class Base(DeclarativeBase):
 class ActivityEvent(Base):
     """Append-only project audit record; local actors have no account or OS identity.
 
-    Only project.created is emitted for now, with a constant empty payload.
+    Payloads contain only minimal references, never user text or file contents.
     Application code never updates or deletes events. This is an audit trail,
     not protection against someone who can write the database directly.
     """

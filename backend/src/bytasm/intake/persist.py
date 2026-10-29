@@ -2,7 +2,8 @@
 
 1. Re-hash the admitted file and compare with the streaming hash.
 2. In one transaction, insert the sample (if new), sample_version,
-   authorization_record, analysis_run, tool_invocation, sections and symbols.
+   authorization_record, analysis_run, tool_invocation, sections, symbols and
+   the sample_version.imported activity event.
 3. Place the file and the adapter's raw result in their content-addressed
    stores (atomic rename on the same filesystem).
 4. Commit. If anything fails, roll back and delete every stored file this
@@ -23,6 +24,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from bytasm import __version__
 from bytasm.adapters.result import AdapterResult
 from bytasm.db.models import (
+    ActivityEvent,
     AnalysisRun,
     AuthorizationRecord,
     Sample,
@@ -160,6 +162,15 @@ def persist_import(
             session.add(Symbol(invocation_id=invocation.id, direction="import", name=name))
         for name in metadata.exports:
             session.add(Symbol(invocation_id=invocation.id, direction="export", name=name))
+        session.add(
+            ActivityEvent(
+                project_id=project_id,
+                actor_id="local",
+                type="sample_version.imported",
+                payload={"sample_id": sample.id, "sample_version_id": version.id},
+                at=version.imported_at,
+            )
+        )
         session.flush()
 
         if outputs.put_bytes(parsed.result_bytes, result_sha256, scratch_dir):
