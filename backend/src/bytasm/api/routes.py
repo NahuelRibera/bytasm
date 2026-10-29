@@ -32,7 +32,7 @@ from bytasm.api.views import (
     symbols_of,
 )
 from bytasm.db.imported import import_record
-from bytasm.db.models import Project, Sample, SampleVersion
+from bytasm.db.models import ActivityEvent, Project, Sample, SampleVersion, utcnow
 from bytasm.jobs.scan import yara_x_installed_version
 from bytasm.jobs.worker import heartbeat_path
 
@@ -87,8 +87,19 @@ def list_projects(request: Request) -> list[ProjectOut]:
 @router.post("/projects", response_model=ProjectOut, status_code=201)
 def create_project(request: Request, body: ProjectIn) -> ProjectOut:
     with _ctx(request).sessions() as session:
-        project = Project(name=body.name, description=body.description)
+        now = utcnow()
+        project = Project(name=body.name, description=body.description, created_at=now)
         session.add(project)
+        session.flush()  # assigns project.id, without committing
+        session.add(
+            ActivityEvent(
+                project_id=project.id,
+                actor_id="local",
+                type="project.created",
+                payload={},
+                at=now,
+            )
+        )
         session.commit()
         return project_out(session, project)
 

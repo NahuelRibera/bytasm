@@ -91,6 +91,24 @@ class Base(DeclarativeBase):
     pass
 
 
+class ActivityEvent(Base):
+    """Append-only project audit record; local actors have no account or OS identity.
+
+    Only project.created is emitted for now, with a constant empty payload.
+    Application code never updates or deletes events. This is an audit trail,
+    not protection against someone who can write the database directly.
+    """
+
+    __tablename__ = "activity_event"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    project_id: Mapped[str] = mapped_column(ForeignKey("project.id"), index=True)
+    actor_id: Mapped[str] = mapped_column(String(32))
+    type: Mapped[str] = mapped_column(String(64))
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON)
+    at: Mapped[datetime] = mapped_column(UtcDateTime)
+
+
 class Project(Base):
     __tablename__ = "project"
 
