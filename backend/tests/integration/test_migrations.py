@@ -153,3 +153,40 @@ def test_0002_runs_survive_0003_and_multi_step_runs_downgrade_cleanly(tmp_path: 
             assert session.scalars(select(StringOccurrence)).all() == []
             assert session.get(AnalysisRun, run["id"]) is None
         assert client.post(f"/api/v1/sample-versions/{version_id}/reports").status_code == 201
+
+
+def test_0004_preserves_existing_data_without_inventing_events(tmp_path: Path) -> None:
+    """Upgrade an occupied 0003 database; downgrade only removes the audit table."""
+    from sqlalchemy import MetaData
+
+    settings = make_settings(tmp_path)
+    with api_client(settings) as client:
+        project = create_project(client)
+        response = do_import(client, project, ELF_X86_64.read_bytes(), sample_name="elf")
+        assert response.status_code == 201
+        engine = ctx_of(client).engine
+        migrate(engine, "0003", downgrade=True)
+        metadata = MetaData()
+        metadata.reflect(engine)
+        with engine.connect() as connection:
+            before = {
+                name: connection.execute(table.select()).all()
+                for name, table in metadata.tables.items()
+                if name != "alembic_version"
+            }
+        migrate(engine, "head")
+        with engine.connect() as connection:
+            assert connection.execute(text("SELECT count(*) FROM activity_event")).scalar_one() == 0
+            assert connection.execute(text("PRAGMA foreign_key_check")).all() == []
+            for name, rows in before.items():
+                assert connection.execute(metadata.tables[name].select()).all() == rows
+        version_id = response.json()["sample_version"]["id"]
+        assert client.get(f"/api/v1/sample-versions/{version_id}").status_code == 200
+        assert client.post("/api/v1/projects", json={"name": "After upgrade"}).status_code == 201
+        migrate(engine, "0003", downgrade=True)
+        with engine.connect() as connection:
+            assert connection.execute(text("SELECT count(*) FROM project")).scalar_one() == 2
+            for name, rows in before.items():
+                if name != "project":
+                    assert connection.execute(metadata.tables[name].select()).all() == rows
+        migrate(engine, "head")
