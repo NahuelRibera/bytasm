@@ -53,6 +53,7 @@ EXPECTED = {
     "entropy_blob-aarch64.elf": ("ELF", "aarch64"),
     "hello_v1-x86_64.o": ("ELF", "x86_64"),
     "hello_v1-x86_64.elf": ("ELF", "x86_64"),
+    "hello_v2-x86_64.elf": ("ELF", "x86_64"),
     "hello_v1-x86_64-stripped.elf": ("ELF", "x86_64"),
     "hello_v1-x86_64.exe": ("PE", "x86_64"),
     "exports_v1-x86_64.dll": ("PE", "x86_64"),

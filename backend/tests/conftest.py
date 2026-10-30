@@ -23,6 +23,7 @@ ELF_AARCH64_STRIPPED = FIXTURES_DIR / "bin" / "hello_v1-aarch64-stripped.elf"
 ELF_ENTROPY = FIXTURES_DIR / "bin" / "entropy_blob-aarch64.elf"
 ELF_X86_64_OBJECT = FIXTURES_DIR / "bin" / "hello_v1-x86_64.o"
 ELF_X86_64 = FIXTURES_DIR / "bin" / "hello_v1-x86_64.elf"
+ELF_X86_64_V2 = FIXTURES_DIR / "bin" / "hello_v2-x86_64.elf"
 ELF_X86_64_STRIPPED = FIXTURES_DIR / "bin" / "hello_v1-x86_64-stripped.elf"
 PE_X86_64_EXE = FIXTURES_DIR / "bin" / "hello_v1-x86_64.exe"
 PE_X86_64_DLL = FIXTURES_DIR / "bin" / "exports_v1-x86_64.dll"
@@ -33,6 +34,7 @@ ELF_FIXTURES = (
     ELF_X86_64_OBJECT,
     ELF_X86_64,
     ELF_X86_64_STRIPPED,
+    ELF_X86_64_V2,
 )
 PE_FIXTURES = (PE_X86_64_EXE, PE_X86_64_DLL)
 ALL_FIXTURES = ELF_FIXTURES + PE_FIXTURES
