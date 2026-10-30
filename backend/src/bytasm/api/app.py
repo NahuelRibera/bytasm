@@ -12,7 +12,17 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.body_limit import RequestBodyLimitMiddleware
 
 from bytasm import __version__
-from bytasm.api import activity, analysis, annotations, compare, imports, reports, routes, tools
+from bytasm.api import (
+    activity,
+    analysis,
+    annotations,
+    compare,
+    ghidra,
+    imports,
+    reports,
+    routes,
+    tools,
+)
 from bytasm.api.context import AppContext
 from bytasm.api.guards import LocalOnlyGuard
 from bytasm.api.maintenance import startup_sweep
@@ -105,6 +115,7 @@ def create_app(
     app.include_router(imports.router, prefix="/api/v1")
     app.include_router(reports.router, prefix="/api/v1")
     app.include_router(analysis.router, prefix="/api/v1")
+    app.include_router(ghidra.router, prefix="/api/v1")
     add_web_routes(app, settings.web_dist)
 
     @app.exception_handler(RequestValidationError)

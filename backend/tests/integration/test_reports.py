@@ -131,9 +131,13 @@ def test_two_exports_differ_only_in_generated_at(client: TestClient) -> None:
     b.pop("generated_at")
     assert a == b
     # Canonical bytes: sorted keys, fixed indent, so equal data gives equal text.
+    # Normalize only this field: an import timestamp can equal generated_at
+    # within the same second and must not be replaced elsewhere in the report.
     assert first.decode().replace(
-        json.loads(first)["generated_at"], "T"
-    ) == second.decode().replace(json.loads(second)["generated_at"], "T")
+        f'"generated_at": "{json.loads(first)["generated_at"]}"', '"generated_at": "T"'
+    ) == second.decode().replace(
+        f'"generated_at": "{json.loads(second)["generated_at"]}"', '"generated_at": "T"'
+    )
     assert list(json.loads(first)) == sorted(json.loads(first))
 
 

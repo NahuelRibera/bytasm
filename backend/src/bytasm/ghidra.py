@@ -1,8 +1,6 @@
-"""Read-only optional-provider preflight. Never launches Ghidra, Java or samples.
+"""Read-only metadata preflight; real health checks live in ghidra_provider.
 
-Metadata is a declaration, not proof that an executable is usable. Until a
-real offline runner and bounded health check are verified, availability is
-always false. No environment variable can override that release boundary.
+Metadata alone never establishes availability or launches a tool or sample.
 """
 
 import os
@@ -15,7 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 MAX_METADATA_BYTES = 16 * 1024
 Status = Literal[
@@ -26,6 +24,10 @@ Status = Literal[
     "java_incompatible",
     "unsupported_host",
     "execution_unavailable",
+    "available",
+    "self_check_failed",
+    "isolation_unavailable",
+    "resource_constraint",
 ]
 
 
@@ -43,14 +45,24 @@ class GhidraConfiguration:
 
 class GhidraDiagnostic(BaseModel):
     provider: Literal["ghidra"] = "ghidra"
-    available: Literal[False] = False
-    analysis_enabled: Literal[False] = False
+    available: bool = False
+    analysis_enabled: bool = False
     status: Status
     message: str
     declared_ghidra_version: Literal["12.2"] | None = None
     declared_java_major: int | None = None
-    verification: Literal["metadata_only"] = "metadata_only"
-    health_check: Literal["not_run"] = "not_run"
+    verification: Literal["metadata_only", "headless_self_check"] = "metadata_only"
+    health_check: Literal["not_run", "passed", "failed"] = "not_run"
+
+    @model_validator(mode="after")
+    def verified_availability(self) -> "GhidraDiagnostic":
+        if self.available and (
+            self.health_check != "passed" or self.verification != "headless_self_check"
+        ):
+            raise ValueError("Availability requires a successful real health check")
+        if self.analysis_enabled and not self.available:
+            raise ValueError("Analysis requires an available provider")
+        return self
 
 
 def _directory(value: str) -> Path:
@@ -82,7 +94,7 @@ def _properties(path: Path) -> dict[str, str]:
             continue
         key, separator, value = line.partition("=")
         key = key.strip()
-        if not separator or not re.fullmatch(r"[A-Za-z0-9_.]+", key) or key in result:
+        if not separator or not re.fullmatch(r"[A-Za-z0-9_.-]+", key) or key in result:
             raise ValueError("Invalid metadata declaration")
         result[key] = value.strip().strip('"')
     return result
@@ -115,7 +127,7 @@ def diagnose(
     if host not in ("linux", "darwin") or architecture is None:
         return GhidraDiagnostic(
             status="unsupported_host",
-            message="Only Linux/macOS x64 or ARM64 metadata is checked; analysis is disabled.",
+            message="Only Linux/macOS x64 or ARM64 installation metadata is reviewed.",
         )
     try:
         properties = _properties(home / "Ghidra" / "application.properties")
@@ -167,7 +179,7 @@ def diagnose(
         declared_ghidra_version="12.2",
         declared_java_major=25,
         message=(
-            "Installation metadata matches. No verified offline Ghidra runner or real health "
-            "check is implemented. Analysis remains disabled; no tool was launched."
+            "Installation metadata matches. Headless health has not run; "
+            "metadata alone cannot establish availability. No tool was launched by preflight."
         ),
     )

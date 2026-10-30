@@ -7,11 +7,13 @@ included. Standard library only.
 Usage:
   python scripts/check_compose.py            # runs `docker compose config`
   python scripts/check_compose.py config.json
+  python scripts/check_compose.py --ghidra-installations  # explicit trusted tool roots only
 
 Exit status 0 if every check passes, 1 otherwise (each failure is printed).
 """
 
 import json
+import os
 import subprocess
 import sys
 from collections.abc import Mapping
@@ -32,7 +34,9 @@ def _memory_bytes(value: Any) -> int | None:
     return None
 
 
-def check_service(name: str, service: Mapping[str, Any]) -> list[str]:
+def check_service(
+    name: str, service: Mapping[str, Any], ghidra_roots: Mapping[str, str] | None = None
+) -> list[str]:
     failures: list[str] = []
 
     def fail(message: str) -> None:
@@ -85,7 +89,23 @@ def check_service(name: str, service: Mapping[str, Any]) -> list[str]:
             fail(f"port {port.get('target')} must be published on 127.0.0.1 only")
 
     for volume in service.get("volumes", []):
-        if volume.get("type") != "volume" or volume.get("target") != DATA_TARGET:
+        trusted_tool = (
+            name == "worker"
+            and ghidra_roots is not None
+            and volume.get("type") == "bind"
+            and volume.get("read_only") is True
+            and volume.get("target") in ghidra_roots
+            and volume.get("source") == ghidra_roots.get(volume.get("target"))
+            and (service.get("environment") or {}).get(
+                "BYTASM_GHIDRA_HOME"
+                if volume.get("target") == "/opt/ghidra"
+                else "BYTASM_GHIDRA_JAVA_HOME"
+            )
+            == volume.get("target")
+        )
+        if not trusted_tool and (
+            volume.get("type") != "volume" or volume.get("target") != DATA_TARGET
+        ):
             fail(
                 f"only the named data volume at {DATA_TARGET} may be mounted, "
                 f"not {volume.get('type')} {volume.get('source')} -> {volume.get('target')}"
@@ -112,13 +132,15 @@ def check_service(name: str, service: Mapping[str, Any]) -> list[str]:
     return failures
 
 
-def check_config(config: Mapping[str, Any]) -> list[str]:
+def check_config(
+    config: Mapping[str, Any], *, ghidra_roots: Mapping[str, str] | None = None
+) -> list[str]:
     services = config.get("services") or {}
     if not services:
         return ["no services defined"]
     failures: list[str] = []
     for name, service in services.items():
-        failures.extend(check_service(name, service))
+        failures.extend(check_service(name, service, ghidra_roots))
     for name, network in (config.get("networks") or {}).items():
         if network.get("driver") == "host":
             failures.append(f"network {name}: host driver is not allowed")
@@ -126,6 +148,20 @@ def check_config(config: Mapping[str, Any]) -> list[str]:
 
 
 def main(argv: list[str]) -> int:
+    roots = None
+    if "--ghidra-installations" in argv:
+        argv = [arg for arg in argv if arg != "--ghidra-installations"]
+        roots = {}
+        for key, target in (
+            ("BYTASM_GHIDRA_HOME", "/opt/ghidra"),
+            ("BYTASM_GHIDRA_JAVA_HOME", "/opt/ghidra-jdk"),
+        ):
+            value = os.environ.get(key, "")
+            path = Path(value)
+            if not value or not path.is_absolute() or path == Path("/") or not path.is_dir():
+                print("FAIL explicit existing absolute tool installation roots are required")
+                return 1
+            roots[target] = str(path)
     if argv:
         config = json.loads(Path(argv[0]).read_text())
     else:
@@ -137,7 +173,7 @@ def main(argv: list[str]) -> int:
             check=True,
         )
         config = json.loads(completed.stdout)
-    failures = check_config(config)
+    failures = check_config(config, ghidra_roots=roots)
     for failure in failures:
         print(f"FAIL {failure}")
     if failures:

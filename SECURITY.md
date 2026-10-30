@@ -169,25 +169,33 @@ changed strings and analyst text: review before sharing. No automatic URL links,
 external queries, sensitive-string classifier or new binary admission is added.
 Stored JSON summaries remain authoritative when rendering historical HTML.
 
-## Optional Ghidra release boundary
+## Optional Ghidra static analysis boundary
 
-The Ghidra diagnostic reads only fixed metadata locations beneath explicitly
-configured local installation/JDK roots. It does not crawl directories or launch
-executables, scripts, plugins, Java classes or samples. Metadata files must be
-regular, non-symlink files, at most 16 KiB each; FIFO opens are nonblocking.
-Duplicate/malformed declarations are refused. Diagnostic messages never include
-configured paths, binary-derived text or arbitrary filesystem exception details.
-Local install directories remain trusted operator configuration, not API inputs.
+Metadata preflight remains bounded/nonblocking and never establishes availability.
+Doctor and the configured worker run a real bounded Headless/native health check
+using an empty in-memory program, without importing a sample. Only explicitly
+configured trusted Ghidra/JDK paths select executable code. No tool is installed
+automatically, no GUI/plugins/MCP/AI integration is added, and no sample-derived
+content is sent to a network service.
 
-The full Ghidra provider is blocked: no bounded real health check/offline runner
-has been verified and no Ghidra/JDK distribution is supplied. Availability and
-analysis-enabled flags remain false even for matching metadata. Optional invalid
-configuration does not stop existing workflows. No environment/request/UI option
-can override this boundary, and no Ghidra analysis profile is exposed.
+Sample analysis requires the offline non-root Linux/resource/tmpfs controls in
+[the setup guide](docs/ghidra-setup.md). The API reads a bounded worker health
+record only while its heartbeat is fresh; every analysis rechecks controls,
+admission, sample hash and script/profile identity. Private per-run projects,
+settings, caches and bounded logs never reuse user-owned databases/preferences.
+Arguments are arrays; sample paths appear only as Headless import inputs.
+No sample is run, loaded as a library, debugged, emulated or detonated.
 
-Native workers still have network access. An offline Compose worker does not
-make a host-installed Ghidra available inside the image. Do not add arbitrary
-host mounts, a Docker socket, user-owned Ghidra projects/preferences or a native
-fallback to bypass this. Future analysis requires tested workspace, heap/memory,
-disk, process-tree, timeout, cancellation and output controls. It must preserve
-admission and cannot be advertised as a complete sandbox or gate I1.
+Ghidra output is hostile parser output, bounded before parent allocation,
+validated against a strict typed protocol and stored transactionally. Address
+spaces remain explicit; no virtual-address/file-offset conversion is invented.
+Raw tool logs are not routine logs. Pseudocode is reconstruction, static calls
+are relationships rather than observed execution, and no safety verdict follows.
+
+This remains option B: fixtures/self_built admission is unchanged. A parser
+vulnerability could still affect the host or shared application data. Process
+groups cannot contain every escaped descendant; cgroup process/memory limits
+and container teardown are backstops, not a complete sandbox. API import isolation
+and writable-volume separation still block arbitrary-file admission. Exported
+Ghidra reports can disclose names, addresses and pseudocode; review before sharing.
+See ADR-0005 and the current milestone for verification and unrun checks.

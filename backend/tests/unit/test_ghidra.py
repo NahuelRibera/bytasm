@@ -101,3 +101,27 @@ def test_missing_launcher_and_java_binary_are_not_usable(tmp_path: Path) -> None
     launcher.chmod(0o700)
     (Path(config.java_home) / "bin" / "java").unlink()
     assert diagnose(config).status == "java_missing"
+
+
+@pytest.mark.parametrize(
+    ("machine", "jdk_arch", "expected"),
+    [
+        ("arm64", "aarch64", "execution_unavailable"),
+        ("x86_64", "amd64", "execution_unavailable"),
+        ("arm64", "amd64", "java_incompatible"),
+        ("x86_64", "aarch64", "java_incompatible"),
+    ],
+)
+def test_real_distribution_metadata_keys_allow_hyphenated_revision(
+    tmp_path: Path, machine: str, jdk_arch: str, expected: str
+) -> None:
+    config = configured(tmp_path)
+    assert config.home is not None and config.java_home is not None
+    (Path(config.java_home) / "release").write_text(
+        f'JAVA_VERSION="25.0.1"\nOS_ARCH="{jdk_arch}"\n'
+    )
+    with (Path(config.home) / "Ghidra" / "application.properties").open("a") as stream:
+        stream.write("application.revision.ghidra.ext-u=verified-release-revision\n")
+    # Synthetic JDK and host identities must not depend on the CI runner's CPU.
+    assert diagnose(config, host="linux", machine=machine).status == expected
+    assert not (tmp_path / "EXECUTED").exists()

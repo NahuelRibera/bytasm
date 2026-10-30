@@ -13,7 +13,7 @@ Environment variables (all optional):
   BYTASM_INPUT_POLICY  "fixtures" (default) or "self_built" (Linux only)
   BYTASM_CONTAINER     "1" only in the Compose image (see `container` below)
   BYTASM_SOURCE_REVISION  source revision baked into the image (no .git there)
-  BYTASM_GHIDRA_HOME   optional caller-installed directory (metadata diagnosis only)
+  BYTASM_GHIDRA_HOME   optional trusted caller-installed Ghidra root
   BYTASM_GHIDRA_JAVA_HOME  optional caller-installed JDK directory; not global JAVA_HOME
 """
 

@@ -239,7 +239,12 @@ async def validate_rule_set(request: Request) -> RuleValidationOut | JSONRespons
 
 
 def _strings_summary(invocation: ToolInvocation | None) -> StringsSummaryOut | None:
-    if invocation is None or invocation.summary is None or invocation.status != "succeeded":
+    if (
+        invocation is None
+        or invocation.tool_name != runs.STRINGS_TOOL
+        or invocation.summary is None
+        or invocation.status != "succeeded"
+    ):
         return None
     return StringsSummaryOut(**invocation.summary)
 
@@ -426,6 +431,20 @@ def _create_run(ctx: AppContext, version_id: str, profile_id: str = "default-sta
             "The stored sample no longer matches its recorded SHA-256, so it cannot be "
             "analysed. Re-import the original file into a new sample.",
         ) from exc
+    if profile_id == "ghidra-static":
+        from bytasm.ghidra_provider import profile_snapshot
+
+        with ctx.sessions() as session:
+            session.connection().exec_driver_sql("BEGIN IMMEDIATE")
+            active = runs.active_run_id(session, version_id)
+            if active is not None:
+                raise _Refused("run_active", extra={"run_id": active})
+            run = runs.new_queued_run(version_id, profile_snapshot(), datetime.now(UTC))
+            session.add(run)
+            session.flush()
+            runs.record_activity(session, run.id, "queued")
+            session.commit()
+            return run.id
     try:
         rule_set = load_rule_set(ctx.settings.rules_dir)
     except RuleSetError as exc:
@@ -540,6 +559,12 @@ def _create_run(ctx: AppContext, version_id: str, profile_id: str = "default-sta
 @router.post("/sample-versions/{version_id}/runs", response_model=RunOut, status_code=202)
 async def create_run(request: Request, version_id: str, body: RunCreate) -> RunOut | JSONResponse:
     ctx = _ctx(request)
+    if body.profile_id == "ghidra-static":
+        from bytasm.ghidra_health import effective_diagnostic
+
+        diagnostic = await effective_diagnostic(ctx.settings)
+        if not diagnostic.available or not diagnostic.analysis_enabled:
+            return problem("provider_unavailable", request_id=_rid(request))
     try:
         run_id = await run_in_threadpool(_create_run, ctx, version_id, body.profile_id)
     except _Refused as refusal:

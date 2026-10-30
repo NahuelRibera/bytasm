@@ -141,3 +141,24 @@ means the optional provider is unavailable; it does not indicate that Quick/Full
 are broken. Open **Tools and profiles** for the same bounded diagnostic. Ghidra
 analysis and a function-detail demo are not shipped in this increment. The
 existing 12-step fixture demo remains the actual supported analysis workflow.
+
+## Optional Ghidra review
+
+Follow docs/ghidra-setup.md to supply trusted Linux Ghidra12.2/JDK25 roots to
+the offline worker. The standard demo still works with no optional provider.
+Run worker doctor and confirm an actual passed health check and enabled analysis;
+installation metadata alone is insufficient.
+
+Import hello_v1-x86_64.elf from the committed fixtures, enter its authorization,
+select Ghidra function review, and wait for the recorded worker result. Open its
+run: read verified observations and limits, search/page the function inventory,
+inspect a detailed function's pseudocode/instructions and static call table,
+then download the run's separate JSON/HTML exports. Inventory-only functions
+remain explicitly unavailable for detailed analysis. Do not execute the fixture.
+
+The real opt-in verification command is scripts/check-ghidra-real.sh with
+BYTASM_GHIDRA_HOME, BYTASM_GHIDRA_JAVA_HOME and BYTASM_GHIDRA_TEST_IMAGE set to
+verified local tools/a test image. It runs real health, admitted-fixture extraction,
+API-to-worker export and bounded cancellation/timeout tests in an offline,
+non-root container. It performs no downloads. The frontend accessibility test
+uses explicitly synthetic API records and is separate from real-tool evidence.

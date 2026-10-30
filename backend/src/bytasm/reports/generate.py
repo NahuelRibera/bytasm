@@ -50,7 +50,11 @@ def _iso(value: datetime) -> str:
 def pattern_run(version: SampleVersion) -> AnalysisRun | None:
     """The newest analysis run of the version that kept results (blueprint J8, J9)."""
     candidates = [
-        run for run in version.runs if run.kind == "analysis" and run.status in runs.WITH_RESULTS
+        run
+        for run in version.runs
+        if run.kind == "analysis"
+        and run.status in runs.WITH_RESULTS
+        and run.profile_snapshot.get("id") != "ghidra-static"
     ]
     return max(candidates, key=lambda r: (r.queued_at or r.started_at, r.id), default=None)
 

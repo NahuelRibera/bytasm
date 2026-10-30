@@ -48,7 +48,7 @@ def _build_parser() -> argparse.ArgumentParser:
     inspect = commands.add_parser("inspect", help="print metadata for a committed fixture")
     inspect.add_argument("path", type=Path, help="path to a fixture listed in the manifest")
     commands.add_parser(
-        "doctor", help="report optional Ghidra metadata blockers without launching tools or samples"
+        "doctor", help="check optional Ghidra with a bounded no-sample Headless self-test"
     )
     commands.add_parser(
         "serve",
@@ -122,10 +122,17 @@ def serve() -> int:
 def main(argv: Sequence[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     if args.command == "doctor":
-        from bytasm.ghidra import GhidraConfiguration, diagnose
+        import asyncio
+        import tempfile
 
-        sys.stdout.write(to_json(diagnose(GhidraConfiguration.from_env()).model_dump()))
-        return 1  # No usable Ghidra provider is implemented yet.
+        from bytasm.ghidra import GhidraConfiguration
+        from bytasm.ghidra_health import verified_diagnostic
+
+        config = GhidraConfiguration.from_env()
+        with tempfile.TemporaryDirectory(prefix="bytasm-doctor-") as scratch:
+            diagnostic = asyncio.run(verified_diagnostic(config, Path(scratch)))
+        sys.stdout.write(to_json(diagnostic.model_dump()))
+        return 0 if diagnostic.available else 1
     if args.command == "serve":
         return serve()
     if args.command == "worker":

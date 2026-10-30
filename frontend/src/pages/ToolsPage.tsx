@@ -14,13 +14,13 @@ export function ToolsPage() {
     </section>)}</div>
     {tools.data.optional_providers?.map(provider => <section className="card optional-provider" aria-label="Ghidra diagnostics" key={provider.provider}>
       <h2>Optional Ghidra provider</h2>
-      <p><strong>Analysis unavailable.</strong> {provider.message}</p>
+      <p><strong>{provider.analysis_enabled ? "Analysis available." : "Analysis unavailable."}</strong> {provider.message}</p>
       <dl className="diff-values">
         <div><dt>Diagnostic</dt><dd>{provider.status.replaceAll("_", " ")}</dd></div>
         <div><dt>Declared Ghidra version</dt><dd>{provider.declared_ghidra_version ?? "Not verified"}</dd></div>
         <div><dt>Declared Java major version</dt><dd>{provider.declared_java_major ?? "Not verified"}</dd></div>
       </dl>
-      <p>Metadata only, not proof of a usable installation. Health check: not run. No executable or sample was opened by this diagnostic.</p>
+      <p>{provider.verification === "metadata_only" ? "Metadata only, not proof of a usable installation." : "A bounded Headless self-check was attempted without a sample."} Health check: {provider.health_check.replaceAll("_", " ")}. {provider.health_check === "not_run" && "No executable or sample was opened by this diagnostic."}</p>
       <p>Local setup uses BYTASM_GHIDRA_HOME and BYTASM_GHIDRA_JAVA_HOME. Nothing is downloaded automatically. A verified offline runner is required before analysis can be enabled.</p>
     </section>)}
     <h2>Built-in profiles</h2>{tools.data.profiles.map((profile) => <section className="card" key={profile.id}>

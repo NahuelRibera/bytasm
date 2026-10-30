@@ -82,14 +82,36 @@ or publish the image as a cleared distribution. Local implementation/testing
 and owner release approval are distinct. No upstream issue, message or PR was
 opened on the owner's behalf.
 
-## Optional Ghidra proposal (not bundled)
+## Optional Ghidra provider (not bundled)
 
-The metadata diagnostic references Ghidra 12.2 and JDK 25; no distribution,
-plugin, upstream script, REA/MCP package, Java runtime or new dependency is added.
-[Official Ghidra LICENSE](https://github.com/NationalSecurityAgency/ghidra/blob/Ghidra_12.2_build/LICENSE)
-is Apache-2.0. Its [NOTICE](https://github.com/NationalSecurityAgency/ghidra/blob/Ghidra_12.2_build/NOTICE)
-requires attention to per-module third-party notices and separately licensed GPL
-support programs. The exact binary distribution and its bundled payload are not
-available for inspection here, so no binary redistribution clearance is claimed.
-Caller ownership of an installation does not replace that review if packaging
-is proposed later. The existing ida-settings blocker above is unchanged.
+Ghidra 12.2 and 64-bit JDK 25 remain caller-installed optional tools. No binary,
+Java runtime, upstream script, REA/MCP package or new runtime dependency is added
+to Bytasm. Its fixed Java extraction/health scripts are self-authored.
+
+The official release archive ghidra_12.2_PUBLIC_20261016.zip was downloaded only
+for temporary local verification. SHA-256 matched the published release digest:
+2c2cd776db3c1f6a097ba418922378ac3649cadd5e844a6f5f088ae628a7be67.
+[Official release](https://github.com/NationalSecurityAgency/ghidra/releases/tag/Ghidra_12.2_build),
+[versioned requirements](https://github.com/NationalSecurityAgency/ghidra/blob/Ghidra_12.2_build/GhidraDocs/GettingStarted.md),
+[LICENSE](https://github.com/NationalSecurityAgency/ghidra/blob/Ghidra_12.2_build/LICENSE),
+[NOTICE](https://github.com/NationalSecurityAgency/ghidra/blob/Ghidra_12.2_build/NOTICE).
+
+The actual archive has an Apache2.0 top-level LICENSE, 37 files under licenses/,
+a CycloneDX bom.json with 209 component entries, and separately licensed GPL
+support programs. The BOM component entries inspected do not supply license
+identifiers; it is not license clearance. The extracted binary archive has no
+root NOTICE file; upstream NOTICE and per-module/license files remain relevant.
+The Linux ARM64 decompiler was built for testing from the verified archive's
+included C++ source using GCC 14.2; no sample was compiled as a helper or run.
+
+Temporary test Java: Adoptium Temurin 25.0.5+8 Linux AArch64, downloaded through
+the official Adoptium asset API/release. SHA-256 matched its published API digest:
+bb5b2ded252f21c6090cf780b0a408ad0d83bbb557e702955643557f13231880.
+[Exact official asset](https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.5%2B8/OpenJDK25U-jdk_aarch64_linux_hotspot_25.0.5_8.tar.gz).
+It is not bundled or redistributed with Bytasm. Review its own included legal/
+notices before any proposed distribution.
+
+The pinned ida-settings3.5.2 source pyproject and installed metadata were
+rechecked; they still do not establish a library license. The existing
+redistribution blocker is unchanged. No package/image distribution clearance is
+claimed and no upstream communication was sent.

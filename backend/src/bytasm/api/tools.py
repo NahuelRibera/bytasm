@@ -3,7 +3,8 @@
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
-from bytasm.ghidra import GhidraDiagnostic, diagnose
+from bytasm.ghidra import GhidraDiagnostic
+from bytasm.ghidra_health import effective_diagnostic
 from bytasm.tools import PROFILES, registry
 
 router = APIRouter()
@@ -34,11 +35,25 @@ class ToolsOut(BaseModel):
 
 
 @router.get("/tools", response_model=ToolsOut)
-def tools(request: Request) -> ToolsOut:
+async def tools(request: Request) -> ToolsOut:
+    diagnostic = await effective_diagnostic(request.app.state.ctx.settings)
+    profiles = list(PROFILES)
+    if diagnostic.available and diagnostic.analysis_enabled:
+        profiles.append(
+            {
+                "id": "ghidra-static",
+                "name": "Ghidra function review",
+                "steps": ["ghidra"],
+                "limitations": (
+                    "Bounded function inventory and first 16 function details. "
+                    "Static evidence, not runtime behavior. Requires the configured offline worker."
+                ),
+            }
+        )
     return ToolsOut.model_validate(
         {
             "tools": registry(),
-            "profiles": PROFILES,
-            "optional_providers": [diagnose(request.app.state.ctx.settings.ghidra)],
+            "profiles": profiles,
+            "optional_providers": [diagnostic],
         }
     )
