@@ -848,3 +848,16 @@ details.card > summary {
   cursor: pointer;
 }
 .report-library, .export { overflow-wrap: anywhere; }
+
+/* Review views keep untrusted provenance and measurements inside narrow cards. */
+.review-panel, .review-observation, .section-map { min-width: 0; overflow-wrap: anywhere; }
+.review-panel details > summary { cursor: pointer; min-height: 28px; padding-block: 8px; }
+.review-observation { border-top: 1px solid var(--border); margin-top: 16px; padding-top: 12px; }
+.section-map { margin: 0 0 24px; }
+.section-map ul { list-style: none; padding: 0; }
+.section-map li { margin: 16px 0; }
+.measurement-track { height: 10px; background: var(--surface-2); border: 1px solid var(--border); margin: 6px 0; }
+.measurement-track > span { display: block; height: 100%; background: var(--accent); }
+.privacy-choice { display: flex; align-items: center; gap: 8px; margin-block: 12px; }
+
+.analysis-summary { overflow-wrap: anywhere; }

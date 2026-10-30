@@ -116,3 +116,19 @@ conclusion; return to the version's **Reports**, choose **Preview new report**
 and download JSON/HTML. For comparisons, use two versions of the same sample,
 review the capabilities compatibility state, then preview the comparison report.
 HTML can be opened offline and printed without scripts or remote assets.
+
+## Post-PR6 evidence-led journey
+
+`make demo` now includes a twelfth check: the exact run's reviewed explanations,
+the immutable report's explanatory view and bounded length-sorted strings from
+that same run. It prints scope/count verification, not extracted string values.
+
+For the UI: import an allowed fixture, inspect **Section sizes and entropy
+measurements**, run Quick/Full, read **Why these observations appear**, follow
+**Inspect exact finding and evidence**, and open **Search the strings**. The
+link pins the source run. Filter by a heuristic prefix category, choose sorting
+or page-local grouping, and explicitly reveal path-like values only when useful.
+A section link returns to the exact source row. Preview a report to inspect the
+same canonical source records and download escaped standalone HTML. Comparison
+remains available for two authorized versions of the same sample, with explicit
+missing/incompatible categories and signed counts. No file is executed.

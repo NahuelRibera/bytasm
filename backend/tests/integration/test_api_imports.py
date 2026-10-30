@@ -272,6 +272,7 @@ def test_no_endpoint_can_change_the_input_policy(client: TestClient) -> None:
     assert routes == {
         ("/api/v1/health", "get"),
         ("/api/v1/tools", "get"),
+        ("/api/v1/reports/{report_id}/review", "get"),
         ("/api/v1/reports/{report_id}/html", "get"),
         ("/api/v1/sample-versions/{version_id}/reports", "get"),
         ("/api/v1/compare", "get"),

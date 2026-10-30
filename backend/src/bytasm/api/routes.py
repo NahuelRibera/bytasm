@@ -147,6 +147,7 @@ def get_sections(request: Request, version_id: str) -> SectionsOut | JSONRespons
             return _not_found(request, "sample version")
         record = import_record(version)
         return SectionsOut(
+            metadata_invocation_id=record.invocation.id,
             entropy_method=record.entropy_method,
             sections=[SectionOut.model_validate(s) for s in sections_of(record.invocation)],
         )

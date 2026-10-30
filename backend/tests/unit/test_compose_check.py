@@ -160,6 +160,8 @@ def test_only_the_api_may_publish_a_port() -> None:
     config = copy.deepcopy(GOOD)
     worker = copy.deepcopy(config["services"]["api"])
     del worker["ports"]
+    worker.pop("networks")
+    worker["network_mode"] = "none"
     config["services"]["worker"] = worker
     assert checker.check_config(config) == []
     worker["volumes_from"] = ["api"]
@@ -167,3 +169,15 @@ def test_only_the_api_may_publish_a_port() -> None:
     failures = checker.check_config(config)
     assert any("only the api service may publish a port" in f for f in failures), failures
     assert any("volumes_from" in f for f in failures), failures
+
+
+def test_worker_must_have_no_network_namespace_access() -> None:
+    config = copy.deepcopy(GOOD)
+    worker = copy.deepcopy(config["services"]["api"])
+    worker.pop("ports")
+    worker["networks"] = {"default": None}
+    config["services"]["worker"] = worker
+    assert any("network_mode: none" in error for error in checker.check_config(config))
+    worker.pop("networks")
+    worker["network_mode"] = "none"
+    assert checker.check_config(config) == []

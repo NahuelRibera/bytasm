@@ -4,8 +4,8 @@
 #
 # These settings are defence in depth. They are NOT a sandbox: the LIEF parser
 # runs in the api container; strings, YARA-X and capa run in the worker, each as the
-# same user as its parent process, with the shared data volume and the same
-# (unrestricted outbound) network. That is why Bytasm only parses its own
+# same user as its parent process, with a shared data volume. The API retains
+# outbound access; the worker has no network. That is why Bytasm only parses its own
 # fixtures here (blueprint 5.4.1, 8.2; SECURITY.md).
 #
 # SQLite replaces the blueprint's `db` service and the API serves the built UI
@@ -68,6 +68,8 @@ services:
   worker:
     image: bytasm-local:v0.4
     command: ["python", "-m", "bytasm", "worker"]
+    # SQLite/file-backed jobs require no network access. This is not a sandbox.
+    network_mode: none
     depends_on:
       api:
         condition: service_healthy

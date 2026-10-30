@@ -83,6 +83,8 @@ export interface SampleVersion {
     bitness: number;
     endianness: string;
     entry_point: number | null;
+    entry_point_hex?: string | null;
+    declared_header_exact?: Record<string, string>;
     declared_header: Record<string, string | number>;
     imported_libraries: string[];
   };
@@ -97,13 +99,16 @@ export interface Section {
   file_offset: number;
   raw_size: number;
   virtual_address: number;
+  virtual_address_hex?: string;
   virtual_size: number;
+  virtual_size_decimal?: string;
   flags: string[];
   entropy: number | null;
   entropy_note: string | null;
 }
 
 export interface Sections {
+  metadata_invocation_id?: string | null;
   entropy_method: string;
   entropy_unit: "bits_per_byte";
   sections: Section[];
@@ -188,6 +193,7 @@ async function get<T>(path: string): Promise<T> {
 
 export const api = {
   tools: () => get<{ tools: Array<{ tool: string; available: boolean; version: string | null; adapter: string; adapter_version: string; formats: string[]; rules_sha256: string | null; limitations: string }>; profiles: Array<{ id: string; name: string; steps: string[]; limitations: string }> }>("/api/v1/tools"),
+  reportReview: (id: string) => get<Review>(`/api/v1/reports/${encodeURIComponent(id)}/review`),
   reportDocument: (id: string) => get<Record<string, unknown>>(`/api/v1/reports/${encodeURIComponent(id)}/download`),
   reportHistory: (id: string, offset = 0) => get<{ items: Array<{ id: string; sha256: string; generated_at: string; scope: { kind: string } | null }>; next_offset: number | null }>(`/api/v1/sample-versions/${encodeURIComponent(id)}/reports?offset=${offset}&limit=25`),
   health: () => get<Health>("/api/v1/health"),
@@ -379,6 +385,7 @@ export interface Run {
   };
   steps: RunStep[];
   summary?: string[];
+  review?: Review | null;
   counts: { findings: number; evidence: number; strings: number };
 }
 
@@ -439,7 +446,13 @@ export interface RunLog {
   complete: boolean;
 }
 
+export type StringCategory = "url_like" | "path_like" | "other";
+export type StringSort = "offset" | "length" | "value" | "category";
+
 export interface StringsQuery {
+  run_id?: string;
+  category?: StringCategory;
+  sort?: StringSort;
   query?: string;
   encoding?: "ascii" | "utf-16le";
   offset?: number;
@@ -448,6 +461,8 @@ export interface StringsQuery {
 }
 
 export interface ExtractedString {
+  category?: StringCategory;
+  section?: { index: number; name: string } | null;
   offset: number;
   encoding: "ascii" | "utf-16le";
   length_chars: number;
@@ -457,6 +472,9 @@ export interface ExtractedString {
 }
 
 export interface StringsPage {
+  category_counts?: Partial<Record<StringCategory, number>>;
+  category_scope?: string;
+  metadata_invocation_id?: string | null;
   version_id: string;
   run_id: string | null;
   run_status: string | null;
@@ -507,4 +525,17 @@ export interface ActivityItem {
 export interface ActivityPage {
   items: ActivityItem[];
   next_offset: number | null;
+}
+
+
+export interface Review {
+  template_version: string;
+  run_id: string | null;
+  version_id: string;
+  total: number;
+  capped: boolean;
+  observations: Array<{ key: string; tool: string; tool_version: string; adapter_version: string;
+    rule_id: string; rule_version: string; rule_sha256: string; statement: string; hypothesis: string;
+    source_href: string; locations: string[]; pointers: string[]; evidence_capped: boolean }>;
+  glossary: Record<string, string>;
 }

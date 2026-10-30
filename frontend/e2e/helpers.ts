@@ -57,10 +57,12 @@ export async function createProject(page: Page, base: string, name: string) {
   await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
 }
 
-export async function importFile(page: Page, path: string, options: { sample?: string; label?: string } = {}) {
+export async function importFile(page: Page, path: string, options: { sample?: string; label?: string; filename?: string } = {}) {
   await page.getByRole("link", { name: "Import a binary" }).first().click();
   await expect(page.getByRole("heading", { name: "Import a binary" })).toBeVisible();
-  await page.getByLabel("File").setInputFiles(path);
+  await page.getByLabel("File").setInputFiles(options.filename
+    ? { name: options.filename, mimeType: "application/octet-stream", buffer: readFileSync(path) }
+    : path);
   if (options.sample) await page.getByLabel("Sample name").fill(options.sample);
   if (options.label) await page.getByLabel("Version label (optional)").fill(options.label);
   await page.getByLabel("Statement").fill(STATEMENT);

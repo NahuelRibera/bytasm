@@ -1,3 +1,4 @@
+import { ReviewPanel } from "../ReviewPanel";
 import { AnnotationsSection } from "./AnnotationsSection";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
@@ -65,7 +66,8 @@ export function RunPage({ runId }: { runId: string }) {
       {ACTIVE.has(r.status) && <WorkerWarning />}
       <RunBanner run={r} />
 
-      {r.summary && <section className="card" aria-labelledby="plain-run"><h2 id="plain-run">Analysis in plain language</h2>{r.summary.map((text, i) => <p key={i}>{text}</p>)}</section>}
+      {r.summary && <section className="card analysis-summary" aria-labelledby="plain-run"><h2 id="plain-run">Analysis in plain language</h2>{r.summary.map((text, i) => <p key={i}>{text}</p>)}</section>}
+      {r.review && <ReviewPanel review={r.review} />}
       <section className="card" aria-label="Run summary"><p>{r.steps.filter(step => step.status === "succeeded").length} of {r.steps.length} selected steps succeeded · {r.counts.findings} findings · {r.counts.strings.toLocaleString("en")} recorded strings</p><p className="hint">Scope: this run. Failed, unsupported and unavailable steps do not establish absence of patterns.</p></section>
       <div className="grid-2 run-grid">
         <SamplePanel run={r} />
@@ -394,7 +396,7 @@ function StringsSummaryPanel({ run }: { run: Run }) {
             Strings are observations, not findings.
           </p>
           <p>
-            <Link to={`/versions/${run.sample.version_id}?tab=strings`}>
+            <Link to={`/versions/${run.sample.version_id}?tab=strings&run_id=${run.id}`}>
               Search the strings on the sample version page
             </Link>
           </p>
@@ -422,11 +424,21 @@ function FindingsSection({ run }: { run: Run }) {
   });
   const [selected, setSelected] = useState<string | null>(() => window.location.hash.startsWith("#finding-") ? window.location.hash.slice(9) : null);
   useEffect(() => {
-    if (window.location.hash.startsWith("#evidence-") && findings.data) {
-      const identity = Number(window.location.hash.slice(10));
-      const match = findings.data.findings.find((item) => item.evidence.some((evidence) => evidence.id === identity));
-      if (match) setSelected(match.id);
-    }
+    const selectSource = (clearFilters = false) => {
+      if (window.location.hash.startsWith("#finding-")) {
+        setSelected(window.location.hash.slice(9));
+        if (clearFilters) { setTool(""); setKind(""); setNamespace(""); setQuery(""); setSearch(""); }
+      }
+      if (window.location.hash.startsWith("#evidence-") && findings.data) {
+        const identity = Number(window.location.hash.slice(10));
+        const match = findings.data.findings.find(item => item.evidence.some(evidence => evidence.id === identity));
+        if (match) setSelected(match.id);
+      }
+    };
+    if (window.location.hash.startsWith("#evidence-")) selectSource();
+    const navigateSource = () => selectSource(true);
+    window.addEventListener("hashchange", navigateSource);
+    return () => window.removeEventListener("hashchange", navigateSource);
   }, [findings.data]);
   const openers = useRef<Record<string, HTMLButtonElement | null>>({});
 

@@ -3,6 +3,8 @@
 from collections import Counter
 from typing import Any
 
+from bytasm.review import explanation, safe_filename
+
 
 def describe(
     identity: dict[str, Any],
@@ -15,6 +17,10 @@ def describe(
     file_format = identity.get("format", identity.get("detected_format", "unknown format"))
     arch = identity.get("architecture", "architecture declared in the file")
     paragraphs = [f"Bytasm read file {sha}… ({file_format}, {arch}). It did not run the file."]
+    filename = identity.get("declared_filename")
+    if filename:
+        name = filename.get("value") if isinstance(filename, dict) else filename
+        paragraphs[0] += f" Display filename: {safe_filename(name)} (directory components hidden)."
     if not steps:
         paragraphs.append(
             "Header metadata is available. No completed analysis run was selected; "
@@ -44,6 +50,22 @@ def describe(
                 )
             )
         if observations:
+            # At most one example; the linked review contains the full bounded catalog view.
+            examples = sorted(
+                findings,
+                key=lambda row: (str(row.get("tool", "yara-x")), str(row.get("rule_id", ""))),
+            )
+            for finding in examples[:1]:
+                completed = {step["tool"] for step in steps if step["status"] == "succeeded"}
+                if "rule_id" not in finding or finding.get("tool", "yara-x") not in completed:
+                    continue
+                statement, hypothesis = explanation(
+                    str(finding.get("tool", "yara-x")),
+                    str(finding.get("tool_version", "")),
+                    str(finding["rule_id"]),
+                    str(finding.get("rule_set_sha256", "")),
+                )
+                observations.append(f"{statement} {hypothesis}")
             paragraphs.append(" ".join(observations))
     paragraphs.append(
         "What this tells you: which static patterns the completed tools reported. "
@@ -83,5 +105,17 @@ def report_summary(document: dict[str, Any]) -> list[str]:
                     f"{name}: +{category['added']} added, −{category['removed']} removed, "
                     f"~{category['changed']} changed"
                 )
-        paragraphs.insert(-1, "Comparison of the selected versions — " + "; ".join(changes) + ".")
+        sides = []
+        for side in ("a", "b"):
+            source = comparison.get(side)
+            if source:
+                sides.append(
+                    f"{side.upper()}: {str(source['sha256'])[:16]}…; "
+                    f"run {source.get('run_id') or 'not selected'} "
+                    f"({source.get('run_status') or 'not run'})"
+                )
+        scope = "; ".join(sides) + ". " if sides else ""
+        paragraphs.insert(
+            -1, scope + "Comparison of the selected versions — " + "; ".join(changes) + "."
+        )
     return paragraphs

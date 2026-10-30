@@ -76,6 +76,8 @@ def check_service(name: str, service: Mapping[str, Any]) -> list[str]:
     if not isinstance(pids, int) or not 0 < pids <= MAX_PIDS:
         fail(f"pids_limit must be set (1..{MAX_PIDS}), not {pids!r}")
 
+    if name == "worker" and service.get("network_mode") != "none":
+        fail("worker must use network_mode: none")
     if name != "api" and service.get("ports"):
         fail("only the api service may publish a port")
     for port in service.get("ports", []):

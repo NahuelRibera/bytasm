@@ -39,3 +39,23 @@ integrity/backup/restore endpoints and user-editable profiles are not exposed.
 source, original files and installed tool version. `virtual_address_hex` provides
 an exact lowercase hexadecimal string for JavaScript displays above 2^53; the
 integer `virtual_address` remains available for exact-integer JSON consumers.
+
+## Post-PR6 additive review contracts
+
+- `RunOut.review`: template version, version/run IDs, total/cap flag, at most 12
+  observations with at most three source locations/pointers each, exact tool /
+  adapter / rules provenance, evidence cap flag and internal source links.
+- `GET /reports/{id}/review`: the same bounded view derived from a hash-verified,
+  schema-validated schema 4 snapshot; missing is 404, corrupt is 409 and legacy
+  schema views are unsupported (422). JSON downloads are unchanged.
+- Strings: allowlisted `category=url_like|path_like|other` and
+  `sort=offset|length|value|category`; counts are selected-run stored observations
+  before filters. `value` orders retained prefixes, `length` decreases full
+  recorded length. Pagination remains <=200 rows, deterministic ties; run_id
+  stays scoped to this version. Oversized (>5,000) persisted sets are refused.
+- Each string includes heuristic category and an optional unique fully-containing
+  raw section reference. No address is derived; metadata invocation identifies
+  the section source. Categories are not findings or confirmed meanings.
+- Section metadata adds import-invocation identity and exact address/size display
+  strings. Header overview adds exact display representations for integer values.
+  These are declarations; no new parser formats/fields or report-schema changes.

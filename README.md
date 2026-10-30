@@ -124,7 +124,7 @@ their results if a later step fails or is cancelled. The run page shows each
 step, a technical log, findings and validated raw JSON downloads. The Strings
 tab supports search, encoding filters and paging.
 
-Reports use schema version 3 and include metadata, provenance, string counts,
+Reports use schema version 4 and include metadata, provenance, string counts,
 findings with evidence and analyst annotations. Single-version reports omit
 string values; comparison reports can include changed strings. Exports re-check stored
 file hashes and are reproducible apart from `generated_at`.
@@ -231,3 +231,25 @@ A project licence has not been chosen. Dependency licences are separate:
 [LIEF](https://lief.re) uses Apache-2.0 and
 [YARA-X](https://virustotal.github.io/yara-x/) uses BSD-3-Clause.
 The lock files list the remaining dependencies and versions.
+
+
+## Evidence-led review after PR6
+
+Analysis results now connect reviewed, deterministic explanations to exact
+findings, rule/tool versions, evidence locations and source runs. Possible
+interpretations are labelled hypotheses, separate from analyst conclusions.
+Unknown rule provenance receives no specific interpretation. No AI or risk
+score is used. Reports use their canonical stored summary and snapshot records.
+
+On a version, the section map compares declared raw sizes and entropy on its
+true 0–8 measurement scale, with the complete source table below. The strings
+explorer supports stable sorting, heuristic prefix categories, paging and exact
+raw-section references where unambiguous. Path-like values are hidden until
+explicitly revealed; original values remain in the local API. No string is an
+automatic link or a behavior claim. Run links keep the selected run's strings.
+
+The Compose worker is offline (`network_mode: none`); the API's import parser
+and native processes retain their existing network/filesystem risks. The input
+policy and unresolved dependency redistribution issue remain unchanged.
+See the [post-PR6 milestone](docs/milestones/post-pr6-evidence-review.md) for the
+implemented scope, follow-ups, source contracts and verification record.

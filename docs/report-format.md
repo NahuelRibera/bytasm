@@ -114,3 +114,15 @@ lowercase `0x` string derived from the exact unsigned 64-bit address. Clients
 should use it for display: JavaScript numbers cannot represent every U64 exactly.
 The native integer remains in canonical JSON for consumers with exact integers;
 React previews and capa panels use the exact hex representation.
+
+## Post-PR6 presentation (schema 4 unchanged)
+
+The published schemas and stored JSON bytes are unchanged. New reports can have
+richer reviewed text in the existing `summary` list. Historical HTML renders
+its stored summary with escaping, rather than reinterpreting that old text.
+A bounded explanatory view derives from the same canonical finding/step/rules
+records, identifies reviewed template version 1 and shows exact source positions,
+pointers, versions and rules hash. It is not an analyst conclusion. Filename
+provenance is behind a privacy expander; comparison data may still contain paths.
+`GET /reports/{id}/review` exposes that view for schema 4 snapshots; it never mixes
+in later live records. Existing JSON download and legacy v2/v3 behavior remains.

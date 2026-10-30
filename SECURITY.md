@@ -37,8 +37,9 @@ Compose runs the API and worker as UID 10001, drops capabilities, uses
 `no-new-privileges`, default seccomp, a read-only root filesystem, a `noexec`
 temporary directory and explicit resource limits. It mounts a named data volume,
 with no host directories or Docker socket. The worker publishes no port.
-Both services share the data volume and network; outbound connections are
-allowed, and containers share the host kernel. This is not the gate I1 boundary.
+Both services share the data volume and host kernel. The worker has no network
+interface beyond loopback (`network_mode: none`); the API retains outbound
+connections on its bridge network. This is not the gate I1 boundary.
 
 ## Requests and stored results
 
@@ -142,3 +143,28 @@ and analyst-authored material: review before sharing. This work adds neither
 arbitrary binary admission nor a backup/archive import mechanism. See
 THIRD_PARTY_NOTICES.md for licensing review and the outstanding transitive
 license packaging clarification before image redistribution.
+
+## Post-PR6 review presentation and offline worker
+
+Compose's worker now has `network_mode: none`; both the resolved-configuration
+and running-container checks require it. It uses the shared SQLite/filesystem
+queue and publishes no ports. This does not remove the API/LIEF import child's
+outbound access, native-process access, shared writable volume or same-UID risks.
+It does not establish a sandbox or pass I1. All admission/resource/cancellation
+checks remain mandatory, including fixture-only native macOS behavior.
+
+Review explanations are deterministic self-authored templates keyed to exact
+tool version, rule identifier and rules hash. Unrecognised provenance receives
+no rule-specific hypothesis. These are hypotheses, separate from cited analyst
+conclusions; no score or executed behavior is inferred. The presentation is
+bounded and escaped, and creates no new activity/log content. API access logs
+are disabled; queries, values and annotation bodies are not routine log data.
+
+String categories describe a prefix's shape only, never its purpose. Path-like
+values are hidden by default in the explorer, but remain in the local API and
+existing bounded raw output. This is a display control, not encrypted storage.
+Filename directory components are hidden in overview summaries; full original
+provenance remains an explicit disclosure. Comparison exports can still contain
+changed strings and analyst text: review before sharing. No automatic URL links,
+external queries, sensitive-string classifier or new binary admission is added.
+Stored JSON summaries remain authoritative when rendering historical HTML.

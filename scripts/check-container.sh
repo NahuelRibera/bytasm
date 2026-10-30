@@ -30,6 +30,10 @@ docker compose exec -T "$service" sh -eu -c '
 '
 done
 
+worker_network=$(docker inspect --format '{{.HostConfig.NetworkMode}}' "$(docker compose ps -q worker)")
+[ "$worker_network" = none ] || { echo "FAIL worker has network access"; exit 1; }
+echo "worker: network_mode none"
+
 # The worker publishes no port (the image EXPOSEs 8000 for the API only).
 bindings=$(docker inspect --format '{{json .HostConfig.PortBindings}}' "$(docker compose ps -q worker)")
 case "$bindings" in

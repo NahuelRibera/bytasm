@@ -72,10 +72,7 @@ def worker() -> int:
         return 1
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
     make_non_dumpable()
-    sys.stderr.write(
-        f"Bytasm {__version__} worker (input policy: {settings.input_policy}; "
-        f"data: {settings.data_dir})\n"
-    )
+    sys.stderr.write(f"Bytasm {__version__} worker (input policy: {settings.input_policy})\n")
     try:
         run_worker(settings)
     except WorkerError as error:
@@ -105,10 +102,7 @@ def serve() -> int:
         if settings.container
         else f"http://{settings.host}:{settings.port}/"
     )
-    sys.stderr.write(
-        f"Bytasm {__version__} on {where} "
-        f"(input policy: {settings.input_policy}; data: {settings.data_dir})\n"
-    )
+    sys.stderr.write(f"Bytasm {__version__} on {where} (input policy: {settings.input_policy})\n")
     uvicorn.run(
         create_app(settings),
         host=settings.host,
@@ -117,6 +111,7 @@ def serve() -> int:
         proxy_headers=False,
         server_header=False,
         log_level="info",
+        access_log=False,  # URLs may contain local strings-explorer queries.
     )
     return 0
 
