@@ -189,6 +189,8 @@ async function get<T>(path: string): Promise<T> {
 export const api = {
   health: () => get<Health>("/api/v1/health"),
   projects: () => get<Project[]>("/api/v1/projects"),
+  activity: (projectId: string, offset = 0) =>
+    get<ActivityPage>(`/api/v1/projects/${encodeURIComponent(projectId)}/activity${queryString({ offset, limit: 25 })}`),
   project: (id: string) => get<Project>(`/api/v1/projects/${encodeURIComponent(id)}`),
   samples: (projectId: string) =>
     get<Sample[]>(`/api/v1/projects/${encodeURIComponent(projectId)}/samples`),
@@ -475,4 +477,23 @@ export function encodeImportHeader(metadata: ImportMetadata): string {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+export interface ActivityItem {
+  annotation_target_type?: "sample_version" | "finding" | "evidence" | null;
+  annotation_target_id?: string | null;
+  annotation_id?: string | null;
+  revision_id?: string | null;
+  id: string;
+  type: string;
+  at: string;
+  sample_version_id: string | null;
+  run_id: string | null;
+  status: string | null;
+  reason: string | null;
+}
+
+export interface ActivityPage {
+  items: ActivityItem[];
+  next_offset: number | null;
 }

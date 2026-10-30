@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../api";
 import { AdmittedPill, Empty, ErrorPanel, Loading, formatDate, shortHash } from "../components";
 import { Link } from "../router";
+import { ProjectActivity } from "./ProjectActivity";
 
 export function ProjectPage({ projectId }: { projectId: string }) {
   const project = useQuery({ queryKey: ["project", projectId], queryFn: () => api.project(projectId) });
@@ -41,6 +42,7 @@ export function ProjectPage({ projectId }: { projectId: string }) {
         {samples.data?.map((sample) => (
           <article className="card" key={sample.id} aria-label={`Sample ${sample.name}`}>
             <h3>{sample.name}</h3>
+            {sample.versions.length >= 2 && <p><Link to={`/projects/${projectId}/compare/${sample.id}`}>Compare versions of {sample.name}</Link></p>}
             {/* Focusable so the table can be scrolled sideways from the keyboard. */}
             <div
               className="table-scroll"
@@ -84,6 +86,7 @@ export function ProjectPage({ projectId }: { projectId: string }) {
           </article>
         ))}
       </section>
+      <ProjectActivity key={projectId} projectId={projectId} />
     </>
   );
 }

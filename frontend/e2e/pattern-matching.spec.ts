@@ -134,3 +134,39 @@ test.describe("narrow window", () => {
     await expectNoAxeViolations(page);
   });
 });
+
+test("project activity records a run and paginates at 360 px", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await createProject(page, FIXTURES_URL, "Activity history");
+  const projectUrl = page.url();
+  await importFile(page, FIXTURE("hello_v1-x86_64.exe"), { sample: "activity", label: "v1" });
+  await startRun(page);
+  const runUrl = page.url();
+
+  // Use smaller real API pages to exercise load-more without creating extra runs.
+  await page.route("**/activity?*", async (route) => {
+    const url = new URL(route.request().url());
+    url.searchParams.set("limit", "2");
+    await route.continue({ url: url.toString() });
+  });
+  await page.goto(projectUrl);
+  const activity = page.getByRole("region", { name: "Activity", exact: true });
+  const list = activity.getByRole("list", { name: "Project activity" });
+  await expect(list.getByRole("listitem")).toHaveCount(2);
+  await expect(activity.getByText("Project created", { exact: true })).toBeVisible();
+  await expect(activity.getByText("Sample version imported", { exact: true })).toBeVisible();
+  const more = activity.getByRole("button", { name: "Load more activity" });
+  await more.focus();
+  await page.keyboard.press("Enter");
+  await expect(list.getByRole("listitem").nth(2)).toBeFocused();
+  await more.click();
+  await expect(activity.getByText("Analysis completed", { exact: true })).toBeVisible();
+  await expect(more).toHaveCount(0);
+  await expect(activity.getByText("Analysis queued", { exact: true })).toBeVisible();
+  await expect(activity.getByText("Analysis started", { exact: true })).toBeVisible();
+  await expectNoAxeViolations(page);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+  await activity.getByRole("link", { name: "View run" }).last().click();
+  await expect(page).toHaveURL(runUrl);
+});

@@ -4,6 +4,7 @@ import { useEffect, useState, type AnchorHTMLAttributes, type MouseEvent } from 
 export type Route =
   | { name: "projects" }
   | { name: "project"; projectId: string }
+  | { name: "compare"; projectId: string; sampleId: string }
   | { name: "import"; projectId: string }
   | { name: "version"; versionId: string }
   | { name: "rules"; ruleSetId: string | null }
@@ -21,6 +22,8 @@ export function parseRoute(path: string): Route {
     return { name: "import", projectId: match[1]! };
   if ((match = path.match(new RegExp(`^/versions/${ID}/?$`))))
     return { name: "version", versionId: match[1]! };
+  if ((match = path.match(new RegExp(`^/projects/${ID}/compare/${ID}/?$`))))
+    return { name: "compare", projectId: match[1]!, sampleId: match[2]! };
   if (path === "/rules" || path === "/rules/") return { name: "rules", ruleSetId: null };
   if ((match = path.match(new RegExp(`^/rules/${ID}/?$`))))
     return { name: "rules", ruleSetId: match[1]! };
