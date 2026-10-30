@@ -862,3 +862,26 @@ details.card > summary {
 
 .analysis-summary { overflow-wrap: anywhere; }
 .optional-provider { min-width: 0; overflow-wrap: anywhere; }
+
+/* Ghidra evidence stays in one reading column; code is an explicit technical view. */
+.ghidra-workspace { min-width: 0; }
+.ghidra-workspace > section, .ghidra-workspace > details { margin-top: var(--space-5); }
+.ghidra-workspace :is(p, li, dd, code, h4) { overflow-wrap: anywhere; }
+.ghidra-summary { border-left: 3px solid var(--border); padding-left: var(--space-4); max-width: 80ch; }
+.ghidra-summary section + section { margin-top: var(--space-4); }
+.ghidra-coverage progress { width: min(100%, 25rem); height: 1rem; accent-color: var(--accent); }
+.ghidra-function-detail { margin-top: var(--space-5); border: 1px solid var(--border); border-radius: var(--radius-small); padding: var(--space-4); background: var(--surface-2); min-width: 0; }
+.ghidra-function-detail details { margin-top: var(--space-4); }
+.ghidra-code { max-height: 32rem; max-width: 100%; overflow: auto; background: var(--surface); padding: var(--space-4); border: 1px solid var(--border); tab-size: 4; }
+.ghidra-call-map { margin: var(--space-4) 0; max-width: 48rem; }
+.ghidra-call-map svg { display: block; width: 100%; height: auto; }
+.ghidra-call-map rect { fill: var(--surface); stroke: var(--text-muted); }
+.ghidra-call-map path { stroke: var(--text); stroke-width: 2; fill: none; }
+.ghidra-call-map text { fill: var(--text); font: 12px var(--font-mono); }
+.ghidra-call-map figcaption { font-size: .9rem; color: var(--text-muted); }
+@media (max-width: 480px) {
+  .ghidra-function-detail { padding: var(--space-3); }
+  .ghidra-workspace .actions { align-items: stretch; }
+  .ghidra-workspace .actions > .button { white-space: normal; }
+}
+.ghidra-workspace button { position: relative; }

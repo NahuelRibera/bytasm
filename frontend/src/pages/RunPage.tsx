@@ -1,3 +1,4 @@
+import { GhidraPanel } from "../GhidraPanel";
 import { ReviewPanel } from "../ReviewPanel";
 import { AnnotationsSection } from "./AnnotationsSection";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -22,7 +23,7 @@ import { Link } from "../router";
 import { RuleSource } from "./RulesPage";
 
 const ACTIVE = new Set(["queued", "running"]);
-const TOOL_NAMES: Record<string, string> = { strings: "Strings extractor", "yara-x": "YARA-X", "capa": "capa" };
+const TOOL_NAMES: Record<string, string> = { strings: "Strings extractor", "yara-x": "YARA-X", "capa": "capa", "ghidra": "Ghidra Headless" };
 
 function stepOf(run: Run, tool: string): RunStep | undefined {
   return run.steps.find((step) => step.tool === tool);
@@ -53,7 +54,7 @@ export function RunPage({ runId }: { runId: string }) {
       <header className="page-header page-header-actions">
         <div>
           <h1>
-            Analysis run <span className="muted">strings + {r.rule_set.label}</span>
+            Analysis run <span className="muted">{r.profile_id === "ghidra-static" ? r.profile_name : `strings + ${r.rule_set.label}`}</span>
           </h1>
           <p className="status-line" aria-live="polite">
             <StatusPill status={r.status} />
@@ -66,7 +67,8 @@ export function RunPage({ runId }: { runId: string }) {
       {ACTIVE.has(r.status) && <WorkerWarning />}
       <RunBanner run={r} />
 
-      {r.summary && <section className="card analysis-summary" aria-labelledby="plain-run"><h2 id="plain-run">Analysis in plain language</h2>{r.summary.map((text, i) => <p key={i}>{text}</p>)}</section>}
+      {r.profile_id === "ghidra-static" && <GhidraPanel run={r} />}
+      {r.profile_id !== "ghidra-static" && r.summary && <section className="card analysis-summary" aria-labelledby="plain-run"><h2 id="plain-run">Analysis in plain language</h2>{r.summary.map((text, i) => <p key={i}>{text}</p>)}</section>}
       {r.review && <ReviewPanel review={r.review} />}
       <section className="card" aria-label="Run summary"><p>{r.steps.filter(step => step.status === "succeeded").length} of {r.steps.length} selected steps succeeded · {r.counts.findings} findings · {r.counts.strings.toLocaleString("en")} recorded strings</p><p className="hint">Scope: this run. Failed, unsupported and unavailable steps do not establish absence of patterns.</p></section>
       <div className="grid-2 run-grid">
@@ -79,7 +81,7 @@ export function RunPage({ runId }: { runId: string }) {
       {r.steps.some(step => ["yara-x", "capa"].includes(step.tool) && step.status === "succeeded") ? (
         <FindingsSection run={r} />
       ) : (
-        !ACTIVE.has(r.status) && (
+        r.profile_id !== "ghidra-static" && !ACTIVE.has(r.status) && (
           <section className="card" aria-labelledby="findings">
             <h2 id="findings">Findings</h2>
             <p>
@@ -106,6 +108,7 @@ function statusSentence(run: Run): string {
         ? `${TOOL_NAMES[current.tool] ?? current.tool} is running (step ${current.index + 1} of ${total}).`
         : "The worker is between steps.";
     case "succeeded":
+      if (run.profile_id === "ghidra-static") return `Finished${finished}: Ghidra completed its bounded static analysis. Inspect the retained evidence and limitations below.`;
       return `Finished${finished}: all ${total} steps completed. ${run.counts.findings} rule${
         run.counts.findings === 1 ? "" : "s"
       } matched; ${run.counts.strings.toLocaleString("en")} strings recorded.`;
@@ -245,8 +248,10 @@ function ProvenancePanel({ run }: { run: Run }) {
       <h2 id="run-provenance">Provenance</h2>
       <KeyValues
         items={[
+          ...(run.profile_id === "ghidra-static" ? [["Profile", run.profile_name] as [string, React.ReactNode]] : [
           ["Rule set", <Link to={`/rules/${run.rule_set.id}`}>{run.rule_set.label}</Link>],
           ["Rule-set SHA-256", <code className="hash">{run.rule_set.sha256}</code>],
+          ] as [string, React.ReactNode][]),
           ["YARA-X", step?.tool_version ? <code>{step.tool_version}</code> : "— (not started)"],
           [
             "Strings extractor",
@@ -269,6 +274,7 @@ function ProvenancePanel({ run }: { run: Run }) {
 }
 
 const STEP_DESCRIPTIONS: Record<string, string> = {
+  ghidra: "Bounded function inventory, decompiler pseudocode, instructions and direct static call references.",
   strings: "Printable ASCII and UTF-16LE runs of at least 6 characters, with their file offsets.",
   "yara-x": "Static pattern matching with Bytasm's bundled rules.",
 };

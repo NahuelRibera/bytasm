@@ -181,3 +181,31 @@ def test_worker_must_have_no_network_namespace_access() -> None:
     worker.pop("networks")
     worker["network_mode"] = "none"
     assert checker.check_config(config) == []
+
+
+def test_optional_tools_require_explicit_exact_readonly_worker_mounts() -> None:
+    config = copy.deepcopy(GOOD)
+    worker = copy.deepcopy(config["services"]["api"])
+    worker.pop("ports")
+    worker["network_mode"] = "none"
+    worker["environment"].update(
+        {
+            "BYTASM_GHIDRA_HOME": "/opt/ghidra",
+            "BYTASM_GHIDRA_JAVA_HOME": "/opt/ghidra-jdk",
+        }
+    )
+    tools = [
+        {"type": "bind", "source": "/trusted/ghidra", "target": "/opt/ghidra", "read_only": True},
+        {"type": "bind", "source": "/trusted/jdk", "target": "/opt/ghidra-jdk", "read_only": True},
+    ]
+    worker["volumes"].extend(tools)
+    config["services"]["worker"] = worker
+    roots = {"/opt/ghidra": "/trusted/ghidra", "/opt/ghidra-jdk": "/trusted/jdk"}
+    assert checker.check_config(config)
+    assert checker.check_config(config, ghidra_roots=roots) == []
+    for replacement in ({"read_only": False}, {"source": "/personal/home"}, {"target": "/other"}):
+        altered = copy.deepcopy(config)
+        altered["services"]["worker"]["volumes"][1].update(replacement)
+        assert checker.check_config(altered, ghidra_roots=roots)
+    config["services"]["api"]["volumes"].extend(tools)
+    assert checker.check_config(config, ghidra_roots=roots)

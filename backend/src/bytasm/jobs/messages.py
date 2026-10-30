@@ -12,8 +12,14 @@ TOOL_LABELS: Final[dict[str, str]] = {
     "strings": "The strings extractor",
     "yara-x": "YARA-X",
     "capa": "capa",
+    "ghidra": "Ghidra",
 }
-SHORT_LABELS: Final[dict[str, str]] = {"strings": "strings", "yara-x": "YARA-X", "capa": "capa"}
+SHORT_LABELS: Final[dict[str, str]] = {
+    "strings": "strings",
+    "yara-x": "YARA-X",
+    "capa": "capa",
+    "ghidra": "Ghidra",
+}
 
 # Why the run stopped before a tool saw the sample (checked before every step).
 ADMISSION_MESSAGES: Final[dict[str, str]] = {
@@ -30,6 +36,16 @@ STEP_MESSAGES: Final[dict[str, str]] = {
     "unsupported_format": "{tool} does not support this file format or architecture in Bytasm.",
     "tool_unavailable": "The pinned {tool} tool is unavailable.",
     "timeout": "{tool} did not finish within the time limit.",
+    "not_configured": "Ghidra is not configured in the analysis worker.",
+    "installation_invalid": "The configured Ghidra installation is invalid or unavailable.",
+    "unsupported_version": "The configured Ghidra version is not supported by this profile.",
+    "java_missing": "The configured Ghidra JDK is missing or invalid.",
+    "java_incompatible": "The configured Ghidra JDK is incompatible.",
+    "unsupported_host": "This host is not supported by the Ghidra provider.",
+    "resource_constraint": "The Ghidra worker lacks required resource limits.",
+    "startup_failed": "The Ghidra Headless launcher could not start.",
+    "profile_integrity": "The queued profile no longer matches the reviewed extraction script.",
+    "isolation_unavailable": "The offline worker or required resource controls are unavailable.",
     "rules_invalid": (
         "Bytasm's rule set did not compile with the installed YARA-X. Open Rules and run "
         "Validate to see the compiler errors."

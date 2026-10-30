@@ -254,20 +254,17 @@ policy and unresolved dependency redistribution issue remain unchanged.
 See the [post-PR6 milestone](docs/milestones/post-pr6-evidence-review.md) for the
 implemented scope, follow-ups, source contracts and verification record.
 
-## Optional Ghidra diagnostics (analysis not enabled)
+## Optional Ghidra static function review
 
-`uv --directory backend run --no-sync bytasm doctor` reports optional Ghidra
-configuration blockers as JSON, without creating application data or launching
-Java, Ghidra or a sample. Its exit code is 1 while analysis is unavailable.
-The Tools page shows the same metadata-only diagnostic. Existing Quick/Full
-profiles remain usable without Ghidra.
+A caller-installed Ghidra 12.2/JDK 25 provider adds a bounded function review to
+admitted fixtures on a configured offline Linux worker. Doctor runs a harmless
+Headless/native self-test; configuration metadata alone never means available.
+The run page shows a plain-language summary, searchable function inventory,
+pseudocode, instructions, exact static-call relationships and separate JSON/HTML
+exports. Details cover the first 16 functions; inventory is capped at 256.
 
-The proposed provider targets caller-installed Ghidra 12.2 and a 64-bit JDK 25.
-Local configuration uses `BYTASM_GHIDRA_HOME` (installation root containing
-`Ghidra/application.properties`) and `BYTASM_GHIDRA_JAVA_HOME` (JDK root containing
-`release` and `bin/java`), both absolute local directories. Global JAVA_HOME and
-PATH do not select the optional provider. Metadata declarations are not proof
-of usability: no health check or Ghidra analysis is enabled in this increment.
-Nothing is downloaded, installed, bundled or mounted into Compose automatically.
-See [the v0.5 diagnostic milestone](docs/milestones/v0.5-ghidra-provider.md)
-for the blocked full workflow, official sources and verification coverage.
+Nothing is installed or bundled automatically. Native macOS/Windows analysis
+and arbitrary-file admission remain unavailable. Follow the
+[setup and status guide](docs/ghidra-setup.md), optional Compose example and
+[current milestone](docs/milestones/v0.5-ghidra-static-review.md) for precise
+limits, verified platforms, deferred scope and residual parser risks.

@@ -542,12 +542,12 @@ export interface Review {
 
 export interface GhidraDiagnostic {
   provider: "ghidra";
-  available: false;
-  analysis_enabled: false;
-  status: "not_configured" | "installation_invalid" | "unsupported_version" | "java_missing" | "java_incompatible" | "unsupported_host" | "execution_unavailable";
+  available: boolean;
+  analysis_enabled: boolean;
+  status: "not_configured" | "installation_invalid" | "unsupported_version" | "java_missing" | "java_incompatible" | "unsupported_host" | "execution_unavailable" | "available" | "self_check_failed" | "isolation_unavailable";
   message: string;
   declared_ghidra_version: "12.2" | null;
   declared_java_major: number | null;
-  verification: "metadata_only";
-  health_check: "not_run";
+  verification: "metadata_only" | "headless_self_check";
+  health_check: "not_run" | "passed" | "failed";
 }

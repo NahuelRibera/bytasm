@@ -105,6 +105,12 @@ _PROBLEMS: Final[dict[str, tuple[int, str, str]]] = {
         "The metadata parser process failed on this file. It was not imported.",
     ),
     # Analysis runs and rules (v0.2)
+    "provider_unavailable": (
+        503,
+        "Provider unavailable",
+        "The Ghidra provider has not passed its real health check in an available worker. "
+        "Open Tools for setup and recovery instructions. Nothing was queued.",
+    ),
     "run_active": (
         409,
         "A run is already in progress",

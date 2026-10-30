@@ -134,3 +134,28 @@ reports. Published v2/v3/v4 models and stored downloads remain unchanged. Metada
 preflight is not analysis evidence. A future provider needs an explicit typed
 provenance/evidence/export contract and preservation tests before report support
 is advertised; see ADR-0004 and the v0.5 milestone.
+
+## Optional Ghidra report contract
+
+Ghidra-only runs do not alter schemas2/3/4 or their stored report history. They
+are excluded from the legacy latest-pattern-run selector and baseline comparison
+selector. Their independent export is bytasm-ghidra-report-1 with overview and
+analysis (ghidra-1). The strict analysis schema is published separately in
+schemas/ghidra-analysis.schema.json. The scoped OpenAPI responses define the
+overview and function inventory/detail contracts.
+
+Exports re-read a regular non-symlink bounded document, verify its content hash,
+sample identity, Ghidra version and queued profile/script digests, then generate
+canonical sorted ASCII JSON. HTML is generated from that canonical JSON using
+text escaping, no JavaScript or remote resources, restrictive CSP and wrapping
+preformatted evidence. Both include exact run/project/version provenance,
+deterministic observations, recommendations, unknowns and function records.
+The HTML includes canonical evidence as escaped text, not a recovered-source
+claim. Export content includes pseudocode/names and should be reviewed before
+sharing. Downloads are deterministic for the same retained run, but are not
+added to the legacy report library in this milestone.
+
+Migration0007 adds no columns and rewrites no evidence, annotations, citations
+or report rows. Downgrade rejects any retained Ghidra run/invocation to prevent
+older code silently hiding its evidence. Existing capa downgrade protection
+remains active and transactional.

@@ -87,6 +87,11 @@ def _run(session: Session, version: str, kind: str, successful: bool = True) -> 
     query = select(AnalysisRun).where(
         AnalysisRun.sample_version_id == version, AnalysisRun.kind == kind
     )
+    if kind == "analysis":
+        # Ghidra has a separate evidence contract. It must not shadow the
+        # historical strings/rules run used by the existing comparison API.
+        profile = AnalysisRun.profile_snapshot["id"].as_string()
+        query = query.where((profile != "ghidra-static") | profile.is_(None))
     if successful:
         query = query.where(AnalysisRun.status.in_(("succeeded", "partial")))
     timestamp = func.coalesce(

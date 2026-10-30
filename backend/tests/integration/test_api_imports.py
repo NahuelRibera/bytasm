@@ -303,6 +303,11 @@ def test_no_endpoint_can_change_the_input_policy(client: TestClient) -> None:
         ("/api/v1/runs/{run_id}/cancel", "post"),
         ("/api/v1/runs/{run_id}/findings", "get"),
         ("/api/v1/runs/{run_id}/log", "get"),
+        # v0.5: read-only scoped Ghidra evidence; admission has no new controls.
+        ("/api/v1/runs/{run_id}/ghidra", "get"),
+        ("/api/v1/runs/{run_id}/ghidra/functions", "get"),
+        ("/api/v1/runs/{run_id}/ghidra/functions/{index}", "get"),
+        ("/api/v1/runs/{run_id}/ghidra/export", "get"),
         # v0.2: read-only views of stored results.
         ("/api/v1/sample-versions/{version_id}/strings", "get"),
         ("/api/v1/invocations/{invocation_id}/raw", "get"),

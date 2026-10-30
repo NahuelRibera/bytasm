@@ -101,3 +101,11 @@ def test_missing_launcher_and_java_binary_are_not_usable(tmp_path: Path) -> None
     launcher.chmod(0o700)
     (Path(config.java_home) / "bin" / "java").unlink()
     assert diagnose(config).status == "java_missing"
+
+
+def test_real_distribution_metadata_keys_allow_hyphenated_revision(tmp_path: Path) -> None:
+    config = configured(tmp_path)
+    assert config.home is not None
+    with (Path(config.home) / "Ghidra" / "application.properties").open("a") as stream:
+        stream.write("application.revision.ghidra.ext-u=verified-release-revision\n")
+    assert diagnose(config).status == "execution_unavailable"

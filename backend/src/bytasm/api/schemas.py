@@ -211,7 +211,7 @@ class RuleValidationOut(BaseModel):
 class RunCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    profile_id: Literal["default-static", "full-static"]
+    profile_id: Literal["default-static", "full-static", "ghidra-static"]
 
 
 class RuleSetRef(BaseModel):

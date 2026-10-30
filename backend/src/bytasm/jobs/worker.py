@@ -128,6 +128,7 @@ def build_deps(
         limits=settings.limits,
         tmp_dir=settings.tmp_dir,
         adapter_command=adapter_command or yara_adapter_command(),
+        ghidra=settings.ghidra,
     )
     return deps, engine
 
@@ -143,6 +144,20 @@ async def main_async(settings: Settings) -> None:
                     "the database schema is not up to date; start `bytasm serve` first"
                 )
             await asyncio.sleep(1.0)
+        # A fixed bounded status document lets the API report the worker's actual
+        # provider boundary without making the network-connected API analyze a sample.
+        from bytasm.ghidra_provider import provider_health
+
+        status_path = settings.data_dir / "ghidra-health.json"
+        # A restarted or reconfigured worker cannot advertise its predecessor's
+        # successful self-check while the new check is pending.
+        status_path.unlink(missing_ok=True)
+        diagnostic = await provider_health(settings.ghidra, settings.tmp_dir)
+        staging = settings.data_dir / ".ghidra-health.json.part"
+        fd = os.open(staging, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(diagnostic, handle, sort_keys=True)
+        os.replace(staging, status_path)
         with deps.sessions() as session:
             interrupted = runs.fail_interrupted_runs(session)
         log.info(

@@ -1,0 +1,279 @@
+{
+  "$defs": {
+    "Address": {
+      "additionalProperties": false,
+      "properties": {
+        "space": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Space",
+          "type": "string"
+        },
+        "address": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Address",
+          "type": "string"
+        }
+      },
+      "required": [
+        "space",
+        "address"
+      ],
+      "title": "Address",
+      "type": "object"
+    },
+    "Call": {
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/Address"
+        },
+        "target": {
+          "$ref": "#/$defs/Address"
+        }
+      },
+      "required": [
+        "source",
+        "target"
+      ],
+      "title": "Call",
+      "type": "object"
+    },
+    "Function": {
+      "additionalProperties": false,
+      "properties": {
+        "entry": {
+          "$ref": "#/$defs/Address"
+        },
+        "name": {
+          "maxLength": 256,
+          "title": "Name",
+          "type": "string"
+        },
+        "namespace": {
+          "maxLength": 256,
+          "title": "Namespace",
+          "type": "string"
+        },
+        "external": {
+          "default": false,
+          "title": "External",
+          "type": "boolean"
+        },
+        "name_truncated": {
+          "default": false,
+          "title": "Name Truncated",
+          "type": "boolean"
+        },
+        "namespace_truncated": {
+          "default": false,
+          "title": "Namespace Truncated",
+          "type": "boolean"
+        },
+        "body_size": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Body Size"
+        },
+        "pseudocode": {
+          "anyOf": [
+            {
+              "maxLength": 4096,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Pseudocode"
+        },
+        "pseudocode_status": {
+          "enum": [
+            "available",
+            "not_selected",
+            "failed"
+          ],
+          "title": "Pseudocode Status",
+          "type": "string"
+        },
+        "pseudocode_truncated": {
+          "title": "Pseudocode Truncated",
+          "type": "boolean"
+        },
+        "instructions": {
+          "items": {
+            "$ref": "#/$defs/Instruction"
+          },
+          "maxItems": 64,
+          "title": "Instructions",
+          "type": "array"
+        },
+        "instructions_truncated": {
+          "title": "Instructions Truncated",
+          "type": "boolean"
+        },
+        "calls": {
+          "items": {
+            "$ref": "#/$defs/Call"
+          },
+          "maxItems": 64,
+          "title": "Calls",
+          "type": "array"
+        },
+        "calls_truncated": {
+          "title": "Calls Truncated",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "entry",
+        "name",
+        "namespace",
+        "body_size",
+        "pseudocode",
+        "pseudocode_status",
+        "pseudocode_truncated",
+        "instructions",
+        "instructions_truncated",
+        "calls",
+        "calls_truncated"
+      ],
+      "title": "Function",
+      "type": "object"
+    },
+    "Instruction": {
+      "additionalProperties": false,
+      "properties": {
+        "address": {
+          "$ref": "#/$defs/Address"
+        },
+        "bytes_hex": {
+          "maxLength": 64,
+          "pattern": "^(?:[0-9a-f]{2})*$",
+          "title": "Bytes Hex",
+          "type": "string"
+        },
+        "text": {
+          "maxLength": 256,
+          "title": "Text",
+          "type": "string"
+        },
+        "text_truncated": {
+          "default": false,
+          "title": "Text Truncated",
+          "type": "boolean"
+        },
+        "bytes_truncated": {
+          "default": false,
+          "title": "Bytes Truncated",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "address",
+        "bytes_hex",
+        "text"
+      ],
+      "title": "Instruction",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "ghidra-1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "input_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Input Sha256",
+      "type": "string"
+    },
+    "ghidra_version": {
+      "const": "12.2",
+      "title": "Ghidra Version",
+      "type": "string"
+    },
+    "language_id": {
+      "maxLength": 256,
+      "title": "Language Id",
+      "type": "string"
+    },
+    "compiler": {
+      "maxLength": 256,
+      "title": "Compiler",
+      "type": "string"
+    },
+    "provider_host": {
+      "default": "unavailable",
+      "maxLength": 256,
+      "title": "Provider Host",
+      "type": "string"
+    },
+    "profile_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Profile Sha256",
+      "type": "string"
+    },
+    "script_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Script Sha256",
+      "type": "string"
+    },
+    "functions": {
+      "items": {
+        "$ref": "#/$defs/Function"
+      },
+      "maxItems": 256,
+      "title": "Functions",
+      "type": "array"
+    },
+    "function_count": {
+      "minimum": 0,
+      "title": "Function Count",
+      "type": "integer"
+    },
+    "functions_truncated": {
+      "title": "Functions Truncated",
+      "type": "boolean"
+    },
+    "analysis_timed_out": {
+      "title": "Analysis Timed Out",
+      "type": "boolean"
+    },
+    "limitations": {
+      "items": {
+        "maxLength": 256,
+        "type": "string"
+      },
+      "maxItems": 32,
+      "title": "Limitations",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "input_sha256",
+    "ghidra_version",
+    "language_id",
+    "compiler",
+    "profile_sha256",
+    "script_sha256",
+    "functions",
+    "function_count",
+    "functions_truncated",
+    "analysis_timed_out",
+    "limitations"
+  ],
+  "title": "GhidraResult",
+  "type": "object"
+}

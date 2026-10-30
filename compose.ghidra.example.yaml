@@ -1,0 +1,19 @@
+# Optional caller-installed tools. Use only with compose.yaml after reading
+# docs/ghidra-setup.md. No tools or binaries are downloaded/bundled by this file.
+services:
+  worker:
+    environment:
+      BYTASM_GHIDRA_HOME: /opt/ghidra
+      BYTASM_GHIDRA_JAVA_HOME: /opt/ghidra-jdk
+    volumes:
+      - type: bind
+        source: ${BYTASM_GHIDRA_HOME:?Set the explicit trusted Ghidra installation root}
+        target: /opt/ghidra
+        read_only: true
+      - type: bind
+        source: ${BYTASM_GHIDRA_JAVA_HOME:?Set the explicit trusted JDK25 installation root}
+        target: /opt/ghidra-jdk
+        read_only: true
+    # Aggregate project/cache/log disk cap; separate from persistent evidence.
+    tmpfs:
+      - /data/tmp:rw,noexec,nosuid,nodev,size=256m,uid=10001,gid=10001,mode=0700

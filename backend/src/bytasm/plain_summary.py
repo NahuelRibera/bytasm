@@ -37,7 +37,7 @@ def describe(
         observations = [
             f"{step['tool']} reported {counts[step['tool']]} rule matches in its completed step."
             for step in steps
-            if step["status"] == "succeeded" and step["tool"] != "strings"
+            if step["status"] == "succeeded" and step["tool"] in ("yara-x", "capa")
         ]
         if strings is not None:
             observations.append(

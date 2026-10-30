@@ -10,6 +10,9 @@ import { Link, navigate } from "./router";
  */
 export function AnalysisPanel({ version }: { version: SampleVersion }) {
   const client = useQueryClient();
+  const tools = useQuery({ queryKey: ["tools"], queryFn: api.tools });
+  const ghidraProfile = tools.data?.profiles.find(item => item.id === "ghidra-static");
+  const ghidraAvailable = Boolean(ghidraProfile && tools.data?.optional_providers?.some(item => item.provider === "ghidra" && item.available && item.analysis_enabled));
   const [profile, setProfile] = useState("default-static");
   const runs = useQuery({
     queryKey: ["runs", version.id],
@@ -43,10 +46,9 @@ export function AnalysisPanel({ version }: { version: SampleVersion }) {
 
   return (
     <section className="card" aria-labelledby="pattern-matching">
-      <h2 id="pattern-matching">Analysis runs: strings and pattern matching (YARA-X)</h2>
+      <h2 id="pattern-matching">Static analysis runs</h2>
       <p>
-        A run extracts the file's strings, then matches Bytasm's bundled rules against its stored
-        bytes. The file is not executed. A match is an observation to interpret, not a verdict; no
+        Choose a reviewed profile to inspect the stored file. Quick review extracts strings and matches Bytasm's bundled rules. The file is not executed. A match is an observation to interpret, not a verdict; no
         match does not mean the file is safe. <Link to="/rules">See the rules</Link>.
       </p>
 
@@ -54,6 +56,7 @@ export function AnalysisPanel({ version }: { version: SampleVersion }) {
       <select id="analysis-profile" value={profile} disabled={confirming || Boolean(active)} onChange={event => setProfile(event.target.value)}>
         <option value="default-static">Quick static review: strings and YARA-X</option>
         <option value="full-static">Full static review: strings, YARA-X and capa</option>
+        {ghidraAvailable && <option value="ghidra-static">{ghidraProfile?.name}</option>}
       </select>
       <p className="hint">Metadata was read at import. Full review adds capa 10.0.0 with two upstream rules, a 120 s deadline and native PE x86/x64 support. Other formats retain Quick results with an unsupported capa step.</p>
       {!confirming && (
@@ -65,7 +68,7 @@ export function AnalysisPanel({ version }: { version: SampleVersion }) {
             onClick={() => setConfirming(true)}
             disabled={Boolean(active)}
           >
-            Run pattern matching…
+            {profile === "ghidra-static" ? "Run Ghidra static analysis…" : "Run pattern matching…"}
           </button>
           {active && (
             <span className="status-text">
@@ -78,10 +81,11 @@ export function AnalysisPanel({ version }: { version: SampleVersion }) {
       {confirming && (
         <div className="confirm" role="group" aria-labelledby="confirm-heading">
           <h3 id="confirm-heading">Start a run?</h3>
-          <p>Selected profile: {profile === "full-static" ? "Full static review — strings, YARA-X, then capa" : "Quick static review — strings and YARA-X"}.</p>
+          <p>Selected profile: {profile === "ghidra-static" ? ghidraProfile?.name : profile === "full-static" ? "Full static review — strings, YARA-X, then capa" : "Quick static review — strings and YARA-X"}.</p>
           {rules.isPending && <Loading label="Loading the rule set…" />}
           {rules.isError && <ErrorPanel error={rules.error} title="The rule set could not be loaded" />}
-          {rules.data && (
+          {profile === "ghidra-static" && <p>Ghidra will inspect the stored file without executing it, recording a bounded function inventory and available pseudocode, assembly and static call references. {ghidraProfile?.limitations}</p>}
+          {profile !== "ghidra-static" && rules.data && (
             <p>
               Step 1 extracts ASCII and UTF-16LE strings. Step 2: YARA-X{" "}
               {rules.data.installed_yara_x_version} will match{" "}
@@ -96,7 +100,7 @@ export function AnalysisPanel({ version }: { version: SampleVersion }) {
               type="button"
               className="button button-primary"
               onClick={() => create.mutate()}
-              disabled={create.isPending || !rules.data}
+              disabled={create.isPending || (profile === "ghidra-static" ? !ghidraAvailable : !rules.data)}
               autoFocus
             >
               {create.isPending ? "Starting…" : "Start run"}
@@ -118,6 +122,7 @@ export function AnalysisPanel({ version }: { version: SampleVersion }) {
         </div>
       )}
 
+      {!ghidraAvailable && <p className="hint">Ghidra analysis requires a verified offline provider. <Link to="/tools">See provider setup and diagnostics</Link>.</p>}
       <h3>Runs</h3>
       {runs.isPending && <Loading label="Loading runs…" />}
       {runs.isError && <ErrorPanel error={runs.error} title="Runs could not be loaded" />}
@@ -145,7 +150,7 @@ export function AnalysisPanel({ version }: { version: SampleVersion }) {
                     <StatusPill status={run.status} />
                   </td>
                   <td>
-                    <code>{run.rule_set.label}</code>
+                    <code>{run.profile_id === "ghidra-static" ? run.profile_name : run.rule_set.label}</code>
                   </td>
                   <td className="num">
                     {run.steps.find((step) => step.tool === "yara-x")?.status === "succeeded"

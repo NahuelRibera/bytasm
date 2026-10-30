@@ -44,6 +44,7 @@ from sqlalchemy.orm import Session
 from bytasm.db.models import AnalysisRun, SampleVersion, ToolInvocation, utcnow
 from bytasm.jobs import runs
 from bytasm.jobs.capa_step import run_capa_step
+from bytasm.jobs.ghidra_step import cleanup_workdir, run_ghidra_step
 from bytasm.jobs.scan import run_yara_step
 from bytasm.jobs.steps import ScanDeps, StepInput, StepOutcome
 from bytasm.jobs.strings_step import run_strings_step
@@ -57,6 +58,7 @@ STEP_RUNNERS: Final[dict[str, StepRunner]] = {
     runs.STRINGS_TOOL: run_strings_step,
     runs.YARA_TOOL: run_yara_step,
     "capa": run_capa_step,
+    "ghidra": run_ghidra_step,
 }
 
 
@@ -257,7 +259,11 @@ async def execute_run(
                 outcome.reason = "worker_interrupted"
             recorded = _record(deps, run_id, index, started_at, outcome, workdir)
         finally:
-            workspace.remove_workdir(workdir)
+            if step.get("tool") == "ghidra":
+                if not cleanup_workdir(workdir):
+                    _log(run_id, "cleanup_pending")
+            else:
+                workspace.remove_workdir(workdir)
         _log(
             run_id,
             "step",
