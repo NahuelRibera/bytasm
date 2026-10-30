@@ -7,14 +7,17 @@ after re-verifying the report file's own SHA-256.
 
 import json
 import logging
+from typing import Annotated
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, Response
 
+from bytasm.annotations import AnnotationError
 from bytasm.api.context import AppContext
 from bytasm.api.problems import problem
 from bytasm.api.schemas import ReportCreated
+from bytasm.compare import CompareError
 from bytasm.db.models import Report, SampleVersion
 from bytasm.reports.generate import export_report
 from bytasm.runner import workspace
@@ -30,7 +33,11 @@ def _version_exists(ctx: AppContext, version_id: str) -> bool:
 
 
 @router.post("/sample-versions/{version_id}/reports", response_model=ReportCreated, status_code=201)
-async def create_report(request: Request, version_id: str) -> ReportCreated | JSONResponse:
+async def create_report(
+    request: Request,
+    version_id: str,
+    compare_with: Annotated[str | None, Query(pattern=r"^[0-9a-f]{32}$")] = None,
+) -> ReportCreated | JSONResponse:
     ctx: AppContext = request.app.state.ctx
     request_id: str = request.state.request_id
     if not await run_in_threadpool(_version_exists, ctx, version_id):
@@ -46,7 +53,10 @@ async def create_report(request: Request, version_id: str) -> ReportCreated | JS
             scratch,
             version_id,
             ctx.generator,
+            compare_with,
         )
+    except (CompareError, AnnotationError) as error:
+        return problem(error.code, request_id=request_id)
     except IntegrityError:
         log.warning(
             json.dumps({"event": "report", "outcome": "integrity_error", "version": version_id})

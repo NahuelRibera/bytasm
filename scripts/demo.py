@@ -1,4 +1,4 @@
-"""Reproducible v0.1 + v0.2 demo (blueprint 13.8), as a script.
+"""Reproducible v0.1–v0.3 demo (blueprint 13.8), as a script.
 
   make demo                                  # throwaway native server
   make demo DEMO_ARGS="--keep-running"       # ... and leave it up to browse
@@ -118,7 +118,10 @@ def upload(client: Client, project_id: str, data: bytes, name: str) -> tuple[int
         "POST",
         f"/api/v1/projects/{project_id}/imports",
         data,
-        {"X-Bytasm-Import": import_header(name, name), "Content-Type": "application/octet-stream"},
+        {
+            "X-Bytasm-Import": import_header(name, name),
+            "Content-Type": "application/octet-stream",
+        },
     )
     return status, json.loads(raw)
 
@@ -166,7 +169,9 @@ def run_demo(client: Client) -> str:
     data = (ROOT / "fixtures" / FIXTURE).read_bytes()
     expected = manifest_hash(FIXTURE)
     if hashlib.sha256(data).hexdigest() != expected:
-        raise DemoError(f"{FIXTURE} does not match MANIFEST.sha256; refusing to upload it")
+        raise DemoError(
+            f"{FIXTURE} does not match MANIFEST.sha256; refusing to upload it"
+        )
     status, body = upload(client, project["id"], data, "hello_v1.exe")
     if status != 201:
         raise DemoError(f"fixture import failed with {status}: {body}")
@@ -190,7 +195,9 @@ def run_demo(client: Client) -> str:
     print(f"   HTTP {status}: {refusal.get('code')} - {refusal.get('detail')}")
     if status != 403:
         raise DemoError("a file outside the manifest was not refused")
-    status, refusal = upload(client, project["id"], b"PK\x03\x04 not a binary", "renamed.exe")
+    status, refusal = upload(
+        client, project["id"], b"PK\x03\x04 not a binary", "renamed.exe"
+    )
     print(f"   HTTP {status}: {refusal.get('code')} - {refusal.get('detail')}")
     if status < 400:
         raise DemoError("a non-PE/ELF file was not refused")
@@ -202,7 +209,9 @@ def run_demo(client: Client) -> str:
     for section in sections["sections"]:
         entropy = section["entropy"]
         shown = "n/a" if entropy is None else f"{entropy:.3f} bits/byte (measurement)"
-        print(f"   section {section['name']!r:12} size {section['raw_size']:>6}  entropy {shown}")
+        print(
+            f"   section {section['name']!r:12} size {section['raw_size']:>6}  entropy {shown}"
+        )
     print(f"   imported libraries: {', '.join(imports['libraries']) or '(none)'}")
     print(f"   imported functions: {len(imports['functions'])}")
 
@@ -225,7 +234,9 @@ def run_demo(client: Client) -> str:
         f"   admitted_under: {report['input_policy']['admitted_under']}; "
         f"authorization: {report['authorization']['type']}"
     )
-    print(f"   limitations: {len(report['limitations'])} stated, no verdict or score fields")
+    print(
+        f"   limitations: {len(report['limitations'])} stated, no verdict or score fields"
+    )
 
     second, _ = export_report(client, version_id)
     if without_generated_at(second) != without_generated_at(report):
@@ -234,13 +245,17 @@ def run_demo(client: Client) -> str:
 
     step("7. Analysis run (v0.2): strings, then YARA-X with Bytasm's bundled rules")
     run = client.json(
-        "POST", f"/api/v1/sample-versions/{version_id}/runs", {"profile_id": "default-static"}
+        "POST",
+        f"/api/v1/sample-versions/{version_id}/runs",
+        {"profile_id": "default-static"},
     )
     print(f"   run {run['id']} queued with {run['rule_set']['label']}")
     deadline = time.monotonic() + 60
     while run["status"] in ("queued", "running"):
         if time.monotonic() > deadline:
-            raise DemoError("the run did not finish within 60 s; is `bytasm worker` running?")
+            raise DemoError(
+                "the run did not finish within 60 s; is `bytasm worker` running?"
+            )
         time.sleep(0.5)
         run = client.json("GET", f"/api/v1/runs/{run['id']}")
     if run["status"] != "succeeded":
@@ -266,17 +281,24 @@ def run_demo(client: Client) -> str:
     for finding in findings["findings"]:
         for item in finding["evidence"]:
             start = item["file_offset"]
-            if data[start : start + min(item["length"], 32)].hex() != item["excerpt_hex"]:
-                raise DemoError("an evidence excerpt does not match the fixture's bytes")
+            if (
+                data[start : start + min(item["length"], 32)].hex()
+                != item["excerpt_hex"]
+            ):
+                raise DemoError(
+                    "an evidence excerpt does not match the fixture's bytes"
+                )
             print(
                 f"   matched {finding['rule_id']} {item['pattern_id']} at offset "
                 f"{start:#x}, {item['length']} bytes"
             )
     if all_keys(findings) & FORBIDDEN_KEYS:
         raise DemoError("findings contain verdict-like fields")
-    print("   every byte range matches the fixture; a match is an observation, not a verdict")
+    print(
+        "   every byte range matches the fixture; a match is an observation, not a verdict"
+    )
 
-    step("8. JSON report with the run's findings (schema version 2)")
+    step("8. JSON report with the run's findings (schema version 3)")
     report, _ = export_report(client, version_id)
     analysis = report["pattern_analysis"]
     if analysis is None or analysis["run"]["id"] != run["id"]:
@@ -285,7 +307,74 @@ def run_demo(client: Client) -> str:
         f"   pattern_analysis: run {analysis['run']['status']}, "
         f"{len(analysis['findings'])} findings, string counts only (values not exported)"
     )
-    return f"{client.base_url}/runs/{run['id']}"
+    step("9. Analyst conclusion with a citation and an immutable revision")
+    cited = findings["findings"][0]
+    draft = {
+        "target_type": "sample_version",
+        "target_id": version_id,
+        "kind": "conclusion",
+        "body": "I reviewed the cited pattern in this fixture.",
+        "confidence": "tentative",
+        "cites": [{"target_type": "finding", "target_id": cited["id"]}],
+    }
+    annotation = client.json("POST", "/api/v1/annotations", draft)
+    revision = client.json(
+        "POST",
+        f"/api/v1/annotations/{annotation['id']}/revisions",
+        {
+            "expected_revision": 1,
+            "kind": "conclusion",
+            "body": "I reviewed the cited pattern and checked its byte evidence.",
+            "confidence": "likely",
+            "cites": draft["cites"],
+        },
+    )
+    if revision["revision"] != 2:
+        raise DemoError("annotation revision was not retained")
+    history = client.json("GET", f"/api/v1/annotations/{annotation['id']}/revisions")
+    if len(history["items"]) != 2 or history["items"][0]["body"] != draft["body"]:
+        raise DemoError("annotation history changed")
+    print("   two immutable revisions, with validated references to the finding")
+
+    step("10. Compare another manifest fixture as a version of the same sample")
+    second_entry = "bin/hello_v2-x86_64.elf"
+    second_bytes = (ROOT / "fixtures" / second_entry).read_bytes()
+    if hashlib.sha256(second_bytes).hexdigest() != manifest_hash(second_entry):
+        raise DemoError("second fixture differs from its manifest")
+    meta = {
+        "sample_id": version["sample_id"],
+        "version_label": "ELF build",
+        "declared_filename": "hello_v2-x86_64.elf",
+        "authorization": {"basis": "owned_or_built", "statement": ATTESTATION},
+    }
+    header = base64.urlsafe_b64encode(json.dumps(meta).encode()).decode().rstrip("=")
+    status, _, raw = client.request(
+        "POST",
+        f"/api/v1/projects/{project['id']}/imports",
+        second_bytes,
+        {"X-Bytasm-Import": header, "Content-Type": "application/octet-stream"},
+    )
+    if status != 201:
+        raise DemoError("second fixture import failed")
+    second_version = json.loads(raw)["sample_version"]["id"]
+    compared = client.json("GET", f"/api/v1/compare?a={version_id}&b={second_version}")
+    if compared["categories"]["strings"]["status"] != "unavailable":
+        raise DemoError("a missing strings run was treated as comparable")
+    created = client.json(
+        "POST",
+        f"/api/v1/sample-versions/{second_version}/reports?compare_with={version_id}",
+    )
+    status, _, raw = client.request("GET", created["download_url"])
+    comparison_report = json.loads(raw)
+    jsonschema.validate(comparison_report, json.loads(SCHEMA.read_text()))
+    if status != 200 or comparison_report["scope"]["kind"] != "comparison":
+        raise DemoError("comparison report failed")
+    if comparison_report["annotations"][0]["revision"] != 2:
+        raise DemoError("comparison report omitted the analyst revision")
+    print(
+        "   metadata compared; missing tool results stay unavailable; schema 3 report validated"
+    )
+    return f"{client.base_url}/projects/{project['id']}/compare/{version['sample_id']}"
 
 
 def wait_for_health(client: Client, process: subprocess.Popen[bytes]) -> None:
@@ -327,7 +416,10 @@ def main() -> int:
         return 1
     with socket.socket() as probe:
         if probe.connect_ex(("127.0.0.1", DEMO_PORT)) == 0:
-            print(f"Port {DEMO_PORT} is already in use; stop that process first.", file=sys.stderr)
+            print(
+                f"Port {DEMO_PORT} is already in use; stop that process first.",
+                file=sys.stderr,
+            )
             return 1
     data_dir = Path(tempfile.mkdtemp(prefix="bytasm-demo-"))
     env = {
@@ -354,7 +446,9 @@ def main() -> int:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-        print(f"Started a throwaway bytasm serve on {client.base_url} (data: {data_dir})")
+        print(
+            f"Started a throwaway bytasm serve on {client.base_url} (data: {data_dir})"
+        )
         page = run_demo(client)
         print(f"\nThe UI shows this run and its findings at {page}")
         if args.keep_running:

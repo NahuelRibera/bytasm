@@ -270,10 +270,17 @@ def test_no_endpoint_can_change_the_input_policy(client: TestClient) -> None:
     routes = {(path, method) for path, item in spec["paths"].items() for method in item}
     assert routes == {
         ("/api/v1/health", "get"),
+        ("/api/v1/compare", "get"),
+        ("/api/v1/annotations", "get"),
+        ("/api/v1/annotations", "post"),
+        ("/api/v1/annotations/{annotation_id}/revisions", "get"),
+        ("/api/v1/annotations/{annotation_id}/revisions", "post"),
+        ("/api/v1/sample-versions/{version_id}/citation-targets", "get"),
         ("/api/v1/projects", "get"),
         ("/api/v1/projects", "post"),
         ("/api/v1/projects/{project_id}", "get"),
         ("/api/v1/projects/{project_id}/samples", "get"),
+        ("/api/v1/projects/{project_id}/activity", "get"),
         ("/api/v1/projects/{project_id}/imports", "post"),
         ("/api/v1/sample-versions/{version_id}", "get"),
         ("/api/v1/sample-versions/{version_id}/sections", "get"),

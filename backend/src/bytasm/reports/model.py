@@ -1,9 +1,9 @@
 """The JSON report: schema (as Pydantic models) and its fixed texts.
 
-Schema version 2 (v0.2) keeps every version-1 field unchanged and adds
-`pattern_analysis`: the newest succeeded or partial analysis run of the
-version (steps, rule set, string counts, findings with byte evidence), or
-null if there is none.
+Schema version 3 keeps the version-2 metadata and pattern-analysis fields,
+and adds an explicit scope, current analyst revisions with citations, and
+an optional structural comparison. The former version-2 schema is retained
+separately for existing report consumers.
 
 The committed JSON Schema, `schemas/report.schema.json`, is generated from
 these models (`make schemas`), and a test keeps the two identical.
@@ -17,8 +17,11 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from bytasm.annotations import AnnotationOut
+from bytasm.compare import CompareOut
+
 REPORT_KIND = "bytasm.sample_version_report"
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 SCHEMA_ID = "https://github.com/NahuelRibera/bytasm/blob/main/schemas/report.schema.json"
 
 LABELS: dict[str, str] = {
@@ -243,6 +246,11 @@ class PatternAnalysis(_Model):
     notices: list[str]
 
 
+class ReportScope(_Model):
+    kind: Literal["sample_version", "comparison"]
+    version_ids: list[str] = Field(min_length=1, max_length=2)
+
+
 class Report(_Model):
     model_config = ConfigDict(
         extra="forbid",
@@ -251,7 +259,7 @@ class Report(_Model):
     )
 
     report_kind: Literal["bytasm.sample_version_report"]
-    schema_version: Literal[2]
+    schema_version: Literal[3]
     generated_at: datetime
     generator: Generator
     sample: SampleIdentity
@@ -260,6 +268,9 @@ class Report(_Model):
     analysis: Analysis
     metadata: Metadata
     pattern_analysis: PatternAnalysis | None
+    scope: ReportScope
+    annotations: list[AnnotationOut]
+    comparison: CompareOut | None
     labels: dict[str, str]
     limitations: list[str]
 

@@ -21,6 +21,117 @@
       "title": "Analysis",
       "type": "object"
     },
+    "AnnotationOut": {
+      "properties": {
+        "author": {
+          "$ref": "#/$defs/AuthorOut"
+        },
+        "body": {
+          "title": "Body",
+          "type": "string"
+        },
+        "cites": {
+          "items": {
+            "$ref": "#/$defs/CitationOut"
+          },
+          "title": "Cites",
+          "type": "array"
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "enum": [
+                "tentative",
+                "likely",
+                "well-supported"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Confidence"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "note",
+            "interpretation",
+            "conclusion"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "revision": {
+          "title": "Revision",
+          "type": "integer"
+        },
+        "revision_id": {
+          "title": "Revision Id",
+          "type": "string"
+        },
+        "target_id": {
+          "title": "Target Id",
+          "type": "string"
+        },
+        "target_type": {
+          "enum": [
+            "sample_version",
+            "finding",
+            "evidence"
+          ],
+          "title": "Target Type",
+          "type": "string"
+        },
+        "version_id": {
+          "title": "Version Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "revision_id",
+        "revision",
+        "target_type",
+        "target_id",
+        "version_id",
+        "kind",
+        "body",
+        "confidence",
+        "author",
+        "created_at",
+        "cites"
+      ],
+      "title": "AnnotationOut",
+      "type": "object"
+    },
+    "AuthorOut": {
+      "properties": {
+        "display_name": {
+          "title": "Display Name",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "display_name"
+      ],
+      "title": "AuthorOut",
+      "type": "object"
+    },
     "Authorization": {
       "additionalProperties": false,
       "properties": {
@@ -68,6 +179,159 @@
         "notice"
       ],
       "title": "Authorization",
+      "type": "object"
+    },
+    "CategoryDiff": {
+      "properties": {
+        "a_status": {
+          "default": "not_run",
+          "title": "A Status",
+          "type": "string"
+        },
+        "added": {
+          "default": 0,
+          "title": "Added",
+          "type": "integer"
+        },
+        "b_status": {
+          "default": "not_run",
+          "title": "B Status",
+          "type": "string"
+        },
+        "changed": {
+          "default": 0,
+          "title": "Changed",
+          "type": "integer"
+        },
+        "next_offset": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Offset"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "removed": {
+          "default": 0,
+          "title": "Removed",
+          "type": "integer"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/DiffRow"
+          },
+          "title": "Rows",
+          "type": "array"
+        },
+        "status": {
+          "enum": [
+            "comparable",
+            "unavailable",
+            "incompatible"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "total_rows": {
+          "default": 0,
+          "title": "Total Rows",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "CategoryDiff",
+      "type": "object"
+    },
+    "CitationOut": {
+      "properties": {
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "target_id": {
+          "title": "Target Id",
+          "type": "string"
+        },
+        "target_type": {
+          "enum": [
+            "finding",
+            "evidence"
+          ],
+          "title": "Target Type",
+          "type": "string"
+        },
+        "version_id": {
+          "title": "Version Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target_type",
+        "target_id",
+        "run_id",
+        "version_id",
+        "label"
+      ],
+      "title": "CitationOut",
+      "type": "object"
+    },
+    "CompareOut": {
+      "properties": {
+        "a": {
+          "$ref": "#/$defs/VersionRef"
+        },
+        "b": {
+          "$ref": "#/$defs/VersionRef"
+        },
+        "categories": {
+          "additionalProperties": {
+            "$ref": "#/$defs/CategoryDiff"
+          },
+          "title": "Categories",
+          "type": "object"
+        },
+        "identical_content": {
+          "title": "Identical Content",
+          "type": "boolean"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "a",
+        "b",
+        "identical_content",
+        "warnings",
+        "categories"
+      ],
+      "title": "CompareOut",
       "type": "object"
     },
     "DeclaredFilename": {
@@ -146,6 +410,77 @@
         "fields"
       ],
       "title": "DeclaredInHeader",
+      "type": "object"
+    },
+    "DiffRow": {
+      "properties": {
+        "after": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "After"
+        },
+        "after_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObservationRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "before": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Before"
+        },
+        "before_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObservationRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "change": {
+          "enum": [
+            "added",
+            "removed",
+            "changed"
+          ],
+          "title": "Change",
+          "type": "string"
+        },
+        "key": {
+          "title": "Key",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "change",
+        "before",
+        "after"
+      ],
+      "title": "DiffRow",
       "type": "object"
     },
     "Entropy": {
@@ -350,6 +685,48 @@
         "warnings"
       ],
       "title": "Metadata",
+      "type": "object"
+    },
+    "ObservationRef": {
+      "properties": {
+        "evidence_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidence Id"
+        },
+        "finding_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Finding Id"
+        },
+        "invocation_id": {
+          "title": "Invocation Id",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "invocation_id"
+      ],
+      "title": "ObservationRef",
       "type": "object"
     },
     "PatternAnalysis": {
@@ -798,6 +1175,34 @@
       "title": "PatternStep",
       "type": "object"
     },
+    "ReportScope": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "sample_version",
+            "comparison"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "version_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 2,
+          "minItems": 1,
+          "title": "Version Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "version_ids"
+      ],
+      "title": "ReportScope",
+      "type": "object"
+    },
     "Run": {
       "additionalProperties": false,
       "properties": {
@@ -1083,6 +1488,58 @@
       ],
       "title": "ToolInvocation",
       "type": "object"
+    },
+    "VersionRef": {
+      "properties": {
+        "project_id": {
+          "title": "Project Id",
+          "type": "string"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Run Id"
+        },
+        "run_status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Run Status"
+        },
+        "sample_id": {
+          "title": "Sample Id",
+          "type": "string"
+        },
+        "sha256": {
+          "title": "Sha256",
+          "type": "string"
+        },
+        "version_id": {
+          "title": "Version Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "version_id",
+        "sample_id",
+        "project_id",
+        "sha256",
+        "run_id",
+        "run_status"
+      ],
+      "title": "VersionRef",
+      "type": "object"
     }
   },
   "$id": "https://github.com/NahuelRibera/bytasm/blob/main/schemas/report.schema.json",
@@ -1092,8 +1549,25 @@
     "analysis": {
       "$ref": "#/$defs/Analysis"
     },
+    "annotations": {
+      "items": {
+        "$ref": "#/$defs/AnnotationOut"
+      },
+      "title": "Annotations",
+      "type": "array"
+    },
     "authorization": {
       "$ref": "#/$defs/Authorization"
+    },
+    "comparison": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CompareOut"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "generated_at": {
       "format": "date-time",
@@ -1142,9 +1616,12 @@
       "$ref": "#/$defs/SampleIdentity"
     },
     "schema_version": {
-      "const": 2,
+      "const": 3,
       "title": "Schema Version",
       "type": "integer"
+    },
+    "scope": {
+      "$ref": "#/$defs/ReportScope"
     }
   },
   "required": [
@@ -1158,6 +1635,9 @@
     "analysis",
     "metadata",
     "pattern_analysis",
+    "scope",
+    "annotations",
+    "comparison",
     "labels",
     "limitations"
   ],

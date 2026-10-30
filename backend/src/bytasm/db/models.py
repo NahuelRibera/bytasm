@@ -366,7 +366,48 @@ class Report(Base):
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
     sample_version_id: Mapped[str] = mapped_column(ForeignKey("sample_version.id"), index=True)
     format: Mapped[str] = mapped_column(String(8))  # "json"
+    scope: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     sha256: Mapped[str] = mapped_column(String(64))
     generated_at: Mapped[datetime] = mapped_column(UtcDateTime)
     generator_version: Mapped[str] = mapped_column(String(32))
     path: Mapped[str] = mapped_column(String(128))  # relative to the report store
+
+
+class Analyst(Base):
+    __tablename__ = "analyst"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    display_name: Mapped[str] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
+
+
+class Annotation(Base):
+    """One immutable revision; root_id identifies the annotation across edits."""
+
+    __tablename__ = "annotation"
+    __table_args__ = (UniqueConstraint("root_id", "revision"),)
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    root_id: Mapped[str] = mapped_column(ForeignKey("annotation.id"), index=True)
+    supersedes_id: Mapped[str | None] = mapped_column(ForeignKey("annotation.id"), unique=True)
+    revision: Mapped[int] = mapped_column(Integer)
+    version_id: Mapped[str] = mapped_column(ForeignKey("sample_version.id"), index=True)
+    target_type: Mapped[str] = mapped_column(String(16))
+    target_id: Mapped[str] = mapped_column(String(32))
+    finding_id: Mapped[str | None] = mapped_column(ForeignKey("finding.id"))
+    evidence_id: Mapped[int | None] = mapped_column(ForeignKey("evidence.id"))
+    kind: Mapped[str] = mapped_column(String(16))
+    body: Mapped[str] = mapped_column(Text)
+    confidence: Mapped[str | None] = mapped_column(String(16))
+    author_id: Mapped[str] = mapped_column(ForeignKey("analyst.id"))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
+
+
+class AnnotationCitation(Base):
+    __tablename__ = "annotation_citation"
+    __table_args__ = (UniqueConstraint("annotation_id", "target_type", "target_id"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    annotation_id: Mapped[str] = mapped_column(ForeignKey("annotation.id"), index=True)
+    position: Mapped[int] = mapped_column(Integer)
+    target_type: Mapped[str] = mapped_column(String(16))
+    target_id: Mapped[str] = mapped_column(String(32))
+    finding_id: Mapped[str | None] = mapped_column(ForeignKey("finding.id"))
+    evidence_id: Mapped[int | None] = mapped_column(ForeignKey("evidence.id"))

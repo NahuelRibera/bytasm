@@ -128,6 +128,11 @@ _PROBLEMS: Final[dict[str, tuple[int, str, str]]] = {
         "The YARA-X process that compiles the rules failed. Try again; if it happens again, "
         "find this request ID in the server log.",
     ),
+    "annotation_stale": (
+        409,
+        "Annotation changed",
+        "This annotation has a newer revision. Reload it before saving your edit.",
+    ),
     # Stored data
     "integrity_error": (
         409,

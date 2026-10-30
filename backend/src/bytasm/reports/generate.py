@@ -18,10 +18,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from bytasm.adapters.yara_result import MAX_EXCERPT_BYTES
+from bytasm.annotations import current_annotations, resolve_target
+from bytasm.compare import CompareOut, compare_versions
 from bytasm.db.imported import import_record
 from bytasm.db.models import AnalysisRun, Finding, Report, RuleSet, SampleVersion
 from bytasm.jobs import runs, summary
@@ -165,6 +167,7 @@ def build_report(
     generator: Generator,
     generated_at: datetime,
     session: Session,
+    comparison: CompareOut | None = None,
 ) -> dict[str, Any]:
     record = import_record(version)
     run = record.run
@@ -270,8 +273,31 @@ def build_report(
             "warnings": list(invocation.warnings),
         },
         "pattern_analysis": _pattern_analysis(session, pattern_run(version)),
+        "scope": {
+            "kind": "comparison" if comparison else "sample_version",
+            "version_ids": list(dict.fromkeys([comparison.a.version_id, comparison.b.version_id]))
+            if comparison
+            else [version.id],
+        },
+        "annotations": [
+            item.model_dump(mode="json")
+            for version_id in sorted(
+                {comparison.a.version_id, comparison.b.version_id} if comparison else {version.id}
+            )
+            for item in current_annotations(session, version_id)
+        ],
+        "comparison": comparison.model_dump(mode="json") if comparison else None,
         "labels": dict(model.LABELS),
-        "limitations": list(REPORT_LIMITATIONS) + list(PATTERN_REPORT_LIMITATIONS),
+        "limitations": list(REPORT_LIMITATIONS)
+        + list(PATTERN_REPORT_LIMITATIONS[:-1] if comparison else PATTERN_REPORT_LIMITATIONS)
+        + (
+            [
+                "This comparison report may include changed string values and analyst text. "
+                "Review these contents before sharing the report."
+            ]
+            if comparison
+            else []
+        ),
     }
     model.Report.model_validate(document)  # never export something off-schema
     return document
@@ -285,24 +311,61 @@ def export_report(
     scratch_dir: Path,
     version_id: str,
     generator: Generator,
+    compare_with: str | None = None,
 ) -> Report:
     """Verify, build, store, and record a report. Raises storage.IntegrityError
     (nothing generated) if a stored file no longer matches its SHA-256."""
     session = sessions()
     created: str | None = None
     try:
+        # Verification and rendering must see the same SQLite snapshot. This export
+        # will insert a report row, so acquire the writer slot before reading.
+        session.execute(text("BEGIN IMMEDIATE"))
         version = session.get_one(SampleVersion, version_id)
-        blobs.verify(version.sha256)
-        outputs.verify(import_record(version).raw_output_sha256)
-        analysis = pattern_run(version)
-        if analysis is not None:
-            # The findings and string counts came from these stored outputs.
+        comparison = (
+            compare_versions(session, compare_with, version_id, limit=200) if compare_with else None
+        )
+        if comparison is not None:
+            # API pages are bounded; a report contains every changed key.
+            for name, category_diff in comparison.categories.items():
+                while category_diff.next_offset is not None:
+                    more = compare_versions(
+                        session,
+                        compare_with or version_id,
+                        version_id,
+                        category=name,
+                        offset=category_diff.next_offset,
+                        limit=200,
+                    ).categories[name]
+                    category_diff.rows.extend(more.rows)
+                    category_diff.next_offset = more.next_offset
+        selected_ids = {version_id, compare_with} if compare_with is not None else {version_id}
+        checked_runs: set[str] = set()
+        for selected_id in sorted(selected_ids):
+            selected = session.get_one(SampleVersion, selected_id)
+            blobs.verify(selected.sha256)
+            outputs.verify(import_record(selected).raw_output_sha256)
+            analysis = pattern_run(selected)
+            if analysis is not None:
+                checked_runs.add(analysis.id)
+            for annotation in current_annotations(session, selected.id):
+                _, target = resolve_target(session, annotation.target_type, annotation.target_id)
+                if target is not None:
+                    checked_runs.add(target.run_id)
+                checked_runs.update(cite.run_id for cite in annotation.cites)
+        for run_id in sorted(checked_runs):
+            analysis = session.get_one(AnalysisRun, run_id)
             for invocation in analysis.invocations:
                 if invocation.raw_output_sha256 is not None:
                     outputs.verify(invocation.raw_output_sha256)
+            rule_step = runs.rule_set_step(analysis.profile_snapshot)
+            if rule_step:
+                rule_set = session.get_one(RuleSet, rule_step["rule_set"]["id"])
+                outputs.verify(rule_set.sha256)
 
         generated_at = datetime.now(UTC).replace(microsecond=0)
-        data = canonical_json(build_report(version, generator, generated_at, session))
+        document = build_report(version, generator, generated_at, session, comparison)
+        data = canonical_json(document)
         sha256 = hashlib.sha256(data).hexdigest()
         if reports.put_bytes(data, sha256, scratch_dir):
             created = sha256
@@ -313,6 +376,7 @@ def export_report(
             generated_at=generated_at,
             generator_version=generator.version,
             path=reports.relative_path(sha256),
+            scope=document["scope"],
         )
         session.add(record)
         session.commit()
