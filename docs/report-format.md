@@ -126,3 +126,11 @@ pointers, versions and rules hash. It is not an analyst conclusion. Filename
 provenance is behind a privacy expander; comparison data may still contain paths.
 `GET /reports/{id}/review` exposes that view for schema 4 snapshots; it never mixes
 in later live records. Existing JSON download and legacy v2/v3 behavior remains.
+
+## Ghidra diagnostic increment
+
+No Ghidra functions, pseudocode, references or provider diagnostics are added to
+reports. Published v2/v3/v4 models and stored downloads remain unchanged. Metadata
+preflight is not analysis evidence. A future provider needs an explicit typed
+provenance/evidence/export contract and preservation tests before report support
+is advertised; see ADR-0004 and the v0.5 milestone.

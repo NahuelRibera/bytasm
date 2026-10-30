@@ -132,3 +132,12 @@ A section link returns to the exact source row. Preview a report to inspect the
 same canonical source records and download escaped standalone HTML. Comparison
 remains available for two authorized versions of the same sample, with explicit
 missing/incompatible categories and signed counts. No file is executed.
+
+## Optional Ghidra preflight
+
+Run `uv --directory backend run --no-sync bytasm doctor` to inspect optional
+metadata configuration without importing a sample or starting a worker. Exit 1
+means the optional provider is unavailable; it does not indicate that Quick/Full
+are broken. Open **Tools and profiles** for the same bounded diagnostic. Ghidra
+analysis and a function-detail demo are not shipped in this increment. The
+existing 12-step fixture demo remains the actual supported analysis workflow.

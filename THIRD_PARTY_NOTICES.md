@@ -81,3 +81,15 @@ packaging correction. Do not describe the dependency chain as license-cleared
 or publish the image as a cleared distribution. Local implementation/testing
 and owner release approval are distinct. No upstream issue, message or PR was
 opened on the owner's behalf.
+
+## Optional Ghidra proposal (not bundled)
+
+The metadata diagnostic references Ghidra 12.2 and JDK 25; no distribution,
+plugin, upstream script, REA/MCP package, Java runtime or new dependency is added.
+[Official Ghidra LICENSE](https://github.com/NationalSecurityAgency/ghidra/blob/Ghidra_12.2_build/LICENSE)
+is Apache-2.0. Its [NOTICE](https://github.com/NationalSecurityAgency/ghidra/blob/Ghidra_12.2_build/NOTICE)
+requires attention to per-module third-party notices and separately licensed GPL
+support programs. The exact binary distribution and its bundled payload are not
+available for inspection here, so no binary redistribution clearance is claimed.
+Caller ownership of an installation does not replace that review if packaging
+is proposed later. The existing ida-settings blocker above is unchanged.
