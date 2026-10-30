@@ -28,7 +28,21 @@ test("full capa review, cited observation and verified HTML preview at 360 px", 
   await editor.getByRole("button", { name: "Save annotation", exact: true }).click();
   await expect(editor.getByText("Annotation saved.")).toBeVisible();
   await expectNoAxeViolations(page);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+  // Font metrics differ between macOS and Linux. Annotation controls must fit
+  // their nested evidence container even when the fallback font is wider.
+  for (const font of ["", "monospace"]) {
+    await page.evaluate((font) => document.documentElement.style.setProperty("--font-sans", font), font);
+    const overflowingControls = await annotations.locator(".annotation-entry > .button").evaluateAll(buttons =>
+      buttons.flatMap(button => {
+        const box = button.getBoundingClientRect();
+        const parent = button.parentElement!.getBoundingClientRect();
+        return box.right > parent.right || box.width > parent.width
+          ? [{ width: box.width, available: parent.width }] : [];
+      }));
+    expect(overflowingControls, `Annotation controls must fit with ${font || "system font"}`).toEqual([]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+  }
+  await page.evaluate(() => document.documentElement.style.removeProperty("--font-sans"));
   await page.goto(versionUrl);
   await page.getByRole("button", { name: "Preview new report" }).click();
   await expect(page.getByRole("heading", { name: "Report preview", exact: true })).toBeVisible();
