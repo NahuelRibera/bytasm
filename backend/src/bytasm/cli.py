@@ -48,6 +48,9 @@ def _build_parser() -> argparse.ArgumentParser:
     inspect = commands.add_parser("inspect", help="print metadata for a committed fixture")
     inspect.add_argument("path", type=Path, help="path to a fixture listed in the manifest")
     commands.add_parser(
+        "doctor", help="report optional Ghidra metadata blockers without launching tools or samples"
+    )
+    commands.add_parser(
         "serve",
         help="run the local web app on 127.0.0.1 (configuration: BYTASM_* environment variables)",
     )
@@ -118,6 +121,11 @@ def serve() -> int:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
+    if args.command == "doctor":
+        from bytasm.ghidra import GhidraConfiguration, diagnose
+
+        sys.stdout.write(to_json(diagnose(GhidraConfiguration.from_env()).model_dump()))
+        return 1  # No usable Ghidra provider is implemented yet.
     if args.command == "serve":
         return serve()
     if args.command == "worker":

@@ -168,3 +168,26 @@ provenance remains an explicit disclosure. Comparison exports can still contain
 changed strings and analyst text: review before sharing. No automatic URL links,
 external queries, sensitive-string classifier or new binary admission is added.
 Stored JSON summaries remain authoritative when rendering historical HTML.
+
+## Optional Ghidra release boundary
+
+The Ghidra diagnostic reads only fixed metadata locations beneath explicitly
+configured local installation/JDK roots. It does not crawl directories or launch
+executables, scripts, plugins, Java classes or samples. Metadata files must be
+regular, non-symlink files, at most 16 KiB each; FIFO opens are nonblocking.
+Duplicate/malformed declarations are refused. Diagnostic messages never include
+configured paths, binary-derived text or arbitrary filesystem exception details.
+Local install directories remain trusted operator configuration, not API inputs.
+
+The full Ghidra provider is blocked: no bounded real health check/offline runner
+has been verified and no Ghidra/JDK distribution is supplied. Availability and
+analysis-enabled flags remain false even for matching metadata. Optional invalid
+configuration does not stop existing workflows. No environment/request/UI option
+can override this boundary, and no Ghidra analysis profile is exposed.
+
+Native workers still have network access. An offline Compose worker does not
+make a host-installed Ghidra available inside the image. Do not add arbitrary
+host mounts, a Docker socket, user-owned Ghidra projects/preferences or a native
+fallback to bypass this. Future analysis requires tested workspace, heap/memory,
+disk, process-tree, timeout, cancellation and output controls. It must preserve
+admission and cannot be advertised as a complete sandbox or gate I1.

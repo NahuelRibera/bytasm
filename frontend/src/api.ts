@@ -192,7 +192,7 @@ async function get<T>(path: string): Promise<T> {
 }
 
 export const api = {
-  tools: () => get<{ tools: Array<{ tool: string; available: boolean; version: string | null; adapter: string; adapter_version: string; formats: string[]; rules_sha256: string | null; limitations: string }>; profiles: Array<{ id: string; name: string; steps: string[]; limitations: string }> }>("/api/v1/tools"),
+  tools: () => get<{ tools: Array<{ tool: string; available: boolean; version: string | null; adapter: string; adapter_version: string; formats: string[]; rules_sha256: string | null; limitations: string }>; profiles: Array<{ id: string; name: string; steps: string[]; limitations: string }>; optional_providers?: GhidraDiagnostic[] }>("/api/v1/tools"),
   reportReview: (id: string) => get<Review>(`/api/v1/reports/${encodeURIComponent(id)}/review`),
   reportDocument: (id: string) => get<Record<string, unknown>>(`/api/v1/reports/${encodeURIComponent(id)}/download`),
   reportHistory: (id: string, offset = 0) => get<{ items: Array<{ id: string; sha256: string; generated_at: string; scope: { kind: string } | null }>; next_offset: number | null }>(`/api/v1/sample-versions/${encodeURIComponent(id)}/reports?offset=${offset}&limit=25`),
@@ -538,4 +538,16 @@ export interface Review {
     rule_id: string; rule_version: string; rule_sha256: string; statement: string; hypothesis: string;
     source_href: string; locations: string[]; pointers: string[]; evidence_capped: boolean }>;
   glossary: Record<string, string>;
+}
+
+export interface GhidraDiagnostic {
+  provider: "ghidra";
+  available: false;
+  analysis_enabled: false;
+  status: "not_configured" | "installation_invalid" | "unsupported_version" | "java_missing" | "java_incompatible" | "unsupported_host" | "execution_unavailable";
+  message: string;
+  declared_ghidra_version: "12.2" | null;
+  declared_java_major: number | null;
+  verification: "metadata_only";
+  health_check: "not_run";
 }

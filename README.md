@@ -253,3 +253,21 @@ and native processes retain their existing network/filesystem risks. The input
 policy and unresolved dependency redistribution issue remain unchanged.
 See the [post-PR6 milestone](docs/milestones/post-pr6-evidence-review.md) for the
 implemented scope, follow-ups, source contracts and verification record.
+
+## Optional Ghidra diagnostics (analysis not enabled)
+
+`uv --directory backend run --no-sync bytasm doctor` reports optional Ghidra
+configuration blockers as JSON, without creating application data or launching
+Java, Ghidra or a sample. Its exit code is 1 while analysis is unavailable.
+The Tools page shows the same metadata-only diagnostic. Existing Quick/Full
+profiles remain usable without Ghidra.
+
+The proposed provider targets caller-installed Ghidra 12.2 and a 64-bit JDK 25.
+Local configuration uses `BYTASM_GHIDRA_HOME` (installation root containing
+`Ghidra/application.properties`) and `BYTASM_GHIDRA_JAVA_HOME` (JDK root containing
+`release` and `bin/java`), both absolute local directories. Global JAVA_HOME and
+PATH do not select the optional provider. Metadata declarations are not proof
+of usability: no health check or Ghidra analysis is enabled in this increment.
+Nothing is downloaded, installed, bundled or mounted into Compose automatically.
+See [the v0.5 diagnostic milestone](docs/milestones/v0.5-ghidra-provider.md)
+for the blocked full workflow, official sources and verification coverage.

@@ -13,6 +13,8 @@ Environment variables (all optional):
   BYTASM_INPUT_POLICY  "fixtures" (default) or "self_built" (Linux only)
   BYTASM_CONTAINER     "1" only in the Compose image (see `container` below)
   BYTASM_SOURCE_REVISION  source revision baked into the image (no .git there)
+  BYTASM_GHIDRA_HOME   optional caller-installed directory (metadata diagnosis only)
+  BYTASM_GHIDRA_JAVA_HOME  optional caller-installed JDK directory; not global JAVA_HOME
 """
 
 import ipaddress
@@ -23,6 +25,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Final, Literal
 
+from bytasm.ghidra import GhidraConfiguration
 from bytasm.runner.limits import DEFAULT_LIMITS, MAX_INPUT_BYTES, ParserLimits
 
 PolicyMode = Literal["fixtures", "self_built"]
@@ -70,6 +73,9 @@ class Settings:
     # guards still apply. self_built is refused in this mode, because the
     # listener is not loopback (blueprint 5.7, 8.2). See ADR-0002.
     container: bool = False
+    ghidra: GhidraConfiguration = field(
+        default_factory=GhidraConfiguration, repr=False, kw_only=True
+    )
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "Settings":
@@ -92,6 +98,7 @@ class Settings:
         if not port_text.isdigit() or not 0 < int(port_text) < 65536:
             raise ConfigError(f"BYTASM_PORT must be a TCP port number, not {port_text!r}.")
         settings = cls(
+            ghidra=GhidraConfiguration.from_env(env),
             data_dir=Path(env.get("BYTASM_DATA_DIR", str(REPO_ROOT / "data"))).resolve(),
             host=CONTAINER_BIND if container else env.get("BYTASM_HOST", "127.0.0.1"),
             port=int(port_text),

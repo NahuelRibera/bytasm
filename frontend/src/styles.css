@@ -861,3 +861,4 @@ details.card > summary {
 .privacy-choice { display: flex; align-items: center; gap: 8px; margin-block: 12px; }
 
 .analysis-summary { overflow-wrap: anywhere; }
+.optional-provider { min-width: 0; overflow-wrap: anywhere; }

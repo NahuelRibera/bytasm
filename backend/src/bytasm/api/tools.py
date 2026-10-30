@@ -1,8 +1,9 @@
 """Read-only tool versions, provenance and built-in profile registry."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
+from bytasm.ghidra import GhidraDiagnostic, diagnose
 from bytasm.tools import PROFILES, registry
 
 router = APIRouter()
@@ -29,8 +30,15 @@ class ProfileOut(BaseModel):
 class ToolsOut(BaseModel):
     tools: list[ToolOut]
     profiles: list[ProfileOut]
+    optional_providers: list[GhidraDiagnostic]
 
 
 @router.get("/tools", response_model=ToolsOut)
-def tools() -> ToolsOut:
-    return ToolsOut.model_validate({"tools": registry(), "profiles": PROFILES})
+def tools(request: Request) -> ToolsOut:
+    return ToolsOut.model_validate(
+        {
+            "tools": registry(),
+            "profiles": PROFILES,
+            "optional_providers": [diagnose(request.app.state.ctx.settings.ghidra)],
+        }
+    )

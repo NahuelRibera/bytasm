@@ -59,3 +59,20 @@ integer `virtual_address` remains available for exact-integer JSON consumers.
 - Section metadata adds import-invocation identity and exact address/size display
   strings. Header overview adds exact display representations for integer values.
   These are declarations; no new parser formats/fields or report-schema changes.
+
+## Optional-provider metadata diagnostic
+
+`GET /tools` adds `optional_providers`, without changing the four existing tool
+entries or the two built-in profiles. Ghidra diagnostics contain `provider`,
+`status`, a fixed safe `message`, `declared_ghidra_version` (12.2 or null),
+`declared_java_major`, `verification: metadata_only`, `health_check: not_run`,
+`available: false` and `analysis_enabled: false`. Status is one of
+`not_configured`, `installation_invalid`, `unsupported_version`, `java_missing`,
+`java_incompatible`, `unsupported_host` or `execution_unavailable`. Missing or
+unreadable/invalid files are reported without filesystem paths or raw exceptions.
+Versions are metadata declarations, not the result of launching a tool.
+
+Configuration is local/startup-read only; no new endpoint accepts installation
+paths, commands, script choices or an availability override. There is no Ghidra
+analysis, function-detail or report endpoint. Provider health/launch failure and
+function results remain blocked pending real offline integration, not simulated.
