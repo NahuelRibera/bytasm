@@ -72,6 +72,21 @@ The [blueprint](docs/PROJECT_BLUEPRINT.md) §8 contains the threat model;
 The worker/database decisions in [ADR-0003](docs/adr/0003-v0.2-pattern-matching.md)
 are still proposed.
 
+## Analyst text and comparison exports
+
+Annotations are plain text displayed through React's escaping. Conclusions
+require scoped finding/evidence citations; they remain the analyst's statements,
+separate from machine observations. The application checks citation relationships
+on write and export. Revisions and citations are append-only, with database
+constraints and triggers, but someone who controls the database or files can
+still tamper with them. The local author badge is not authentication.
+
+Activity records contain IDs and revision numbers, never annotation bodies.
+Comparison exports can contain changed extracted strings and evidence excerpts.
+Review them before sharing; the single-version report still exports string
+counts only. Comparisons describe static observations, not behavioural
+equivalence or a safety verdict.
+
 ## Reporting a vulnerability
 
 Contact the maintainer privately. If GitHub's Security tab offers

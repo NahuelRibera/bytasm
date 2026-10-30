@@ -34,7 +34,7 @@ make demo                       # throwaway native server on 127.0.0.1:8765
    mode starts its own `bytasm worker`; with `--url`, the server needs one
    (`make serve` and `make compose-up` start it);
 8. (v0.2) exports the report again and checks that `pattern_analysis`
-   (schema version 2) holds that run's findings.
+   (schema version 3) holds that run's findings.
 
 It exits non-zero if any step does not behave as described.
 
@@ -83,3 +83,19 @@ It exits non-zero if any step does not behave as described.
 8. `make compose-down`.
 
 The recording itself is not in the repository yet (a release-gate item).
+
+## v0.3 walkthrough
+
+`make demo` now also creates a cited conclusion, revises it, checks that both
+revisions remain intact, imports the self-authored hello_v2 ELF fixture as another
+version of the same sample, and exports a schema 3 comparison report. Its
+unanalysed second version deliberately demonstrates unavailable tool results.
+The script checks both manifest hashes and uses only its temporary data folder.
+
+For the full UI flow, import and analyse both versions. Choose **Compare
+versions**, switch categories and inspect source links. On the version page or
+inside a finding's evidence panel, open **Add note / View annotations**. Create
+a Conclusion with confidence and a selected citation, revise it, then open
+**Revision history**. Return to the project to see the two annotation events.
+Export the comparison JSON from the comparison screen. The Playwright
+`compare-annotate.spec.ts` test performs this flow at 360 px with axe checks.
