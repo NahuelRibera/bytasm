@@ -1,7 +1,7 @@
 import { ApiError, queryString, type Problem, type ReportCreated } from "./api";
 
-export type Category = "metadata" | "sections" | "imports" | "exports" | "strings" | "findings" | "evidence";
-export const CATEGORIES: Category[] = ["metadata", "sections", "imports", "exports", "strings", "findings", "evidence"];
+export type Category = "metadata" | "sections" | "imports" | "exports" | "strings" | "findings" | "evidence" | "capabilities";
+export const CATEGORIES: Category[] = ["metadata", "sections", "imports", "exports", "strings", "findings", "evidence", "capabilities"];
 export interface ComparisonSide {
   version_id: string;
   sample_id: string;

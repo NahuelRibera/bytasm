@@ -100,7 +100,7 @@ def _pattern_analysis(session: Session, run: AnalysisRun | None) -> dict[str, An
         ],
         "rule_set": (
             {
-                "tool": "yara-x",
+                "tool": rule_set.tool,
                 "name": rule_set.name,
                 "version": rule_set.version,
                 "sha256": rule_set.sha256,
@@ -123,7 +123,8 @@ def _pattern_analysis(session: Session, run: AnalysisRun | None) -> dict[str, An
         "findings": [
             {
                 "kind": finding.kind,
-                "tool": "yara-x",
+                "rule_set_sha256": session.get_one(RuleSet, finding.rule_set_id).sha256,
+                "tool": "capa" if finding.kind == "capability" else "yara-x",
                 "tool_version": yara_versions[finding.invocation_id],
                 "rule_id": finding.rule_id,
                 "rule_namespace": finding.rule_namespace,
@@ -140,15 +141,23 @@ def _pattern_analysis(session: Session, run: AnalysisRun | None) -> dict[str, An
                         "kind": item.kind,
                         "pattern_id": item.pattern_id,
                         "file_offset": item.file_offset,
+                        "virtual_address": item.virtual_address,
+                        "virtual_address_hex": f"{item.virtual_address:#x}"
+                        if item.virtual_address is not None
+                        else None,
                         "length": item.length,
                         "xor_key": item.xor_key,
                         "excerpt_hex": item.excerpt_hex,
-                        "excerpt_truncated": item.length > MAX_EXCERPT_BYTES,
+                        "excerpt_truncated": (item.length or 0) > MAX_EXCERPT_BYTES,
                         "raw_json_pointer": item.raw_json_pointer,
                     }
                     for item in sorted(
                         finding.evidence,
-                        key=lambda e: (e.file_offset, e.pattern_id, e.raw_json_pointer),
+                        key=lambda e: (
+                            e.file_offset or e.virtual_address or 0,
+                            e.pattern_id,
+                            e.raw_json_pointer,
+                        ),
                     )
                 ],
             }
@@ -299,6 +308,24 @@ def build_report(
             else []
         ),
     }
+    from bytasm.plain_summary import report_summary
+
+    latest = max(
+        (r for r in version.runs if r.kind == "analysis"),
+        key=lambda r: (r.queued_at or r.started_at, r.id),
+        default=None,
+    )
+    selected = pattern_run(version)
+    document["analysis_context"] = (
+        {
+            "latest_run_id": latest.id,
+            "latest_status": latest.status,
+            "selected_run_id": selected.id if selected else None,
+        }
+        if latest
+        else None
+    )
+    document["summary"] = report_summary(document)
     model.Report.model_validate(document)  # never export something off-schema
     return document
 
@@ -356,6 +383,8 @@ def export_report(
         for run_id in sorted(checked_runs):
             analysis = session.get_one(AnalysisRun, run_id)
             for invocation in analysis.invocations:
+                if invocation.rule_set is not None:
+                    outputs.verify(invocation.rule_set.sha256)
                 if invocation.raw_output_sha256 is not None:
                     outputs.verify(invocation.raw_output_sha256)
             rule_step = runs.rule_set_step(analysis.profile_snapshot)

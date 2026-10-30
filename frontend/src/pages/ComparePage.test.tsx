@@ -146,7 +146,7 @@ describe("Version comparison", () => {
     setup({ [`GET ${compareUrl()}`]: () => json(data) });
     await screen.findByText("No differences in this category.");
     const navigation = screen.getByRole("navigation", { name: "Comparison categories" });
-    expect(within(navigation).getAllByRole("button")).toHaveLength(7);
+    expect(within(navigation).getAllByRole("button")).toHaveLength(8);
     await user.click(within(navigation).getByRole("button", { name: "Findings" }));
     expect(await screen.findByText("Finding added")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Findings" }).getAttribute("aria-pressed")).toBe("true");

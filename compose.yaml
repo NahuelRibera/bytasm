@@ -3,14 +3,14 @@
 # `make compose-check` (scripts/check_compose.py); keep the two in step.
 #
 # These settings are defence in depth. They are NOT a sandbox: the LIEF parser
-# runs in the api container, and YARA-X in the worker container, each as the
+# runs in the api container; strings, YARA-X and capa run in the worker, each as the
 # same user as its parent process, with the shared data volume and the same
 # (unrestricted outbound) network. That is why Bytasm only parses its own
 # fixtures here (blueprint 5.4.1, 8.2; SECURITY.md).
 #
 # SQLite replaces the blueprint's `db` service and the API serves the built UI
 # (ADR-0002). The v0.2 worker shares the API's image and data volume and
-# publishes no port (ADR-0003).
+# publishes no port (proposed ADR-0003).
 name: bytasm
 
 services:
@@ -19,7 +19,7 @@ services:
       context: .
       args:
         BYTASM_SOURCE_REVISION: ${BYTASM_SOURCE_REVISION:-}
-    image: bytasm-local:v0.2
+    image: bytasm-local:v0.4
     # Fixtures-only. Container mode refuses self_built (its listener is not
     # loopback inside the container); there is no API or UI switch either.
     environment:
@@ -62,11 +62,11 @@ services:
       start_period: 10s
     restart: "no"
 
-  # v0.2: processes queued analysis runs (YARA-X). Same image, same settings
+  # Processes queued analysis runs (strings, YARA-X, optional capa). Same settings
   # as `api`, no published port. It starts after the API has migrated the
   # database, and refuses to run twice on the same volume.
   worker:
-    image: bytasm-local:v0.2
+    image: bytasm-local:v0.4
     command: ["python", "-m", "bytasm", "worker"]
     depends_on:
       api:

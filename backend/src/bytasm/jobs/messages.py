@@ -8,8 +8,12 @@ fixed codes and the step's tool name.
 from collections.abc import Sequence
 from typing import Final
 
-TOOL_LABELS: Final[dict[str, str]] = {"strings": "The strings extractor", "yara-x": "YARA-X"}
-SHORT_LABELS: Final[dict[str, str]] = {"strings": "strings", "yara-x": "YARA-X"}
+TOOL_LABELS: Final[dict[str, str]] = {
+    "strings": "The strings extractor",
+    "yara-x": "YARA-X",
+    "capa": "capa",
+}
+SHORT_LABELS: Final[dict[str, str]] = {"strings": "strings", "yara-x": "YARA-X", "capa": "capa"}
 
 # Why the run stopped before a tool saw the sample (checked before every step).
 ADMISSION_MESSAGES: Final[dict[str, str]] = {
@@ -23,6 +27,8 @@ ADMISSION_MESSAGES: Final[dict[str, str]] = {
 }
 
 STEP_MESSAGES: Final[dict[str, str]] = {
+    "unsupported_format": "{tool} does not support this file format or architecture in Bytasm.",
+    "tool_unavailable": "The pinned {tool} tool is unavailable.",
     "timeout": "{tool} did not finish within the time limit.",
     "rules_invalid": (
         "Bytasm's rule set did not compile with the installed YARA-X. Open Rules and run "
@@ -106,8 +112,15 @@ def run_message(status: str, reason: str | None, steps: Sequence[tuple[str, str]
         text += f" Results from {_join(done)} are complete and kept."
         if any(tool == "yara-x" for tool, _ in missing):
             text += (
-                " This run has no findings: absence of a YARA-X match does not mean the "
-                "pattern is absent."
+                (
+                    " This run has no YARA-X findings: absence of a match does not mean "
+                    "the pattern is absent."
+                )
+                if "capa" in done
+                else (
+                    " This run has no findings: absence of a YARA-X match does not mean the "
+                    "pattern is absent."
+                )
             )
         if any(tool == "strings" for tool, _ in missing):
             text += " This run recorded no strings."

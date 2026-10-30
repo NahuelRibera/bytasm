@@ -30,6 +30,7 @@ from bytasm.runner.limits import DEFAULT_LIMITS
 from bytasm.runner.supervisor import run_child, yara_adapter_command
 
 EXPECTED_MATCHES = {
+    "capa_environment-x86_64.exe": ["pe_dos_stub_message", "pe_kernel32_import_name"],
     "entropy_blob-aarch64.elf": ["elf_dynamic_loader_path"],
     "exports_v1-x86_64.dll": ["pe_dos_stub_message", "pe_kernel32_import_name"],
     "hello_v1-aarch64-stripped.elf": ["elf_dynamic_loader_path", "url_reference"],

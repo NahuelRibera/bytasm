@@ -2,10 +2,11 @@
 
 Bytasm is a local app for inspecting PE and ELF binaries without running them.
 Import a file, browse its headers, sections, imports and strings, run the
-bundled YARA-X rules, and export a JSON report with byte evidence for each match.
+bundled YARA-X rules or the pinned capa subset, and preview JSON and standalone
+HTML reports with provenance and evidence.
 
 The backend uses FastAPI, SQLite and LIEF. The UI uses React and TypeScript.
-A separate worker extracts strings and runs YARA-X. The project is still in early development. It also supports version comparison
+A separate worker extracts strings and runs YARA-X and optional capa. The project is still in early development. It also supports version comparison
 and analyst annotations with citations and revision history.
 
 ## Before you start
@@ -57,7 +58,32 @@ Both build the UI and serve it at http://127.0.0.1:8000/. With Docker, use
 3. Browse the metadata, sections, imports and exports.
 4. Choose **Run pattern matching…** to extract strings and scan with YARA-X.
 5. Open a finding to inspect its offsets, matched bytes and rule text.
-6. Choose **Export JSON report** to download the results.
+6. In **Reports**, choose **Preview new report**, then download JSON or standalone HTML.
+7. For capa, import `fixtures/bin/capa_environment-x86_64.exe`, select **Full static
+   review**, and inspect its environment-query observation and function address.
+8. Add an analyst note or cited conclusion; compare two versions of the same
+   sample. Comparison reports warn that changed strings and analyst text may be shared.
+
+This working tree targets **v0.4.0** (schema 4), pending owner review. **Tools**
+shows installed versions, availability, adapters, rules hashes and profile limits.
+Quick static review remains the default. Full adds capa 10.0.0 with two upstream
+Apache-2.0 rules, native PE x86/x64 only and no library signatures. Other formats
+keep Quick results and explicitly show partial analysis. Function addresses from
+capa are not file offsets. No arbitrary commands, plugins or custom rules are exposed.
+See [v0.4 scope and verified limits](docs/milestones/v0.4-deeper-analysis-sharing.md)
+and [dependency notices](THIRD_PARTY_NOTICES.md), including an unresolved transitive
+license packaging issue before redistributing the image.
+
+```mermaid
+flowchart LR
+  Fixture[Admitted fixture] --> API[Loopback API / import hash check]
+  API --> Data[SQLite + content-addressed files]
+  Data --> Worker[Single worker: verify before each step]
+  Worker --> Steps[Strings / YARA-X / optional capa children]
+  Steps --> Data
+  Data --> JSON[Verified canonical JSON snapshot]
+  JSON --> Preview[React preview / escaped offline HTML]
+```
 
 The **Rules** page shows and validates the bundled rules. They are read-only
 in the app; editing them requires a code change.

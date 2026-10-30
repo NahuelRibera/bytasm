@@ -1,0 +1,20 @@
+{
+  "name": "capa-rules-bytasm-subset",
+  "version": "10.0.0",
+  "upstream_commit": "805f9eaccfb6a4e1ddffc809d71d1e2b5ccc15e5",
+  "source": "https://github.com/mandiant/capa-rules/tree/v10.0.0",
+  "license": "Apache-2.0",
+  "files": [
+    {
+      "file": "query-environment-variable.yml",
+      "source": "host-interaction/environment-variable/query-environment-variable.yml",
+      "sha256": "f80ba67c75d54e65a8cf30166ccde8e818a14012adc31738beecd70d641bc861"
+    },
+    {
+      "file": "set-environment-variable.yml",
+      "source": "host-interaction/environment-variable/set-environment-variable.yml",
+      "sha256": "6c3e693c80ce7a0f7fa205df7bfcc220540638087f6e69ba339144e94ff6aa89"
+    }
+  ],
+  "sha256": "c78c7ff8ad97ba7e6f2b74060e425bbcc830ea30c5fb5b2594acc9365d78d3a6"
+}

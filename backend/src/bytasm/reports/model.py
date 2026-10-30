@@ -1,9 +1,8 @@
 """The JSON report: schema (as Pydantic models) and its fixed texts.
 
-Schema version 3 keeps the version-2 metadata and pattern-analysis fields,
-and adds an explicit scope, current analyst revisions with citations, and
-an optional structural comparison. The former version-2 schema is retained
-separately for existing report consumers.
+Schema version 4 adds multi-tool evidence, deterministic summaries and explicit
+latest-run context to the v3 version/comparison scope and analyst citations.
+The published v2/v3 schemas and stored report bytes remain unchanged.
 
 The committed JSON Schema, `schemas/report.schema.json`, is generated from
 these models (`make schemas`), and a test keeps the two identical.
@@ -21,7 +20,7 @@ from bytasm.annotations import AnnotationOut
 from bytasm.compare import CompareOut
 
 REPORT_KIND = "bytasm.sample_version_report"
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 SCHEMA_ID = "https://github.com/NahuelRibera/bytasm/blob/main/schemas/report.schema.json"
 
 LABELS: dict[str, str] = {
@@ -183,7 +182,9 @@ class PatternStep(_Model):
     index: int
     tool: str
     adapter: str
-    status: Literal["succeeded", "failed", "timed_out", "cancelled", "skipped"]
+    status: Literal[
+        "succeeded", "failed", "timed_out", "cancelled", "skipped", "unsupported", "unavailable"
+    ]
     message: str | None
     tool_version: str | None
     adapter_version: str | None
@@ -193,11 +194,11 @@ class PatternStep(_Model):
 
 
 class PatternRuleSet(_Model):
-    tool: Literal["yara-x"]
+    tool: Literal["yara-x", "capa"]
     name: str
     version: str
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
-    source: Literal["bytasm-repo"]
+    source: str
     rule_count: int
 
 
@@ -212,10 +213,12 @@ class StringsCounts(_Model):
 
 
 class PatternEvidence(_Model):
-    kind: Literal["byte_range"]
+    kind: Literal["byte_range", "virtual_address"]
     pattern_id: str
-    file_offset: int = Field(ge=0)
-    length: int = Field(ge=0)
+    file_offset: int | None = Field(ge=0)
+    length: int | None = Field(ge=0)
+    virtual_address: int | None = Field(default=None, ge=0)
+    virtual_address_hex: str | None = Field(default=None, pattern=r"^0x[0-9a-f]{1,16}$")
     xor_key: int | None
     excerpt_hex: str = Field(pattern=r"^([0-9a-f]{2}){0,32}$")
     excerpt_truncated: bool
@@ -223,8 +226,9 @@ class PatternEvidence(_Model):
 
 
 class PatternFinding(_Model):
-    kind: Literal["yara_match"]
-    tool: Literal["yara-x"]
+    rule_set_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    kind: Literal["yara_match", "capability"]
+    tool: Literal["yara-x", "capa"]
     tool_version: str
     rule_id: str
     rule_namespace: str
@@ -246,6 +250,12 @@ class PatternAnalysis(_Model):
     notices: list[str]
 
 
+class AnalysisContext(_Model):
+    latest_run_id: str
+    latest_status: str
+    selected_run_id: str | None
+
+
 class ReportScope(_Model):
     kind: Literal["sample_version", "comparison"]
     version_ids: list[str] = Field(min_length=1, max_length=2)
@@ -259,7 +269,7 @@ class Report(_Model):
     )
 
     report_kind: Literal["bytasm.sample_version_report"]
-    schema_version: Literal[3]
+    schema_version: Literal[4]
     generated_at: datetime
     generator: Generator
     sample: SampleIdentity
@@ -271,6 +281,8 @@ class Report(_Model):
     scope: ReportScope
     annotations: list[AnnotationOut]
     comparison: CompareOut | None
+    summary: list[str]
+    analysis_context: AnalysisContext | None
     labels: dict[str, str]
     limitations: list[str]
 

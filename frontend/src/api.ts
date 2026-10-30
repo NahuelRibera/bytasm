@@ -187,6 +187,9 @@ async function get<T>(path: string): Promise<T> {
 }
 
 export const api = {
+  tools: () => get<{ tools: Array<{ tool: string; available: boolean; version: string | null; adapter: string; adapter_version: string; formats: string[]; rules_sha256: string | null; limitations: string }>; profiles: Array<{ id: string; name: string; steps: string[]; limitations: string }> }>("/api/v1/tools"),
+  reportDocument: (id: string) => get<Record<string, unknown>>(`/api/v1/reports/${encodeURIComponent(id)}/download`),
+  reportHistory: (id: string, offset = 0) => get<{ items: Array<{ id: string; sha256: string; generated_at: string; scope: { kind: string } | null }>; next_offset: number | null }>(`/api/v1/sample-versions/${encodeURIComponent(id)}/reports?offset=${offset}&limit=25`),
   health: () => get<Health>("/api/v1/health"),
   projects: () => get<Project[]>("/api/v1/projects"),
   activity: (projectId: string, offset = 0) =>
@@ -252,11 +255,11 @@ export const api = {
     return parse<RuleValidation>(response);
   },
 
-  async createRun(versionId: string): Promise<Run> {
+  async createRun(versionId: string, profileId = "default-static"): Promise<Run> {
     const response = await fetch(`/api/v1/sample-versions/${encodeURIComponent(versionId)}/runs`, {
       method: "POST",
       headers: { ...MUTATION_HEADERS, "Content-Type": "application/json" },
-      body: JSON.stringify({ profile_id: "default-static" }),
+      body: JSON.stringify({ profile_id: profileId }),
     });
     return parse<Run>(response);
   },
@@ -278,7 +281,8 @@ export interface RuleFile {
 
 export interface RuleSet {
   id: string | null;
-  tool: "yara-x";
+  tool: "yara-x" | "capa";
+  installed_tool_version?: string | null;
   name: string;
   version: string;
   label: string;
@@ -312,6 +316,8 @@ export interface RuleValidation {
 
 export type RunStatus = "queued" | "running" | "succeeded" | "partial" | "failed" | "cancelled";
 export type StepStatus =
+  | "unsupported"
+  | "unavailable"
   | "queued"
   | "running"
   | "succeeded"
@@ -372,15 +378,18 @@ export interface Run {
     admitted_under: string;
   };
   steps: RunStep[];
+  summary?: string[];
   counts: { findings: number; evidence: number; strings: number };
 }
 
 export interface Evidence {
   id: number;
-  kind: "byte_range";
+  kind: "byte_range" | "virtual_address";
+  virtual_address?: number | null;
+  virtual_address_hex?: string | null;
   pattern_id: string;
-  file_offset: number;
-  length: number;
+  file_offset: number | null;
+  length: number | null;
   xor_key: number | null;
   excerpt_hex: string;
   excerpt_truncated: boolean;
@@ -389,7 +398,8 @@ export interface Evidence {
 
 export interface Finding {
   id: string;
-  kind: "yara_match";
+  kind: "yara_match" | "capability";
+  tool?: string;
   title: string;
   rule_id: string;
   rule_namespace: string;
@@ -406,6 +416,7 @@ export interface FindingFilters {
   tool?: string;
   kind?: string;
   q?: string;
+  namespace?: string;
   [key: string]: string | undefined;
 }
 

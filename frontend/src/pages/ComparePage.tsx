@@ -3,7 +3,7 @@ import { useState } from "react";
 import { api, type VersionSummary } from "../api";
 import { compareApi, CATEGORIES, type Category, type Change } from "../compare-api";
 import { Empty, ErrorPanel, Loading } from "../components";
-import { Link } from "../router";
+import { Link, navigate } from "../router";
 
 export function ComparePage({ projectId, sampleId }: { projectId: string; sampleId: string }) {
   const samples = useQuery({ queryKey: ["samples", projectId], queryFn: () => api.samples(projectId) });
@@ -33,6 +33,7 @@ function ComparisonView({ versions }: { versions: VersionSummary[] }) {
     const link = document.createElement("a"); link.href = data.download_url; link.download = "";
     document.body.append(link); link.click(); link.remove();
   } });
+  const preview = useMutation({ mutationFn: () => compareApi.report(a, b), onSuccess: data => navigate(`/reports/${data.id}`) });
   const diff = result.data?.categories[category];
   const choose = (side: "a" | "b", value: string) => { if (side === "a") setA(value); else setB(value); setOffset(0); report.reset(); };
   return (
@@ -77,9 +78,11 @@ function ComparisonView({ versions }: { versions: VersionSummary[] }) {
         </>}
       </section>}
       <div className="export">
+        <button className="button" disabled={report.isPending || preview.isPending || !result.data} onClick={() => preview.mutate()}>{preview.isPending ? "Creating preview…" : "Preview comparison report"}</button>
         <p className="hint">Comparison reports may include changed string values and analyst text. Review them before sharing.</p>
         <button className="button button-primary" type="button" disabled={report.isPending || !result.data} onClick={() => report.mutate()}>Export comparison JSON report</button>
         {report.isError && <ErrorPanel error={report.error} />}
+        {preview.isError && <ErrorPanel error={preview.error} />}
         {report.isSuccess && <p role="status">Comparison report exported.</p>}
       </div>
     </>

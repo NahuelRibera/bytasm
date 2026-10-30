@@ -47,7 +47,7 @@ export async function expectNoAxeViolations(page: Page) {
   // @axe-core/playwright types `page` against its own playwright-core copy.
   const options = { page } as unknown as ConstructorParameters<typeof AxeBuilder>[0];
   const results = await new AxeBuilder(options).withTags(["wcag2a", "wcag2aa", "wcag22aa"]).analyze();
-  expect(results.violations.map((v) => `${v.id}: ${v.help}`)).toEqual([]);
+  expect(results.violations.map((v) => `${v.id}: ${v.help} (${v.nodes.map(node => node.target.join(", ")).join("; ")})`)).toEqual([]);
 }
 
 export async function createProject(page: Page, base: string, name: string) {

@@ -74,7 +74,7 @@ def test_report_validates_and_carries_identity_and_provenance(
 
     Draft202012Validator(json.loads(SCHEMA_PATH.read_text())).validate(report)
     assert report["report_kind"] == "bytasm.sample_version_report"
-    assert report["schema_version"] == 3
+    assert report["schema_version"] == 4
     # No analysis run yet: version-2 reports say so explicitly.
     assert report["pattern_analysis"] is None
     assert report["generator"]["name"] == "bytasm"

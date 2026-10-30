@@ -14,7 +14,16 @@ from sqlalchemy.orm import Session
 
 from bytasm.db.models import AnalysisRun, Finding, SampleVersion, StringOccurrence, ToolInvocation
 
-CATEGORIES = ("metadata", "sections", "imports", "exports", "strings", "findings", "evidence")
+CATEGORIES = (
+    "metadata",
+    "sections",
+    "imports",
+    "exports",
+    "strings",
+    "findings",
+    "evidence",
+    "capabilities",
+)
 
 
 class CompareError(Exception):
@@ -180,7 +189,7 @@ def _observations(session: Session, inv: ToolInvocation, category: str) -> dict[
                 "invocation_id": inv.id,
                 "finding_id": finding.id,
             }
-            if category == "findings":
+            if category in ("findings", "capabilities"):
                 grouped[key].append(
                     _fields(
                         finding,
@@ -191,6 +200,15 @@ def _observations(session: Session, inv: ToolInvocation, category: str) -> dict[
                         "evidence_truncated",
                     )
                 )
+                if category == "capabilities":
+                    grouped[key][-1]["function_virtual_addresses"] = [
+                        f"{address:#x}"
+                        for address in sorted(
+                            evidence.virtual_address
+                            for evidence in finding.evidence
+                            if evidence.virtual_address is not None
+                        )
+                    ]
             else:
                 for evidence in finding.evidence:
                     evidence_key = _canonical(
@@ -300,7 +318,15 @@ def compare_versions(
     ]
     categories = {}
     for name in [category] if category else CATEGORIES:
-        tool = "lief" if name in CATEGORIES[:4] else "strings" if name == "strings" else "yara-x"
+        tool = (
+            "lief"
+            if name in CATEGORIES[:4]
+            else "strings"
+            if name == "strings"
+            else "capa"
+            if name == "capabilities"
+            else "yara-x"
+        )
         source = imports if tool == "lief" else analysis
         left, right = (_invocation(run, tool) for run in source)
         if left is None or right is None:

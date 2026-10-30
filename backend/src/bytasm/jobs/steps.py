@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from bytasm.db.models import Base
 from bytasm.intake.policy import InputPolicy
 from bytasm.runner.limits import ParserLimits
-from bytasm.runner.supervisor import strings_adapter_command
+from bytasm.runner.supervisor import adapter_command, strings_adapter_command
 from bytasm.storage import ContentStore
 
 
@@ -33,6 +33,9 @@ class ScanDeps:
     # The YARA-X adapter child (tests substitute a fake).
     adapter_command: list[str]
     strings_command: list[str] = field(default_factory=strings_adapter_command)
+    capa_command: list[str] = field(
+        default_factory=lambda: adapter_command("bytasm.adapters.capa_scan")
+    )
 
 
 @dataclass(frozen=True)

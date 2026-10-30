@@ -99,7 +99,10 @@ def test_upgrade_preserves_existing_analysis_and_seeds_one_analyst(tmp_path: Pat
                 connection.exec_driver_sql(sql)
 
 
-def test_round_trip_preserves_populated_main_schema_and_legacy_report(tmp_path: Path) -> None:
+@pytest.mark.parametrize("legacy_version", [2, 3])
+def test_round_trip_preserves_populated_main_schema_and_legacy_report(
+    tmp_path: Path, legacy_version: int
+) -> None:
     import hashlib
 
     from jsonschema import Draft202012Validator
@@ -117,10 +120,20 @@ def test_round_trip_preserves_populated_main_schema_and_legacy_report(tmp_path: 
         assert process(ctx) == "succeeded"
         created = client.post(f"/api/v1/sample-versions/{version['id']}/reports").json()
         legacy = client.get(created["download_url"]).json()
-        legacy["schema_version"] = 2
-        for key in ("scope", "annotations", "comparison"):
+        legacy["schema_version"] = legacy_version
+        removed = ["summary", "analysis_context"]
+        if legacy_version == 2:
+            removed.extend(["scope", "annotations", "comparison"])
+        for key in removed:
             del legacy[key]
-        schema = Path(__file__).resolve().parents[3] / "schemas/report-v2.schema.json"
+        for finding in (legacy.get("pattern_analysis") or {}).get("findings", []):
+            finding.pop("rule_set_sha256", None)
+            for evidence in finding["evidence"]:
+                evidence.pop("virtual_address", None)
+                evidence.pop("virtual_address_hex", None)
+        schema = (
+            Path(__file__).resolve().parents[3] / f"schemas/report-v{legacy_version}.schema.json"
+        )
         Draft202012Validator(json.loads(schema.read_text())).validate(legacy)
         raw = canonical_json(legacy)
         digest = hashlib.sha256(raw).hexdigest()
@@ -190,3 +203,71 @@ def test_round_trip_preserves_populated_main_schema_and_legacy_report(tmp_path: 
         assert client.get(created["download_url"]).content == raw
         with ctx.sessions() as session:
             assert session.scalar(select(Report.sha256)) == digest
+
+
+def test_v04_upgrade_preserves_populated_v03_revisions_and_citations(tmp_path: Path) -> None:
+    from sqlalchemy import MetaData, select
+    from test_analysis import process, start_run
+
+    with api_client(make_settings(tmp_path)) as client:
+        project = create_project(client)
+        version = do_import(client, project, ELF_X86_64.read_bytes()).json()["sample_version"]
+        run = start_run(client, version["id"])
+        ctx = ctx_of(client)
+        assert process(ctx) == "succeeded"
+        finding = client.get(f"/api/v1/runs/{run['id']}/findings").json()["findings"][0]
+        cites = [{"target_type": "evidence", "target_id": str(finding["evidence"][0]["id"])}]
+        created = client.post(
+            "/api/v1/annotations",
+            json={
+                "target_type": "sample_version",
+                "target_id": version["id"],
+                "kind": "conclusion",
+                "body": "Original cited conclusion",
+                "confidence": "tentative",
+                "cites": cites,
+            },
+        )
+        assert created.status_code == 201
+        history_url = f"/api/v1/annotations/{created.json()['id']}/revisions"
+        revised = client.post(
+            history_url,
+            json={
+                "expected_revision": 1,
+                "kind": "conclusion",
+                "body": "Revised cited conclusion",
+                "confidence": "likely",
+                "cites": cites,
+            },
+        )
+        assert revised.status_code == 201
+        record = client.post(f"/api/v1/sample-versions/{version['id']}/reports").json()
+        report_bytes = client.get(record["download_url"]).content
+        migrate(ctx.engine, "0005", downgrade=True)
+        previous = MetaData()
+        previous.reflect(bind=ctx.engine)
+        tables = {
+            name: table for name, table in previous.tables.items() if name != "alembic_version"
+        }
+        with ctx.engine.connect() as connection:
+            before = {
+                name: sorted([tuple(row) for row in connection.execute(select(table))], key=repr)
+                for name, table in tables.items()
+            }
+        assert before["annotation"] and before["annotation_citation"] and before["evidence"]
+        migrate(ctx.engine)
+        migrate(ctx.engine)
+        with ctx.engine.connect() as connection:
+            after = {
+                name: sorted([tuple(row) for row in connection.execute(select(table))], key=repr)
+                for name, table in tables.items()
+            }
+            assert after == before
+            assert connection.exec_driver_sql("PRAGMA foreign_key_check").all() == []
+        assert client.get(record["download_url"]).content == report_bytes
+        history = client.get(history_url).json()["items"]
+        assert [item["body"] for item in history] == [
+            "Original cited conclusion",
+            "Revised cited conclusion",
+        ]
+        assert all(item["cites"][0]["target_id"] == cites[0]["target_id"] for item in history)

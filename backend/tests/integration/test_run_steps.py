@@ -527,7 +527,7 @@ def test_findings_filters_are_bounded_and_keep_the_total(client: TestClient) -> 
     assert dos["total"] == 3 and dos["filters"]["q"] == "dos mode"
     assert client.get(url, params={"tool": "yara-x", "kind": "yara_match"}).json()["findings"]
     assert client.get(url, params={"q": "no such rule"}).json()["findings"] == []
-    for params in ({"tool": "capa"}, {"kind": "string"}, {"q": "x" * 129}):
+    for params in ({"tool": "unknown"}, {"kind": "string"}, {"q": "x" * 129}):
         assert client.get(url, params=params).status_code == 422
 
 

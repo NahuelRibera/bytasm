@@ -1,4 +1,4 @@
-"""Reproducible v0.1–v0.3 demo (blueprint 13.8), as a script.
+"""Reproducible v0.1–v0.4 demo (blueprint 13.8), as a script.
 
   make demo                                  # throwaway native server
   make demo DEMO_ARGS="--keep-running"       # ... and leave it up to browse
@@ -298,7 +298,7 @@ def run_demo(client: Client) -> str:
         "   every byte range matches the fixture; a match is an observation, not a verdict"
     )
 
-    step("8. JSON report with the run's findings (schema version 3)")
+    step("8. JSON report with the run's findings (schema version 4)")
     report, _ = export_report(client, version_id)
     analysis = report["pattern_analysis"]
     if analysis is None or analysis["run"]["id"] != run["id"]:
@@ -372,8 +372,36 @@ def run_demo(client: Client) -> str:
     if comparison_report["annotations"][0]["revision"] != 2:
         raise DemoError("comparison report omitted the analyst revision")
     print(
-        "   metadata compared; missing tool results stay unavailable; schema 3 report validated"
+        "   metadata compared; missing tool results stay unavailable; schema 4 report validated"
     )
+    step("11. Full static review: positive capa fixture and standalone HTML")
+    capa_entry = "bin/capa_environment-x86_64.exe"
+    capa_data = (ROOT / "fixtures" / capa_entry).read_bytes()
+    if hashlib.sha256(capa_data).hexdigest() != manifest_hash(capa_entry):
+        raise DemoError("capa fixture hash mismatch")
+    status, imported = upload(client, project["id"], capa_data, "capa_environment-x86_64.exe")
+    if status != 201:
+        raise DemoError("capa fixture import failed")
+    capa_version = imported["sample_version"]["id"]
+    full = client.json("POST", f"/api/v1/sample-versions/{capa_version}/runs", {"profile_id": "full-static"})
+    deadline = time.monotonic() + 150
+    while full["status"] in ("queued", "running"):
+        if time.monotonic() > deadline:
+            raise DemoError("Full review did not finish within 150 seconds")
+        time.sleep(0.5)
+        full = client.json("GET", f"/api/v1/runs/{full['id']}")
+    if full["status"] != "succeeded":
+        raise DemoError(f"Full review ended {full['status']}")
+    observations = client.json("GET", f"/api/v1/runs/{full['id']}/findings?tool=capa")
+    if [finding["rule_id"] for finding in observations["findings"]] != ["query environment variable"]:
+        raise DemoError("expected positive capa observation missing")
+    snapshot = client.json("POST", f"/api/v1/sample-versions/{capa_version}/reports")
+    status, headers, html = client.request("GET", f"/api/v1/reports/{snapshot['id']}/html")
+    if status != 200 or b"query environment variable" not in html or b"<script" in html:
+        raise DemoError("standalone HTML content check failed")
+    if "default-src 'none'" not in {key.lower(): value for key, value in headers.items()}.get("content-security-policy", ""):
+        raise DemoError("standalone HTML CSP missing")
+    print("   three steps succeeded; capa static observation and schema 4 HTML verified")
     return f"{client.base_url}/projects/{project['id']}/compare/{version['sample_id']}"
 
 

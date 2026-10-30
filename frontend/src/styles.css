@@ -836,3 +836,10 @@ details.card > summary {
 .annotation-entry { margin: var(--space-4) 0; }
 
 .annotation-body { white-space: pre-wrap; }
+
+.evidence-panel > details > summary {
+  min-height: 28px;
+  padding-block: var(--space-2);
+  cursor: pointer;
+}
+.report-library, .export { overflow-wrap: anywhere; }

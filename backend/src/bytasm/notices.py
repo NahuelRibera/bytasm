@@ -31,7 +31,7 @@ REPORT_LIMITATIONS: Final = (
 # Shown next to every set of YARA-X findings, and with a run that matched
 # nothing (blueprint 7.5, 10).
 FINDING_NOTICES: Final = (
-    "A match means a rule's pattern was found in the file's bytes. It is an observation "
+    "A match means a rule matched static features read from the file. It is an observation "
     "that needs human interpretation, not a conclusion.",
     "A match does not by itself show that a file is malicious, and Bytasm gives no verdict, "
     "score, or severity.",
@@ -51,7 +51,7 @@ STRINGS_NOTICES: Final = (
 
 # Added to a report's limitations when it includes an analysis run (v0.2).
 PATTERN_REPORT_LIMITATIONS: Final = (
-    "Pattern matches (YARA-X, with Bytasm's own bundled rules) are observations that need "
+    "Pattern matches (YARA-X with Bytasm rules; capa with its attributed subset) need "
     "interpretation. A match is not a verdict, and no match does not show that the file "
     "is safe.",
     "Strings are listed as counts only in this report; the values stay in Bytasm.",

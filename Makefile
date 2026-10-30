@@ -14,7 +14,7 @@ help:
 	@echo "make compose-up       build the image and run Bytasm in the hardened container on 127.0.0.1:8000"
 	@echo "make compose-down     stop the container (keeps the bytasm-data volume)"
 	@echo "make compose-check    assert the security settings of the resolved compose.yaml"
-	@echo "make demo             scripted demo: import a fixture, check metadata, export the report, run YARA-X"
+	@echo "make demo             scripted demo: import a fixture, check metadata, export reports, run YARA-X and capa"
 	@echo "make audit            audit locked Python (pip-audit) and npm dependencies for known vulnerabilities"
 	@echo "make format           format Python code with ruff"
 	@echo "make lint             check formatting and lint rules (ruff)"

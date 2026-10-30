@@ -99,3 +99,20 @@ a Conclusion with confidence and a selected citation, revise it, then open
 **Revision history**. Return to the project to see the two annotation events.
 Export the comparison JSON from the comparison screen. The Playwright
 `compare-annotate.spec.ts` test performs this flow at 360 px with axe checks.
+
+
+## v0.4 extension
+
+The scripted demo now also imports the self-authored
+`capa_environment-x86_64.exe`, selects Full static review, waits for all three
+steps, verifies the positive environment-query observation and downloads the
+schema 4 standalone HTML with its CSP. No fixture is executed. The native demo
+uses its own temporary database and stops/deletes only its own resources.
+
+For a manual review: open **Tools**, inspect actual versions and two-rule scope;
+create a project and import the positive PE fixture; select **Full static
+review**; inspect capa's function virtual address and limitations; add a cited
+conclusion; return to the version's **Reports**, choose **Preview new report**
+and download JSON/HTML. For comparisons, use two versions of the same sample,
+review the capabilities compatibility state, then preview the comparison report.
+HTML can be opened offline and printed without scripts or remote assets.

@@ -43,6 +43,7 @@ from sqlalchemy.orm import Session
 
 from bytasm.db.models import AnalysisRun, SampleVersion, ToolInvocation, utcnow
 from bytasm.jobs import runs
+from bytasm.jobs.capa_step import run_capa_step
 from bytasm.jobs.scan import run_yara_step
 from bytasm.jobs.steps import ScanDeps, StepInput, StepOutcome
 from bytasm.jobs.strings_step import run_strings_step
@@ -55,6 +56,7 @@ StepRunner = Callable[[ScanDeps, StepInput], Awaitable[StepOutcome]]
 STEP_RUNNERS: Final[dict[str, StepRunner]] = {
     runs.STRINGS_TOOL: run_strings_step,
     runs.YARA_TOOL: run_yara_step,
+    "capa": run_capa_step,
 }
 
 

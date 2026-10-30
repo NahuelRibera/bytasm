@@ -21,7 +21,7 @@ import { Link } from "../router";
 import { RuleSource } from "./RulesPage";
 
 const ACTIVE = new Set(["queued", "running"]);
-const TOOL_NAMES: Record<string, string> = { strings: "Strings extractor", "yara-x": "YARA-X" };
+const TOOL_NAMES: Record<string, string> = { strings: "Strings extractor", "yara-x": "YARA-X", "capa": "capa" };
 
 function stepOf(run: Run, tool: string): RunStep | undefined {
   return run.steps.find((step) => step.tool === tool);
@@ -65,6 +65,8 @@ export function RunPage({ runId }: { runId: string }) {
       {ACTIVE.has(r.status) && <WorkerWarning />}
       <RunBanner run={r} />
 
+      {r.summary && <section className="card" aria-labelledby="plain-run"><h2 id="plain-run">Analysis in plain language</h2>{r.summary.map((text, i) => <p key={i}>{text}</p>)}</section>}
+      <section className="card" aria-label="Run summary"><p>{r.steps.filter(step => step.status === "succeeded").length} of {r.steps.length} selected steps succeeded · {r.counts.findings} findings · {r.counts.strings.toLocaleString("en")} recorded strings</p><p className="hint">Scope: this run. Failed, unsupported and unavailable steps do not establish absence of patterns.</p></section>
       <div className="grid-2 run-grid">
         <SamplePanel run={r} />
         <ProvenancePanel run={r} />
@@ -72,7 +74,7 @@ export function RunPage({ runId }: { runId: string }) {
       <StepsTable run={r} />
       <TechnicalLog run={r} />
       <StringsSummaryPanel run={r} />
-      {stepOf(r, "yara-x")?.status === "succeeded" ? (
+      {r.steps.some(step => ["yara-x", "capa"].includes(step.tool) && step.status === "succeeded") ? (
         <FindingsSection run={r} />
       ) : (
         !ACTIVE.has(r.status) && (
@@ -410,9 +412,12 @@ function StringsSummaryPanel({ run }: { run: Run }) {
 function FindingsSection({ run }: { run: Run }) {
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
+  const [tool, setTool] = useState("");
+  const [kind, setKind] = useState("");
+  const [namespace, setNamespace] = useState("");
   const findings = useQuery({
-    queryKey: ["findings", run.id, query],
-    queryFn: () => api.findings(run.id, { q: query }),
+    queryKey: ["findings", run.id, query, tool, kind, namespace],
+    queryFn: () => api.findings(run.id, { q: query, tool, kind, namespace }),
     placeholderData: (previous) => previous,
   });
   const [selected, setSelected] = useState<string | null>(() => window.location.hash.startsWith("#finding-") ? window.location.hash.slice(9) : null);
@@ -453,6 +458,9 @@ function FindingsSection({ run }: { run: Run }) {
             setQuery(search.trim());
           }}
         >
+          <label>Tool<select aria-label="Finding tool" value={tool} onChange={event => setTool(event.target.value)}><option value="">All</option><option value="yara-x">YARA-X</option><option value="capa">capa</option></select></label>
+          <label>Kind<select aria-label="Finding kind" value={kind} onChange={event => setKind(event.target.value)}><option value="">All</option><option value="yara_match">Pattern match</option><option value="capability">Capability</option></select></label>
+          <label>Namespace<input maxLength={128} value={namespace} onChange={event => setNamespace(event.target.value)} /></label>
           <label htmlFor="finding-search">Search findings</label>
           <input
             id="finding-search"
@@ -466,19 +474,18 @@ function FindingsSection({ run }: { run: Run }) {
             Search
           </button>
           <span className="hint" aria-live="polite">
-            {query ? `${items.length} of ${total} shown` : `${total} shown`} · tool: YARA-X
+            {findings.isFetching ? "Updating filtered findings…" : query || tool || kind || namespace ? `${items.length} of ${total} shown` : `${total} shown`} · tool: {tool || "all completed tools"}
           </span>
         </form>
       )}
       {total > 0 && items.length === 0 ? (
         <Empty>
-          <p>No finding matches “{query}”.</p>
+          <p>{query ? `No finding matches “${query}”.` : "No finding matches the selected filters."}</p>
         </Empty>
       ) : items.length === 0 ? (
         <Empty>
           <p>
-            <strong>No rule matched.</strong> None of the {run.rule_set.label} rules found their
-            patterns in this file's bytes.
+            <strong>No rule matched.</strong> The completed rule-matching steps in this run reported no matches. Incomplete steps cannot establish absence of patterns.
           </p>
           <p className="hint">
             This is not evidence that the file is safe. It only says these specific rules did not
@@ -501,7 +508,7 @@ function FindingsSection({ run }: { run: Run }) {
               {items.map((finding) => (
                 <tr id={`finding-${finding.id}`} key={finding.id} className={finding.id === selected ? "row-selected" : undefined}>
                   <td>
-                    <span className="tool-badge">YARA-X</span> <code className="untrusted">{finding.rule_id}</code>
+                    <span className="tool-badge">{finding.tool ?? "YARA-X"}</span> <code className="untrusted">{finding.rule_id}</code>
                   </td>
                   <td className="untrusted">{finding.title}</td>
                   <td className="num">
@@ -528,7 +535,7 @@ function FindingsSection({ run }: { run: Run }) {
           </table>
         </div>
       )}
-      {current && <EvidencePanel finding={current} run={run} onClose={close} />}
+      {current && (current.kind === "capability" ? <CapabilityPanel finding={current} run={run} onClose={close} /> : <EvidencePanel finding={current} run={run} onClose={close} />)}
     </section>
   );
 }
@@ -612,10 +619,10 @@ function EvidencePanel({ finding, run, onClose }: { finding: Finding; run: Run; 
                     {item.xor_key !== null && <div className="hint">XOR key {hex(item.xor_key)}</div>}
                   </td>
                   <td className="num">
-                    <code>{hex(item.file_offset)}</code>
-                    <div className="hint">{item.file_offset.toLocaleString("en")}</div>
+                    <code>{item.file_offset === null ? "Not available" : hex(item.file_offset)}</code>
+                    <div className="hint">{item.file_offset?.toLocaleString("en") ?? "—"}</div>
                   </td>
-                  <td className="num">{item.length.toLocaleString("en")} B</td>
+                  <td className="num">{item.length?.toLocaleString("en") ?? "—"} B</td>
                   <td>
                     <code className="hash">{spacedHex(item.excerpt_hex)}</code>
                     {item.excerpt_truncated && <div className="hint">first 32 bytes shown</div>}
@@ -647,9 +654,27 @@ function EvidencePanel({ finding, run, onClose }: { finding: Finding; run: Run; 
       {file && <RuleSource file={file} headingLevel={4} />}
       <AnnotationsSection key={finding.id} versionId={run.sample.version_id} targetType="finding" targetId={finding.id} />
       {finding.evidence.map((item) => <details key={item.id} className="card" open={new URLSearchParams(window.location.search).has("annotations") && window.location.hash === `#evidence-${item.id}`} >
-        <summary>Annotations for evidence at {hex(item.file_offset)}</summary>
+        <summary>Annotations for evidence at {item.file_offset === null ? "Not available" : hex(item.file_offset)}</summary>
         <AnnotationsSection versionId={run.sample.version_id} targetType="evidence" targetId={String(item.id)} />
       </details>)}
     </section>
   );
+}
+
+
+function CapabilityPanel({ finding, run, onClose }: { finding: Finding; run: Run; onClose: () => void }) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => heading.current?.focus(), [finding.id]);
+  const step = stepOf(run, "capa");
+  return <section id="evidence-panel" className="evidence-panel" aria-labelledby="capability-heading" onKeyDown={event => { if (event.key === "Escape") onClose(); }}>
+    <h3 id="capability-heading" tabIndex={-1} ref={heading}>capa evidence: {finding.title}</h3>
+    <button className="button" onClick={onClose}>Close evidence</button>
+    <p>capa {step?.tool_version} reported a static match in namespace {finding.rule_namespace}. This does not show that the capability occurred during execution.</p>
+    <p className="notice">Packed files, installers, wrapper functions and missing library signatures can yield incomplete or misleading observations. Only the bundled two-rule subset was evaluated.</p>
+    <ul>{finding.evidence.map(item => <li id={`evidence-${item.id}`} key={item.id}>Function virtual address: <code>{item.virtual_address_hex ?? (item.virtual_address == null ? "Unavailable" : hex(item.virtual_address))}</code>. File byte range: not supplied by capa.<AnnotationsSection versionId={run.sample.version_id} targetType="evidence" targetId={String(item.id)} /></li>)}</ul>
+    {finding.evidence_truncated && <p>Evidence display was capped; more locations were reported.</p>}
+    <p>Rule-supplied classifications describe this static observation, not observed execution.</p><ul>{finding.metadata.filter(([key]) => key !== "source").map(([key, value], index) => <li key={index}>{key}: {String(value)}</li>)}</ul><details><summary>Exact matched rule</summary><pre className="untrusted">{String(finding.metadata.find(([key]) => key === "source")?.[1] ?? "Unavailable")}</pre></details>
+    {step?.invocation_id && <a className="button" href={rawOutputUrl(step.invocation_id)} download>Download original capa JSON</a>}
+    <AnnotationsSection versionId={run.sample.version_id} targetType="finding" targetId={finding.id} />
+  </section>;
 }

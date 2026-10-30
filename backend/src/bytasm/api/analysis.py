@@ -48,6 +48,7 @@ from bytasm.api.schemas import (
     StringsOut,
     StringsSummaryOut,
 )
+from bytasm.db.imported import import_record
 from bytasm.db.models import (
     AnalysisRun,
     Evidence,
@@ -66,6 +67,7 @@ from bytasm.jobs.scan import (
     yara_x_installed_version,
 )
 from bytasm.notices import FINDING_NOTICES, STRINGS_NOTICES
+from bytasm.plain_summary import describe
 from bytasm.rules import RuleSetError, load_rule_set, split_snapshot
 from bytasm.runner import workspace
 from bytasm.runner.supervisor import run_child
@@ -75,8 +77,6 @@ router = APIRouter()
 log = logging.getLogger("bytasm.analysis")
 
 MAX_LISTED_RUNS = 50
-# Every finding so far comes from the YARA-X step.
-FINDING_TOOL = "yara-x"
 
 
 def _ctx(request: Request) -> AppContext:
@@ -132,6 +132,7 @@ def stored_rule_set(request: Request, rule_set_id: str) -> RuleSetOut | JSONResp
         if row is None:
             return _not_found(request, "rule set")
         name, version, sha256 = row.name, row.version, row.sha256
+        tool, source = row.tool, row.source
     try:
         snapshot = ctx.outputs.read_verified(sha256)
     except IntegrityError:
@@ -141,22 +142,37 @@ def stored_rule_set(request: Request, rule_set_id: str) -> RuleSetOut | JSONResp
             request_id=_rid(request),
         )
     try:
-        current_sha = load_rule_set(ctx.settings.rules_dir).sha256
-    except RuleSetError:
+        if tool == "capa":
+            from bytasm.capa_rules import snapshot as capa_snapshot
+
+            current_sha = capa_snapshot()[1]
+        else:
+            current_sha = load_rule_set(ctx.settings.rules_dir).sha256
+    except (RuleSetError, OSError, ValueError):
         current_sha = None
-    files = split_snapshot(snapshot)
+    files = json.loads(snapshot) if tool == "capa" else split_snapshot(snapshot)
+    from bytasm.tools import installed
+
     return RuleSetOut(
         id=rule_set_id,
-        tool="yara-x",
+        tool=tool,  # type: ignore[arg-type]  # fixed tool registry
         name=name,
         version=version,
         label=f"{name}@{version}",
         sha256=sha256,
-        source="bytasm-repo",
+        source=source,
+        installed_tool_version=installed("flare-capa" if tool == "capa" else "yara-x"),
         current=current_sha == sha256,
         rule_count=len(files),
         files=[
-            RuleFileOut(name=n, identifier=n.removesuffix(".yar"), text=t) for n, t in files.items()
+            RuleFileOut(
+                name=n,
+                identifier=n.removesuffix(".yml").replace("-", " ")
+                if tool == "capa"
+                else n.removesuffix(".yar"),
+                text=t,
+            )
+            for n, t in sorted(files.items())
         ],
         installed_yara_x_version=yara_x_installed_version(),
     )
@@ -293,6 +309,27 @@ def run_out(session: Session, run: AnalysisRun) -> RunOut:
             )
             for view in views
         ],
+        summary=describe(
+            {
+                "sha256": version.sha256,
+                "detected_format": version.detected_format,
+                "architecture": import_record(version).header["architecture"],
+            },
+            run.status,
+            [{"tool": v.tool, "status": v.status} for v in views],
+            [
+                {"tool": "capa" if f.kind == "capability" else "yara-x"}
+                for f in session.scalars(select(Finding).where(Finding.run_id == run.id))
+            ],
+            next(
+                (
+                    v.invocation.summary
+                    for v in views
+                    if v.tool == "strings" and v.invocation and v.invocation.status == "succeeded"
+                ),
+                None,
+            ),
+        ),
         counts=RunCounts(
             findings=finding_count or 0, evidence=evidence_count or 0, strings=string_count or 0
         ),
@@ -312,7 +349,7 @@ class _Refused(Exception):
         self.code, self.detail, self.extra = code, detail, extra
 
 
-def _create_run(ctx: AppContext, version_id: str) -> str:
+def _create_run(ctx: AppContext, version_id: str, profile_id: str = "default-static") -> str:
     """Check, then record a queued run in one transaction. Returns its ID."""
     with ctx.sessions() as session:
         version = session.get(SampleVersion, version_id)
@@ -343,6 +380,8 @@ def _create_run(ctx: AppContext, version_id: str) -> str:
 
     scratch = workspace.create_workdir(ctx.tmp_dir)
     created_snapshot = False
+    capa_snapshot_created = False
+    capa_sha: str | None = None
     session = ctx.sessions()
     try:
         created_snapshot = ctx.outputs.put_bytes(rule_set.snapshot, rule_set.sha256, scratch)
@@ -369,6 +408,61 @@ def _create_run(ctx: AppContext, version_id: str) -> str:
             runs.profile_snapshot(row, ctx.settings.limits.timeout_seconds),
             datetime.now(UTC),
         )
+        if profile_id == "full-static":
+            from bytasm.capa_rules import snapshot
+
+            raw, sha = snapshot()
+            capa_sha = sha
+            capa_snapshot_created = ctx.outputs.put_bytes(raw, sha, scratch)
+            capa_rules = session.scalar(select(RuleSet).where(RuleSet.sha256 == sha))
+            if capa_rules is None:
+                capa_rules = RuleSet(
+                    tool="capa",
+                    name="capa-rules-bytasm-subset",
+                    version="10.0.0",
+                    sha256=sha,
+                    source="upstream@v10.0.0",
+                    snapshot_path=ctx.outputs.relative_path(sha),
+                    rule_count=2,
+                )
+                session.add(capa_rules)
+                session.flush()
+            run.profile_snapshot = {
+                **run.profile_snapshot,
+                "id": "full-static",
+                "version": 3,
+                "name": "Full static review: strings, YARA-X and capa (PE x86/x64)",
+                "steps": [
+                    *run.profile_snapshot["steps"],
+                    {
+                        "tool": "capa",
+                        "adapter": "capa_scan",
+                        "tool_version": "10.0.0",
+                        "rule_set": {
+                            "id": capa_rules.id,
+                            "sha256": sha,
+                            "label": "capa-rules-bytasm-subset@10.0.0",
+                        },
+                        "timeout_seconds": 120,
+                        "backend": "vivisect",
+                        "signatures": "none",
+                    },
+                ],
+            }
+        from bytasm.tools import registry
+
+        tools_by_name = {tool["tool"]: tool for tool in registry()}
+        run.profile_snapshot = {
+            **run.profile_snapshot,
+            "steps": [
+                {
+                    **step,
+                    "tool_version": tools_by_name[step["tool"]]["version"],
+                    "adapter_version": tools_by_name[step["tool"]]["adapter_version"],
+                }
+                for step in run.profile_snapshot["steps"]
+            ],
+        }
         session.add(run)
         session.flush()
         runs.record_activity(session, run.id, "queued")
@@ -379,6 +473,10 @@ def _create_run(ctx: AppContext, version_id: str) -> str:
         still_used = session.scalar(select(RuleSet.id).where(RuleSet.sha256 == rule_set.sha256))
         if created_snapshot and still_used is None:
             ctx.outputs.remove(rule_set.sha256)
+        if capa_snapshot_created and capa_sha is not None:
+            capa_used = session.scalar(select(RuleSet.id).where(RuleSet.sha256 == capa_sha))
+            if capa_used is None:
+                ctx.outputs.remove(capa_sha)
         raise
     finally:
         session.close()
@@ -389,7 +487,7 @@ def _create_run(ctx: AppContext, version_id: str) -> str:
 async def create_run(request: Request, version_id: str, body: RunCreate) -> RunOut | JSONResponse:
     ctx = _ctx(request)
     try:
-        run_id = await run_in_threadpool(_create_run, ctx, version_id)
+        run_id = await run_in_threadpool(_create_run, ctx, version_id, body.profile_id)
     except _Refused as refusal:
         log.info(
             json.dumps({"event": "run_create", "outcome": refusal.code, "version": version_id})
@@ -442,7 +540,8 @@ def _finding_out(finding: Finding) -> FindingOut:
     attributes = finding.tool_reported_attributes
     return FindingOut(
         id=finding.id,
-        kind="yara_match",
+        kind="capability" if finding.kind == "capability" else "yara_match",
+        tool="capa" if finding.kind == "capability" else "yara-x",
         title=finding.title,
         rule_id=finding.rule_id,
         rule_namespace=finding.rule_namespace,
@@ -455,13 +554,17 @@ def _finding_out(finding: Finding) -> FindingOut:
         evidence=[
             EvidenceOut(
                 id=item.id,
-                kind="byte_range",
+                kind="virtual_address" if item.kind == "virtual_address" else "byte_range",
+                virtual_address=item.virtual_address,
+                virtual_address_hex=f"{item.virtual_address:#x}"
+                if item.virtual_address is not None
+                else None,
                 pattern_id=item.pattern_id,
                 file_offset=item.file_offset,
                 length=item.length,
                 xor_key=item.xor_key,
                 excerpt_hex=item.excerpt_hex,
-                excerpt_truncated=item.length > MAX_EXCERPT_BYTES,
+                excerpt_truncated=(item.length or 0) > MAX_EXCERPT_BYTES,
                 raw_json_pointer=item.raw_json_pointer,
             )
             for item in finding.evidence
@@ -476,9 +579,10 @@ MAX_QUERY = 128
 def run_findings(
     request: Request,
     run_id: str,
-    tool: Annotated[Literal["yara-x"] | None, Query()] = None,
-    kind: Annotated[Literal["yara_match"] | None, Query()] = None,
+    tool: Annotated[Literal["yara-x", "capa"] | None, Query()] = None,
+    kind: Annotated[Literal["yara_match", "capability"] | None, Query()] = None,
     q: Annotated[str | None, Query(max_length=MAX_QUERY)] = None,
+    namespace: Annotated[str | None, Query(max_length=128)] = None,
 ) -> FindingsOut | JSONResponse:
     """A run's findings, optionally filtered by tool, kind, and a text search.
 
@@ -497,9 +601,11 @@ def run_findings(
                 .order_by(Finding.rule_namespace, Finding.rule_id)
             )
         )
-        tools = {f.id: FINDING_TOOL for f in findings}
+        tools = {f.id: ("capa" if f.kind == "capability" else "yara-x") for f in findings}
 
         def keep(finding: Finding) -> bool:
+            if namespace is not None and finding.rule_namespace != namespace:
+                return False
             if tool is not None and tools[finding.id] != tool:
                 return False
             if kind is not None and finding.kind != kind:
@@ -516,7 +622,7 @@ def run_findings(
             run_status=run.status,
             run_message=summary.run_message(run, views),
             total=len(findings),
-            filters=FindingsFilterOut(tool=tool, kind=kind, q=needle or None),
+            filters=FindingsFilterOut(tool=tool, kind=kind, q=needle or None, namespace=namespace),
             available_tools=sorted(set(tools.values())),
             available_kinds=sorted({f.kind for f in findings}),
             findings=[_finding_out(f) for f in findings if keep(f)],

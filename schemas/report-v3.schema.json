@@ -1,0 +1,1646 @@
+{
+  "$defs": {
+    "Analysis": {
+      "additionalProperties": false,
+      "properties": {
+        "run": {
+          "$ref": "#/$defs/Run"
+        },
+        "tool_invocations": {
+          "items": {
+            "$ref": "#/$defs/ToolInvocation"
+          },
+          "title": "Tool Invocations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "run",
+        "tool_invocations"
+      ],
+      "title": "Analysis",
+      "type": "object"
+    },
+    "AnnotationOut": {
+      "properties": {
+        "author": {
+          "$ref": "#/$defs/AuthorOut"
+        },
+        "body": {
+          "title": "Body",
+          "type": "string"
+        },
+        "cites": {
+          "items": {
+            "$ref": "#/$defs/CitationOut"
+          },
+          "title": "Cites",
+          "type": "array"
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "enum": [
+                "tentative",
+                "likely",
+                "well-supported"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Confidence"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "note",
+            "interpretation",
+            "conclusion"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "revision": {
+          "title": "Revision",
+          "type": "integer"
+        },
+        "revision_id": {
+          "title": "Revision Id",
+          "type": "string"
+        },
+        "target_id": {
+          "title": "Target Id",
+          "type": "string"
+        },
+        "target_type": {
+          "enum": [
+            "sample_version",
+            "finding",
+            "evidence"
+          ],
+          "title": "Target Type",
+          "type": "string"
+        },
+        "version_id": {
+          "title": "Version Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "revision_id",
+        "revision",
+        "target_type",
+        "target_id",
+        "version_id",
+        "kind",
+        "body",
+        "confidence",
+        "author",
+        "created_at",
+        "cites"
+      ],
+      "title": "AnnotationOut",
+      "type": "object"
+    },
+    "AuthorOut": {
+      "properties": {
+        "display_name": {
+          "title": "Display Name",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "display_name"
+      ],
+      "title": "AuthorOut",
+      "type": "object"
+    },
+    "Authorization": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "const": "owned_or_built",
+          "title": "Basis",
+          "type": "string"
+        },
+        "notice": {
+          "title": "Notice",
+          "type": "string"
+        },
+        "recorded_at": {
+          "format": "date-time",
+          "title": "Recorded At",
+          "type": "string"
+        },
+        "statement": {
+          "title": "Statement",
+          "type": "string"
+        },
+        "terms_reference": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Terms Reference"
+        },
+        "type": {
+          "const": "self_attestation",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "basis",
+        "statement",
+        "terms_reference",
+        "recorded_at",
+        "notice"
+      ],
+      "title": "Authorization",
+      "type": "object"
+    },
+    "CategoryDiff": {
+      "properties": {
+        "a_status": {
+          "default": "not_run",
+          "title": "A Status",
+          "type": "string"
+        },
+        "added": {
+          "default": 0,
+          "title": "Added",
+          "type": "integer"
+        },
+        "b_status": {
+          "default": "not_run",
+          "title": "B Status",
+          "type": "string"
+        },
+        "changed": {
+          "default": 0,
+          "title": "Changed",
+          "type": "integer"
+        },
+        "next_offset": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Offset"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "removed": {
+          "default": 0,
+          "title": "Removed",
+          "type": "integer"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/DiffRow"
+          },
+          "title": "Rows",
+          "type": "array"
+        },
+        "status": {
+          "enum": [
+            "comparable",
+            "unavailable",
+            "incompatible"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "total_rows": {
+          "default": 0,
+          "title": "Total Rows",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "CategoryDiff",
+      "type": "object"
+    },
+    "CitationOut": {
+      "properties": {
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "target_id": {
+          "title": "Target Id",
+          "type": "string"
+        },
+        "target_type": {
+          "enum": [
+            "finding",
+            "evidence"
+          ],
+          "title": "Target Type",
+          "type": "string"
+        },
+        "version_id": {
+          "title": "Version Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target_type",
+        "target_id",
+        "run_id",
+        "version_id",
+        "label"
+      ],
+      "title": "CitationOut",
+      "type": "object"
+    },
+    "CompareOut": {
+      "properties": {
+        "a": {
+          "$ref": "#/$defs/VersionRef"
+        },
+        "b": {
+          "$ref": "#/$defs/VersionRef"
+        },
+        "categories": {
+          "additionalProperties": {
+            "$ref": "#/$defs/CategoryDiff"
+          },
+          "title": "Categories",
+          "type": "object"
+        },
+        "identical_content": {
+          "title": "Identical Content",
+          "type": "boolean"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "a",
+        "b",
+        "identical_content",
+        "warnings",
+        "categories"
+      ],
+      "title": "CompareOut",
+      "type": "object"
+    },
+    "DeclaredFilename": {
+      "additionalProperties": false,
+      "properties": {
+        "trust": {
+          "const": "untrusted_as_uploaded",
+          "title": "Trust",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Value"
+        }
+      },
+      "required": [
+        "value",
+        "trust"
+      ],
+      "title": "DeclaredFilename",
+      "type": "object"
+    },
+    "DeclaredInHeader": {
+      "additionalProperties": false,
+      "properties": {
+        "architecture": {
+          "title": "Architecture",
+          "type": "string"
+        },
+        "bitness": {
+          "title": "Bitness",
+          "type": "integer"
+        },
+        "endianness": {
+          "title": "Endianness",
+          "type": "string"
+        },
+        "entry_point": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Entry Point"
+        },
+        "fields": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ]
+          },
+          "title": "Fields",
+          "type": "object"
+        }
+      },
+      "required": [
+        "architecture",
+        "bitness",
+        "endianness",
+        "entry_point",
+        "fields"
+      ],
+      "title": "DeclaredInHeader",
+      "type": "object"
+    },
+    "DiffRow": {
+      "properties": {
+        "after": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "After"
+        },
+        "after_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObservationRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "before": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Before"
+        },
+        "before_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObservationRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "change": {
+          "enum": [
+            "added",
+            "removed",
+            "changed"
+          ],
+          "title": "Change",
+          "type": "string"
+        },
+        "key": {
+          "title": "Key",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "change",
+        "before",
+        "after"
+      ],
+      "title": "DiffRow",
+      "type": "object"
+    },
+    "Entropy": {
+      "additionalProperties": false,
+      "properties": {
+        "computed_by": {
+          "title": "Computed By",
+          "type": "string"
+        },
+        "measured_over": {
+          "const": "section_bytes_in_file",
+          "title": "Measured Over",
+          "type": "string"
+        },
+        "method": {
+          "title": "Method",
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Note"
+        },
+        "unit": {
+          "const": "bits_per_byte",
+          "title": "Unit",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "maximum": 8.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Value"
+        }
+      },
+      "required": [
+        "value",
+        "unit",
+        "method",
+        "computed_by",
+        "measured_over",
+        "note"
+      ],
+      "title": "Entropy",
+      "type": "object"
+    },
+    "Generator": {
+      "additionalProperties": false,
+      "properties": {
+        "image_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Container image ID; null when run natively.",
+          "title": "Image Id"
+        },
+        "name": {
+          "const": "bytasm",
+          "title": "Name",
+          "type": "string"
+        },
+        "source_revision": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "`git describe --always --dirty` of the running checkout, or null.",
+          "title": "Source Revision"
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version",
+        "source_revision",
+        "image_id"
+      ],
+      "title": "Generator",
+      "type": "object"
+    },
+    "Imports": {
+      "additionalProperties": false,
+      "properties": {
+        "functions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Functions",
+          "type": "array"
+        },
+        "libraries": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Libraries",
+          "type": "array"
+        }
+      },
+      "required": [
+        "libraries",
+        "functions"
+      ],
+      "title": "Imports",
+      "type": "object"
+    },
+    "InputPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "admitted_under": {
+          "enum": [
+            "fixture_manifest",
+            "self_built_optin"
+          ],
+          "title": "Admitted Under",
+          "type": "string"
+        },
+        "manifest_entry": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Manifest Entry"
+        },
+        "notice": {
+          "title": "Notice",
+          "type": "string"
+        }
+      },
+      "required": [
+        "admitted_under",
+        "manifest_entry",
+        "notice"
+      ],
+      "title": "InputPolicy",
+      "type": "object"
+    },
+    "Metadata": {
+      "additionalProperties": false,
+      "properties": {
+        "declared_in_header": {
+          "$ref": "#/$defs/DeclaredInHeader"
+        },
+        "exports": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Exports",
+          "type": "array"
+        },
+        "imports": {
+          "$ref": "#/$defs/Imports"
+        },
+        "sections": {
+          "items": {
+            "$ref": "#/$defs/Section"
+          },
+          "title": "Sections",
+          "type": "array"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "declared_in_header",
+        "sections",
+        "imports",
+        "exports",
+        "warnings"
+      ],
+      "title": "Metadata",
+      "type": "object"
+    },
+    "ObservationRef": {
+      "properties": {
+        "evidence_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidence Id"
+        },
+        "finding_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Finding Id"
+        },
+        "invocation_id": {
+          "title": "Invocation Id",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "invocation_id"
+      ],
+      "title": "ObservationRef",
+      "type": "object"
+    },
+    "PatternAnalysis": {
+      "additionalProperties": false,
+      "properties": {
+        "findings": {
+          "items": {
+            "$ref": "#/$defs/PatternFinding"
+          },
+          "title": "Findings",
+          "type": "array"
+        },
+        "notices": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Notices",
+          "type": "array"
+        },
+        "rule_set": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PatternRuleSet"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "run": {
+          "$ref": "#/$defs/PatternRun"
+        },
+        "steps": {
+          "items": {
+            "$ref": "#/$defs/PatternStep"
+          },
+          "title": "Steps",
+          "type": "array"
+        },
+        "strings": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StringsCounts"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "run",
+        "steps",
+        "rule_set",
+        "strings",
+        "findings",
+        "notices"
+      ],
+      "title": "PatternAnalysis",
+      "type": "object"
+    },
+    "PatternEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "excerpt_hex": {
+          "pattern": "^([0-9a-f]{2}){0,32}$",
+          "title": "Excerpt Hex",
+          "type": "string"
+        },
+        "excerpt_truncated": {
+          "title": "Excerpt Truncated",
+          "type": "boolean"
+        },
+        "file_offset": {
+          "minimum": 0,
+          "title": "File Offset",
+          "type": "integer"
+        },
+        "kind": {
+          "const": "byte_range",
+          "title": "Kind",
+          "type": "string"
+        },
+        "length": {
+          "minimum": 0,
+          "title": "Length",
+          "type": "integer"
+        },
+        "pattern_id": {
+          "title": "Pattern Id",
+          "type": "string"
+        },
+        "raw_json_pointer": {
+          "title": "Raw Json Pointer",
+          "type": "string"
+        },
+        "xor_key": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Xor Key"
+        }
+      },
+      "required": [
+        "kind",
+        "pattern_id",
+        "file_offset",
+        "length",
+        "xor_key",
+        "excerpt_hex",
+        "excerpt_truncated",
+        "raw_json_pointer"
+      ],
+      "title": "PatternEvidence",
+      "type": "object"
+    },
+    "PatternFinding": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/PatternEvidence"
+          },
+          "minItems": 1,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "evidence_truncated": {
+          "title": "Evidence Truncated",
+          "type": "boolean"
+        },
+        "fingerprint": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Fingerprint",
+          "type": "string"
+        },
+        "kind": {
+          "const": "yara_match",
+          "title": "Kind",
+          "type": "string"
+        },
+        "match_count": {
+          "title": "Match Count",
+          "type": "integer"
+        },
+        "metadata": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  }
+                ]
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Metadata",
+          "type": "array"
+        },
+        "rule_id": {
+          "title": "Rule Id",
+          "type": "string"
+        },
+        "rule_namespace": {
+          "title": "Rule Namespace",
+          "type": "string"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "tool": {
+          "const": "yara-x",
+          "title": "Tool",
+          "type": "string"
+        },
+        "tool_version": {
+          "title": "Tool Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "tool",
+        "tool_version",
+        "rule_id",
+        "rule_namespace",
+        "title",
+        "tags",
+        "metadata",
+        "fingerprint",
+        "match_count",
+        "evidence_truncated",
+        "evidence"
+      ],
+      "title": "PatternFinding",
+      "type": "object"
+    },
+    "PatternRuleSet": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "rule_count": {
+          "title": "Rule Count",
+          "type": "integer"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "source": {
+          "const": "bytasm-repo",
+          "title": "Source",
+          "type": "string"
+        },
+        "tool": {
+          "const": "yara-x",
+          "title": "Tool",
+          "type": "string"
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool",
+        "name",
+        "version",
+        "sha256",
+        "source",
+        "rule_count"
+      ],
+      "title": "PatternRuleSet",
+      "type": "object"
+    },
+    "PatternRun": {
+      "additionalProperties": false,
+      "properties": {
+        "bytasm_version": {
+          "title": "Bytasm Version",
+          "type": "string"
+        },
+        "failure_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Failure Reason"
+        },
+        "finished_at": {
+          "format": "date-time",
+          "title": "Finished At",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "profile": {
+          "additionalProperties": true,
+          "title": "Profile",
+          "type": "object"
+        },
+        "queued_at": {
+          "format": "date-time",
+          "title": "Queued At",
+          "type": "string"
+        },
+        "started_at": {
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "succeeded",
+            "partial"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "status_message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "For a partial run, which steps did not complete and what that means.",
+          "title": "Status Message"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "failure_reason",
+        "status_message",
+        "profile",
+        "bytasm_version",
+        "queued_at",
+        "started_at",
+        "finished_at"
+      ],
+      "title": "PatternRun",
+      "type": "object"
+    },
+    "PatternStep": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter": {
+          "title": "Adapter",
+          "type": "string"
+        },
+        "adapter_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Adapter Version"
+        },
+        "duration_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Duration Ms"
+        },
+        "execution": {
+          "const": "separate_resource_limited_process",
+          "title": "Execution",
+          "type": "string"
+        },
+        "index": {
+          "title": "Index",
+          "type": "integer"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Message"
+        },
+        "result_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Result Sha256"
+        },
+        "status": {
+          "enum": [
+            "succeeded",
+            "failed",
+            "timed_out",
+            "cancelled",
+            "skipped"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "tool": {
+          "title": "Tool",
+          "type": "string"
+        },
+        "tool_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Tool Version"
+        }
+      },
+      "required": [
+        "index",
+        "tool",
+        "adapter",
+        "status",
+        "message",
+        "tool_version",
+        "adapter_version",
+        "duration_ms",
+        "result_sha256",
+        "execution"
+      ],
+      "title": "PatternStep",
+      "type": "object"
+    },
+    "ReportScope": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "sample_version",
+            "comparison"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "version_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 2,
+          "minItems": 1,
+          "title": "Version Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "version_ids"
+      ],
+      "title": "ReportScope",
+      "type": "object"
+    },
+    "Run": {
+      "additionalProperties": false,
+      "properties": {
+        "bytasm_version": {
+          "title": "Bytasm Version",
+          "type": "string"
+        },
+        "finished_at": {
+          "format": "date-time",
+          "title": "Finished At",
+          "type": "string"
+        },
+        "profile": {
+          "additionalProperties": true,
+          "title": "Profile",
+          "type": "object"
+        },
+        "started_at": {
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        },
+        "status": {
+          "const": "succeeded",
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "profile",
+        "bytasm_version",
+        "started_at",
+        "finished_at"
+      ],
+      "title": "Run",
+      "type": "object"
+    },
+    "SampleIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "blob_sha256_verified_at_export": {
+          "const": true,
+          "title": "Blob Sha256 Verified At Export",
+          "type": "boolean"
+        },
+        "declared_filename": {
+          "$ref": "#/$defs/DeclaredFilename"
+        },
+        "format": {
+          "enum": [
+            "ELF",
+            "PE"
+          ],
+          "title": "Format",
+          "type": "string"
+        },
+        "format_basis": {
+          "const": "identified_from_bytes_and_parsed",
+          "title": "Format Basis",
+          "type": "string"
+        },
+        "project_name": {
+          "title": "Project Name",
+          "type": "string"
+        },
+        "sample_name": {
+          "title": "Sample Name",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size_bytes": {
+          "minimum": 1,
+          "title": "Size Bytes",
+          "type": "integer"
+        },
+        "version_label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Version Label"
+        }
+      },
+      "required": [
+        "project_name",
+        "sample_name",
+        "version_label",
+        "sha256",
+        "size_bytes",
+        "format",
+        "format_basis",
+        "declared_filename",
+        "blob_sha256_verified_at_export"
+      ],
+      "title": "SampleIdentity",
+      "type": "object"
+    },
+    "Section": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes_in_file": {
+          "title": "Bytes In File",
+          "type": "integer"
+        },
+        "declared_size": {
+          "title": "Declared Size",
+          "type": "integer"
+        },
+        "entropy": {
+          "$ref": "#/$defs/Entropy"
+        },
+        "file_offset": {
+          "title": "File Offset",
+          "type": "integer"
+        },
+        "flags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Flags",
+          "type": "array"
+        },
+        "index": {
+          "title": "Index",
+          "type": "integer"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Type"
+        },
+        "virtual_address": {
+          "title": "Virtual Address",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "index",
+        "name",
+        "type",
+        "file_offset",
+        "bytes_in_file",
+        "virtual_address",
+        "declared_size",
+        "flags",
+        "entropy"
+      ],
+      "title": "Section",
+      "type": "object"
+    },
+    "StringsCounts": {
+      "additionalProperties": false,
+      "properties": {
+        "encodings": {
+          "items": {
+            "enum": [
+              "ascii",
+              "utf-16le"
+            ],
+            "type": "string"
+          },
+          "title": "Encodings",
+          "type": "array"
+        },
+        "found_by_encoding": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Found By Encoding",
+          "type": "object"
+        },
+        "min_length": {
+          "title": "Min Length",
+          "type": "integer"
+        },
+        "stored": {
+          "title": "Stored",
+          "type": "integer"
+        },
+        "total_found": {
+          "title": "Total Found",
+          "type": "integer"
+        },
+        "truncated": {
+          "title": "Truncated",
+          "type": "boolean"
+        },
+        "values_included": {
+          "const": false,
+          "title": "Values Included",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "encodings",
+        "min_length",
+        "total_found",
+        "found_by_encoding",
+        "stored",
+        "truncated",
+        "values_included"
+      ],
+      "title": "StringsCounts",
+      "type": "object"
+    },
+    "ToolInvocation": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter": {
+          "title": "Adapter",
+          "type": "string"
+        },
+        "adapter_version": {
+          "title": "Adapter Version",
+          "type": "string"
+        },
+        "duration_ms": {
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "execution": {
+          "const": "separate_resource_limited_process",
+          "title": "Execution",
+          "type": "string"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "result_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Result Sha256",
+          "type": "string"
+        },
+        "status": {
+          "const": "succeeded",
+          "title": "Status",
+          "type": "string"
+        },
+        "step_index": {
+          "title": "Step Index",
+          "type": "integer"
+        },
+        "tool": {
+          "title": "Tool",
+          "type": "string"
+        },
+        "tool_version": {
+          "title": "Tool Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "step_index",
+        "tool",
+        "tool_version",
+        "adapter",
+        "adapter_version",
+        "status",
+        "exit_code",
+        "duration_ms",
+        "result_sha256",
+        "execution"
+      ],
+      "title": "ToolInvocation",
+      "type": "object"
+    },
+    "VersionRef": {
+      "properties": {
+        "project_id": {
+          "title": "Project Id",
+          "type": "string"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Run Id"
+        },
+        "run_status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Run Status"
+        },
+        "sample_id": {
+          "title": "Sample Id",
+          "type": "string"
+        },
+        "sha256": {
+          "title": "Sha256",
+          "type": "string"
+        },
+        "version_id": {
+          "title": "Version Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "version_id",
+        "sample_id",
+        "project_id",
+        "sha256",
+        "run_id",
+        "run_status"
+      ],
+      "title": "VersionRef",
+      "type": "object"
+    }
+  },
+  "$id": "https://github.com/NahuelRibera/bytasm/blob/main/schemas/report.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "analysis": {
+      "$ref": "#/$defs/Analysis"
+    },
+    "annotations": {
+      "items": {
+        "$ref": "#/$defs/AnnotationOut"
+      },
+      "title": "Annotations",
+      "type": "array"
+    },
+    "authorization": {
+      "$ref": "#/$defs/Authorization"
+    },
+    "comparison": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CompareOut"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "generator": {
+      "$ref": "#/$defs/Generator"
+    },
+    "input_policy": {
+      "$ref": "#/$defs/InputPolicy"
+    },
+    "labels": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Labels",
+      "type": "object"
+    },
+    "limitations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Limitations",
+      "type": "array"
+    },
+    "metadata": {
+      "$ref": "#/$defs/Metadata"
+    },
+    "pattern_analysis": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PatternAnalysis"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "report_kind": {
+      "const": "bytasm.sample_version_report",
+      "title": "Report Kind",
+      "type": "string"
+    },
+    "sample": {
+      "$ref": "#/$defs/SampleIdentity"
+    },
+    "schema_version": {
+      "const": 3,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "scope": {
+      "$ref": "#/$defs/ReportScope"
+    }
+  },
+  "required": [
+    "report_kind",
+    "schema_version",
+    "generated_at",
+    "generator",
+    "sample",
+    "input_policy",
+    "authorization",
+    "analysis",
+    "metadata",
+    "pattern_analysis",
+    "scope",
+    "annotations",
+    "comparison",
+    "labels",
+    "limitations"
+  ],
+  "title": "Bytasm sample version report",
+  "type": "object"
+}

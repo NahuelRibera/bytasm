@@ -140,6 +140,8 @@ const STATUS_LABELS: Record<string, string> = {
   timed_out: "Timed out",
   cancelled: "Cancelled",
   skipped: "Skipped",
+  unsupported: "Unsupported",
+  unavailable: "Unavailable",
 };
 
 const STATUS_TONES: Record<string, string> = {

@@ -355,3 +355,79 @@ def test_latest_run_orders_mixed_timestamp_precision_chronologically(db: Session
     compared = compare_versions(db, "a", "b", category="strings")
     assert compared.a.run_id == later
     assert compared.categories["strings"].total_rows == 0
+
+
+@pytest.mark.parametrize("difference", [None, "tool", "adapter", "rules", "args"])
+def test_capa_comparison_requires_exact_provenance(db: Session, difference: str | None) -> None:
+    from bytasm.db.models import Evidence, Finding, RuleSet
+
+    for index, version in enumerate(("a", "b")):
+        rid = run(db, version)
+        rules = RuleSet(
+            id="capa-rules-" + version,
+            tool="capa",
+            name="subset",
+            version="10.0.0",
+            sha256=("1" if difference == "rules" and index else "0") * 64,
+            source="upstream",
+            snapshot_path="outputs/hash",
+            rule_count=2,
+        )
+        existing = db.scalar(select(RuleSet).where(RuleSet.sha256 == rules.sha256))
+        if existing is None:
+            db.add(rules)
+            db.flush()
+        else:
+            rules = existing
+        inv = ToolInvocation(
+            id="capa-" + version,
+            run_id=rid,
+            step_index=2,
+            tool_name="capa",
+            tool_version="other" if difference == "tool" and index else "10.0.0",
+            adapter_name="capa_scan",
+            adapter_version="other" if difference == "adapter" and index else "0.1.0",
+            args={"backend": "other" if difference == "args" and index else "vivisect"},
+            status="succeeded",
+            duration_ms=1,
+            warnings=[],
+            rule_set_id=rules.id,
+        )
+        db.add(inv)
+        db.flush()
+        db.add(
+            Finding(
+                id="finding-" + version,
+                run_id=rid,
+                invocation_id=inv.id,
+                kind="capability",
+                title="query environment variable",
+                rule_id="query environment variable",
+                rule_namespace="host-interaction/environment-variable",
+                rule_set_id=rules.id,
+                tool_reported_attributes={},
+                fingerprint="f" * 64,
+                match_count=1,
+                evidence_truncated=False,
+                evidence=[
+                    Evidence(
+                        kind="virtual_address",
+                        pattern_id="function",
+                        file_offset=None,
+                        length=None,
+                        virtual_address=0xFFFFF80000001234 + index,
+                        excerpt_hex="",
+                        raw_json_pointer="/rules/query environment variable/matches/0/0",
+                    )
+                ],
+            )
+        )
+    db.flush()
+    category = compare_versions(db, "a", "b", category="capabilities").categories["capabilities"]
+    assert category.status == ("incompatible" if difference else "comparable")
+    if difference:
+        assert category.rows == []
+    else:
+        assert (category.added, category.removed, category.changed) == (0, 0, 1)
+        assert '"0xfffff80000001234"' in category.model_dump_json()
+        assert '"0xfffff80000001235"' in category.model_dump_json()

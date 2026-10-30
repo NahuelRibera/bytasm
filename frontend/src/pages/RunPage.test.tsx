@@ -215,3 +215,16 @@ describe("Analysis run page", () => {
     await waitFor(() => expect(screen.getAllByText("Queued").length).toBeGreaterThan(0));
   });
 });
+
+
+it("keeps filtered counts scoped and does not call an empty filter a no-match analysis", async () => {
+  const user = userEvent.setup();
+  openRun(run(), findings(), {
+    [`GET /api/v1/runs/${RUN_ID}/findings?tool=capa`]: () => json({ ...findings([]), total: 1 }),
+  });
+  await screen.findByLabelText("Finding tool");
+  await user.selectOptions(screen.getByLabelText("Finding tool"), "capa");
+  expect(await screen.findByText("No finding matches the selected filters.")).toBeTruthy();
+  expect(screen.getByText(/0 of 1 shown/)).toBeTruthy();
+  expect(screen.queryByText("No rule matched.")).toBeNull();
+});
