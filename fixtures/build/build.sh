@@ -66,6 +66,7 @@ docker run --rm --network none --pull never \
     x86_64-linux-gnu-gcc -O0 -ffile-prefix-map=/src=. -o /out/hello_v1-x86_64.elf hello_v1.c
     x86_64-linux-gnu-gcc -O0 -ffile-prefix-map=/src=. -o /out/hello_v2-x86_64.elf hello_v2.c
     x86_64-linux-gnu-strip -o /out/hello_v1-x86_64-stripped.elf /out/hello_v1-x86_64.elf
+    x86_64-w64-mingw32-gcc -O0 -s -ffile-prefix-map=/src=. -Wl,--no-insert-timestamp -o /out/capa_environment-x86_64.exe capa_environment.c
     x86_64-w64-mingw32-gcc -O0 -s -ffile-prefix-map=/src=. -Wl,--no-insert-timestamp \
       -o /out/hello_v1-x86_64.exe hello_v1.c
     x86_64-w64-mingw32-gcc -O0 -s -shared -ffile-prefix-map=/src=. -Wl,--no-insert-timestamp \

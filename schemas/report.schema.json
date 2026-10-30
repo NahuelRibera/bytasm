@@ -21,6 +21,37 @@
       "title": "Analysis",
       "type": "object"
     },
+    "AnalysisContext": {
+      "additionalProperties": false,
+      "properties": {
+        "latest_run_id": {
+          "title": "Latest Run Id",
+          "type": "string"
+        },
+        "latest_status": {
+          "title": "Latest Status",
+          "type": "string"
+        },
+        "selected_run_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Selected Run Id"
+        }
+      },
+      "required": [
+        "latest_run_id",
+        "latest_status",
+        "selected_run_id"
+      ],
+      "title": "AnalysisContext",
+      "type": "object"
+    },
     "AnnotationOut": {
       "properties": {
         "author": {
@@ -801,19 +832,36 @@
           "type": "boolean"
         },
         "file_offset": {
-          "minimum": 0,
-          "title": "File Offset",
-          "type": "integer"
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "File Offset"
         },
         "kind": {
-          "const": "byte_range",
+          "enum": [
+            "byte_range",
+            "virtual_address"
+          ],
           "title": "Kind",
           "type": "string"
         },
         "length": {
-          "minimum": 0,
-          "title": "Length",
-          "type": "integer"
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Length"
         },
         "pattern_id": {
           "title": "Pattern Id",
@@ -822,6 +870,32 @@
         "raw_json_pointer": {
           "title": "Raw Json Pointer",
           "type": "string"
+        },
+        "virtual_address": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Virtual Address"
+        },
+        "virtual_address_hex": {
+          "anyOf": [
+            {
+              "pattern": "^0x[0-9a-f]{1,16}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Virtual Address Hex"
         },
         "xor_key": {
           "anyOf": [
@@ -869,7 +943,10 @@
           "type": "string"
         },
         "kind": {
-          "const": "yara_match",
+          "enum": [
+            "yara_match",
+            "capability"
+          ],
           "title": "Kind",
           "type": "string"
         },
@@ -915,6 +992,11 @@
           "title": "Rule Namespace",
           "type": "string"
         },
+        "rule_set_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Rule Set Sha256",
+          "type": "string"
+        },
         "tags": {
           "items": {
             "type": "string"
@@ -927,7 +1009,10 @@
           "type": "string"
         },
         "tool": {
-          "const": "yara-x",
+          "enum": [
+            "yara-x",
+            "capa"
+          ],
           "title": "Tool",
           "type": "string"
         },
@@ -937,6 +1022,7 @@
         }
       },
       "required": [
+        "rule_set_sha256",
         "kind",
         "tool",
         "tool_version",
@@ -970,12 +1056,14 @@
           "type": "string"
         },
         "source": {
-          "const": "bytasm-repo",
           "title": "Source",
           "type": "string"
         },
         "tool": {
-          "const": "yara-x",
+          "enum": [
+            "yara-x",
+            "capa"
+          ],
           "title": "Tool",
           "type": "string"
         },
@@ -1139,7 +1227,9 @@
             "failed",
             "timed_out",
             "cancelled",
-            "skipped"
+            "skipped",
+            "unsupported",
+            "unavailable"
           ],
           "title": "Status",
           "type": "string"
@@ -1549,6 +1639,16 @@
     "analysis": {
       "$ref": "#/$defs/Analysis"
     },
+    "analysis_context": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AnalysisContext"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "annotations": {
       "items": {
         "$ref": "#/$defs/AnnotationOut"
@@ -1616,12 +1716,19 @@
       "$ref": "#/$defs/SampleIdentity"
     },
     "schema_version": {
-      "const": 3,
+      "const": 4,
       "title": "Schema Version",
       "type": "integer"
     },
     "scope": {
       "$ref": "#/$defs/ReportScope"
+    },
+    "summary": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Summary",
+      "type": "array"
     }
   },
   "required": [
@@ -1638,6 +1745,8 @@
     "scope",
     "annotations",
     "comparison",
+    "summary",
+    "analysis_context",
     "labels",
     "limitations"
   ],

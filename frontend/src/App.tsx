@@ -1,3 +1,5 @@
+import { ToolsPage } from "./pages/ToolsPage";
+import { ReportPage } from "./pages/ReportPage";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "./api";
 import { SelfBuiltBanner } from "./components";
@@ -36,6 +38,7 @@ export function App() {
           <Link to="/rules" aria-current={route.name === "rules" ? "page" : undefined}>
             Rules
           </Link>
+          <Link to="/tools" aria-current={route.name === "tools" ? "page" : undefined}>Tools</Link>
         </nav>
         <span className="topbar-meta">
           local · static analysis only
@@ -49,6 +52,8 @@ export function App() {
       <SelfBuiltBanner health={health.data} />
       <main id="main" className="main" tabIndex={-1}>
         {route.name === "projects" && <ProjectsPage />}
+        {route.name === "tools" && <ToolsPage />}
+        {route.name === "report" && <ReportPage key={route.reportId} reportId={route.reportId} />}
         {route.name === "compare" && <ComparePage key={route.sampleId} projectId={route.projectId} sampleId={route.sampleId} />}
         {route.name === "project" && <ProjectPage projectId={route.projectId} />}
         {route.name === "import" && <ImportPage projectId={route.projectId} health={health.data} />}

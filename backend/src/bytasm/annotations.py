@@ -140,7 +140,11 @@ def resolve_target(
     label = (
         finding.title
         if evidence is None
-        else f"{evidence.pattern_id} at file offset {evidence.file_offset}"
+        else (
+            f"{evidence.pattern_id} at virtual address {evidence.virtual_address:#x}"
+            if evidence.virtual_address is not None
+            else f"{evidence.pattern_id} at file offset {evidence.file_offset}"
+        )
     )
     return version, CitationOut(
         target_type="finding" if target_type == "finding" else "evidence",

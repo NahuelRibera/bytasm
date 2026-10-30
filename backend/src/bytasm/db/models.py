@@ -295,10 +295,11 @@ class Evidence(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     finding_id: Mapped[str] = mapped_column(ForeignKey("finding.id"), index=True)
-    kind: Mapped[str] = mapped_column(String(16))  # "byte_range"
+    kind: Mapped[str] = mapped_column(String(16))  # byte_range or virtual_address
     pattern_id: Mapped[str] = mapped_column(String(128))  # e.g. "$https"
-    file_offset: Mapped[int] = mapped_column(U64)
-    length: Mapped[int] = mapped_column(Integer)
+    file_offset: Mapped[int | None] = mapped_column(U64)
+    length: Mapped[int | None] = mapped_column(Integer)
+    virtual_address: Mapped[int | None] = mapped_column(U64)
     xor_key: Mapped[int | None] = mapped_column(Integer)
     # At most the first 32 matched bytes, hex-encoded.
     excerpt_hex: Mapped[str] = mapped_column(String(64))

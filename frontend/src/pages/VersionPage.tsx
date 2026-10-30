@@ -1,3 +1,4 @@
+import { ReportLibrary } from "../ReportLibrary";
 import { useQuery } from "@tanstack/react-query";
 import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { api, type SampleVersion } from "../api";
@@ -71,6 +72,7 @@ export function VersionPage({
       </div>
       <ProvenancePanel v={v} />
       {analysis?.(v)}
+      <ReportLibrary key={versionId} versionId={versionId} />
       <p><Link to={`/projects/${v.project_id}/compare/${v.sample_id}`}>Compare versions</Link></p>
       <AnnotationsSection key={versionId} versionId={versionId} />
 

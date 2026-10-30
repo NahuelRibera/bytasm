@@ -8,6 +8,7 @@ from conftest import ALL_FIXTURES, ELF_ENTROPY, REPO_ROOT, run_cli, sha256_of
 
 # file name -> (format, architecture, (declared_header key, value), entry_point)
 EXPECTED = {
+    "capa_environment-x86_64.exe": ("PE", "x86_64", ("pe_machine", "AMD64"), 0x1400013F0),
     "hello_v1-aarch64.elf": ("ELF", "aarch64", ("elf_file_type", "DYN"), 0x660),
     "hello_v1-aarch64-stripped.elf": ("ELF", "aarch64", ("elf_file_type", "DYN"), 0x660),
     "entropy_blob-aarch64.elf": ("ELF", "aarch64", ("elf_file_type", "DYN"), 0x660),

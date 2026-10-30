@@ -10,6 +10,7 @@ import { Link, navigate } from "./router";
  */
 export function AnalysisPanel({ version }: { version: SampleVersion }) {
   const client = useQueryClient();
+  const [profile, setProfile] = useState("default-static");
   const runs = useQuery({
     queryKey: ["runs", version.id],
     queryFn: () => api.runs(version.id),
@@ -20,7 +21,7 @@ export function AnalysisPanel({ version }: { version: SampleVersion }) {
   const [confirming, setConfirming] = useState(false);
   const startButton = useRef<HTMLButtonElement>(null);
   const create = useMutation({
-    mutationFn: () => api.createRun(version.id),
+    mutationFn: () => api.createRun(version.id, profile),
     onSuccess: (run) => {
       void client.invalidateQueries({ queryKey: ["runs", version.id] });
       navigate(`/runs/${run.id}`);
@@ -49,6 +50,12 @@ export function AnalysisPanel({ version }: { version: SampleVersion }) {
         match does not mean the file is safe. <Link to="/rules">See the rules</Link>.
       </p>
 
+      <label htmlFor="analysis-profile">Analysis profile</label>
+      <select id="analysis-profile" value={profile} disabled={confirming || Boolean(active)} onChange={event => setProfile(event.target.value)}>
+        <option value="default-static">Quick static review: strings and YARA-X</option>
+        <option value="full-static">Full static review: strings, YARA-X and capa</option>
+      </select>
+      <p className="hint">Metadata was read at import. Full review adds capa 10.0.0 with two upstream rules, a 120 s deadline and native PE x86/x64 support. Other formats retain Quick results with an unsupported capa step.</p>
       {!confirming && (
         <div className="actions">
           <button
@@ -71,6 +78,7 @@ export function AnalysisPanel({ version }: { version: SampleVersion }) {
       {confirming && (
         <div className="confirm" role="group" aria-labelledby="confirm-heading">
           <h3 id="confirm-heading">Start a run?</h3>
+          <p>Selected profile: {profile === "full-static" ? "Full static review — strings, YARA-X, then capa" : "Quick static review — strings and YARA-X"}.</p>
           {rules.isPending && <Loading label="Loading the rule set…" />}
           {rules.isError && <ErrorPanel error={rules.error} title="The rule set could not be loaded" />}
           {rules.data && (

@@ -156,3 +156,31 @@ bin/hello_v2-x86_64.elf  16,088 bytes
   output directories produced exactly equal bytes and the SHA-256 above.
   Only this new binary was copied to fixtures/bin, with mode 0644.
   All eight pre-existing manifest entries and binary bytes were preserved.
+
+
+v0.4 positive capa fixture (2026-10-30)
+--------------------------------------
+
+bin/capa_environment-x86_64.exe  14,336 bytes; mode 0644
+  Source: src/capa_environment.c, self-authored for Bytasm.
+  Statically references GetEnvironmentVariableA("BYTASM_FIXTURE_ONLY", ...).
+  Neither this program nor any other fixture was executed.
+  SHA-256: aaea303376ac91c45074181f915cc6d479499865f7412ff572ff9b36984f52a5
+  Cached toolchain: bytasm-fixture-toolchain:trixie-20261020
+  Image ID: sha256:47c1639029d85b693515686d2daeae9dcad22124ebd6a575e3724446ddb4173e
+  Same pinned MinGW GCC/binutils as above; no toolchain image download.
+  Exact compiler invocation, working directory /src:
+    x86_64-w64-mingw32-gcc -O0 -s -ffile-prefix-map=/src=. \
+      -Wl,--no-insert-timestamp -o /out/capa_environment-x86_64.exe capa_environment.c
+  Docker invocation: --rm --network none --pull never, current uid:gid,
+  SOURCE_DATE_EPOCH=1761436800, fixtures/src mounted /src read-only and a new
+  empty temporary output directory mounted /out.
+  Reproducibility: two independent container compilations into separate empty
+  directories produced exactly the committed bytes and SHA-256 above.
+  All nine earlier fixture bytes and hashes remain unchanged.
+
+  Independently inspected capa 10.0.0 CLI JSON (-j, vivisect backend, -f pe,
+  two packaged rules, explicitly empty signatures directory) reported
+  "query environment variable" at function virtual address 0x140001450.
+  This demonstrates a static API feature matched by that rule, not execution
+  of the environment query, a general behavior detector, or a safety verdict.

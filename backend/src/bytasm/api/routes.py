@@ -35,6 +35,7 @@ from bytasm.db.imported import import_record
 from bytasm.db.models import ActivityEvent, Project, Sample, SampleVersion, utcnow
 from bytasm.jobs.scan import yara_x_installed_version
 from bytasm.jobs.worker import heartbeat_path
+from bytasm.tools import installed
 
 router = APIRouter()
 
@@ -53,6 +54,7 @@ def _not_found(request: Request, what: str) -> JSONResponse:
 @router.get("/health", response_model=HealthOut)
 def health(request: Request) -> HealthOut:
     settings = _ctx(request).settings
+    worker_age = _worker_last_seen(settings.data_dir)
     return HealthOut(
         status="ok",
         bytasm_version=__version__,
@@ -65,7 +67,11 @@ def health(request: Request) -> HealthOut:
         platform=sys.platform,
         parser_memory_limit_enforced=sys.platform == "linux",
         yara_x_version=yara_x_installed_version(),
-        worker_last_seen_seconds=_worker_last_seen(settings.data_dir),
+        capa_version=installed("flare-capa"),
+        worker_state=(
+            "absent" if worker_age is None else "stale" if worker_age > 15 else "present"
+        ),
+        worker_last_seen_seconds=worker_age,
     )
 
 

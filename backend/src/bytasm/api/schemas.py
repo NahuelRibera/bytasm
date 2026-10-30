@@ -60,6 +60,8 @@ class HealthOut(BaseModel):
     # v0.2: the pinned YARA-X package, and when a worker last checked in
     # (None: no worker has run for this data directory).
     yara_x_version: str
+    capa_version: str | None = None
+    worker_state: Literal["present", "stale", "absent"] = "absent"
     worker_last_seen_seconds: float | None
 
 
@@ -158,7 +160,7 @@ class RuleFileOut(BaseModel):
 
 class RuleSetOut(BaseModel):
     id: str | None  # None until a run has used this exact rule set
-    tool: Literal["yara-x"]
+    tool: Literal["yara-x", "capa"]
     name: str
     version: str
     label: str
@@ -168,6 +170,7 @@ class RuleSetOut(BaseModel):
     rule_count: int
     files: list[RuleFileOut]
     installed_yara_x_version: str
+    installed_tool_version: str | None = None
 
 
 class DiagnosticOut(BaseModel):
@@ -194,7 +197,7 @@ class RuleValidationOut(BaseModel):
 class RunCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    profile_id: Literal["default-static"]
+    profile_id: Literal["default-static", "full-static"]
 
 
 class RuleSetRef(BaseModel):
@@ -217,7 +220,15 @@ class RunSampleOut(BaseModel):
 
 
 StepStatus = Literal[
-    "queued", "running", "succeeded", "failed", "timed_out", "cancelled", "skipped"
+    "queued",
+    "running",
+    "succeeded",
+    "failed",
+    "timed_out",
+    "cancelled",
+    "skipped",
+    "unsupported",
+    "unavailable",
 ]
 
 
@@ -272,6 +283,7 @@ class RunOut(BaseModel):
     rule_set: RuleSetRef
     sample: RunSampleOut
     steps: list[RunStepOut]
+    summary: list[str] = []
     counts: RunCounts
 
 
@@ -281,10 +293,12 @@ class RunsOut(BaseModel):
 
 class EvidenceOut(BaseModel):
     id: int
-    kind: Literal["byte_range"]
+    kind: Literal["byte_range", "virtual_address"]
     pattern_id: str
-    file_offset: int
-    length: int
+    file_offset: int | None
+    length: int | None
+    virtual_address: int | None = None
+    virtual_address_hex: str | None = None
     xor_key: int | None
     # At most the first 32 matched bytes, hex-encoded; `excerpt_truncated`
     # when the match is longer than the excerpt.
@@ -295,7 +309,8 @@ class EvidenceOut(BaseModel):
 
 class FindingOut(BaseModel):
     id: str
-    kind: Literal["yara_match"]
+    kind: Literal["yara_match", "capability"]
+    tool: str = "yara-x"
     title: str
     rule_id: str
     rule_namespace: str
@@ -309,6 +324,7 @@ class FindingOut(BaseModel):
 
 
 class FindingsFilterOut(BaseModel):
+    namespace: str | None = None
     tool: str | None
     kind: str | None
     q: str | None

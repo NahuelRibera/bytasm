@@ -834,5 +834,17 @@ details.card > summary {
 .annotation-form fieldset { min-width: 0; }
 .annotation-citation-option { display: flex; align-items: start; gap: var(--space-2); }
 .annotation-entry { margin: var(--space-4) 0; }
+.annotation-entry > .button {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 
 .annotation-body { white-space: pre-wrap; }
+
+.evidence-panel > details > summary {
+  min-height: 28px;
+  padding-block: var(--space-2);
+  cursor: pointer;
+}
+.report-library, .export { overflow-wrap: anywhere; }

@@ -1,6 +1,6 @@
 [project]
 name = "bytasm"
-version = "0.0.1"
+version = "0.4.0"
 description = "Local-first static binary-analysis workbench (in development; fixtures-only)."
 requires-python = ">=3.12"
 authors = [{ name = "Bytasm contributors" }]
@@ -8,6 +8,8 @@ classifiers = ["Private :: Do Not Upload"]
 dependencies = [
     "alembic>=1.20.1,<1.21",
     "fastapi>=0.162.0,<0.163",
+    "flare-capa==10.0.0",
+    "jinja2==3.1.6",
     "lief>=1.0.0,<1.1",
     "sqlalchemy>=2.1.6,<2.2",
     "uvicorn>=0.54.0,<0.55",

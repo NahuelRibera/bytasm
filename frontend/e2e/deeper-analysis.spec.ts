@@ -1,0 +1,55 @@
+import { expect, test } from "@playwright/test";
+import { FIXTURES_URL } from "../playwright.config";
+import { createProject, expectNoAxeViolations, FIXTURE, importFile } from "./helpers";
+
+test("full capa review, cited observation and verified HTML preview at 360 px", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await createProject(page, FIXTURES_URL, "Deeper static analysis");
+  await importFile(page, FIXTURE("capa_environment-x86_64.exe"), { sample: "environment", label: "v1" });
+  await expect(page).toHaveURL(/\/versions\/[0-9a-f]{32}$/);
+  const versionUrl = page.url();
+  await page.getByLabel("Analysis profile").selectOption("full-static");
+  await page.getByRole("button", { name: "Run pattern matching…" }).click();
+  await page.getByRole("button", { name: "Start run", exact: true }).click();
+  await expect(page.getByTestId("status").first()).toHaveText("Succeeded", { timeout: 120_000 });
+  await expect(page.getByRole("heading", { name: "Analysis in plain language" })).toBeVisible();
+  await page.getByLabel("Finding tool").selectOption("capa");
+  await page.getByRole("button", { name: "Inspect query environment variable", exact: true }).click();
+  await expect(page.getByText(/Function virtual address:/)).toBeVisible();
+  await expect(page.getByText(/File byte range: not supplied by capa/)).toBeVisible();
+  const annotations = page.getByRole("region", { name: /capa evidence:/ });
+  await annotations.getByRole("button", { name: "Add note / View annotations", exact: true }).last().click();
+  const editor = annotations.getByRole("region", { name: "Analyst annotations", exact: true });
+  await editor.getByRole("button", { name: "Add note", exact: true }).click();
+  await editor.getByLabel("Kind", { exact: true }).selectOption("conclusion");
+  await editor.getByLabel("Annotation text", { exact: true }).fill("I reviewed this static environment-query observation.");
+  await editor.getByLabel("Confidence", { exact: true }).selectOption("tentative");
+  await editor.getByRole("checkbox", { name: /query environment variable/ }).first().check();
+  await editor.getByRole("button", { name: "Save annotation", exact: true }).click();
+  await expect(editor.getByText("Annotation saved.")).toBeVisible();
+  await expectNoAxeViolations(page);
+  // Font metrics differ between macOS and Linux. Annotation controls must fit
+  // their nested evidence container even when the fallback font is wider.
+  for (const font of ["", "monospace"]) {
+    await page.evaluate((font) => document.documentElement.style.setProperty("--font-sans", font), font);
+    const overflowingControls = await annotations.locator(".annotation-entry > .button").evaluateAll(buttons =>
+      buttons.flatMap(button => {
+        const box = button.getBoundingClientRect();
+        const parent = button.parentElement!.getBoundingClientRect();
+        return box.right > parent.right || box.width > parent.width
+          ? [{ width: box.width, available: parent.width }] : [];
+      }));
+    expect(overflowingControls, `Annotation controls must fit with ${font || "system font"}`).toEqual([]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+  }
+  await page.evaluate(() => document.documentElement.style.removeProperty("--font-sans"));
+  await page.goto(versionUrl);
+  await page.getByRole("button", { name: "Preview new report" }).click();
+  await expect(page.getByRole("heading", { name: "Report preview", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Download standalone HTML" })).toBeVisible();
+  const html = await (await page.request.get(new URL((await page.getByRole("link", { name: "Download standalone HTML" }).getAttribute("href"))!, page.url()).href)).text();
+  expect(html).toContain("query environment variable");
+  expect(html).toContain("Content-Security-Policy");
+  expect(html).not.toContain("<script");
+  await expectNoAxeViolations(page);
+});

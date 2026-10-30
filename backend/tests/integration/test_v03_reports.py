@@ -39,7 +39,7 @@ def test_report_includes_annotations_and_comparison_deterministically(tmp_path: 
             assert created.status_code == 201, created.text
             report = client.get(created.json()["download_url"]).json()
             Draft202012Validator(json_schema()).validate(report)
-            assert report["schema_version"] == 3
+            assert report["schema_version"] == 4
             assert report["scope"]["kind"] == "comparison"
             assert report["comparison"]["a"]["version_id"] == a["id"]
             assert report["comparison"]["b"]["version_id"] == b["id"]

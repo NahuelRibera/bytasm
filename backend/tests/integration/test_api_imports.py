@@ -48,6 +48,7 @@ HOSTILE_NAME = '<script>alert("bytasm")</script>'
 
 # file name -> (format, architecture)
 EXPECTED = {
+    "capa_environment-x86_64.exe": ("PE", "x86_64"),
     "hello_v1-aarch64.elf": ("ELF", "aarch64"),
     "hello_v1-aarch64-stripped.elf": ("ELF", "aarch64"),
     "entropy_blob-aarch64.elf": ("ELF", "aarch64"),
@@ -270,6 +271,9 @@ def test_no_endpoint_can_change_the_input_policy(client: TestClient) -> None:
     routes = {(path, method) for path, item in spec["paths"].items() for method in item}
     assert routes == {
         ("/api/v1/health", "get"),
+        ("/api/v1/tools", "get"),
+        ("/api/v1/reports/{report_id}/html", "get"),
+        ("/api/v1/sample-versions/{version_id}/reports", "get"),
         ("/api/v1/compare", "get"),
         ("/api/v1/annotations", "get"),
         ("/api/v1/annotations", "post"),

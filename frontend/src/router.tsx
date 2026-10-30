@@ -3,6 +3,8 @@ import { useEffect, useState, type AnchorHTMLAttributes, type MouseEvent } from 
 
 export type Route =
   | { name: "projects" }
+  | { name: "tools" }
+  | { name: "report"; reportId: string }
   | { name: "project"; projectId: string }
   | { name: "compare"; projectId: string; sampleId: string }
   | { name: "import"; projectId: string }
@@ -15,6 +17,8 @@ const ID = "([0-9a-f]{32})";
 
 export function parseRoute(path: string): Route {
   let match: RegExpMatchArray | null;
+  if (path === "/tools") return { name: "tools" };
+  if ((match = path.match(new RegExp(`^/reports/${ID}/?$`)))) return { name: "report", reportId: match[1]! };
   if (path === "/" || path === "") return { name: "projects" };
   if ((match = path.match(new RegExp(`^/projects/${ID}/?$`))))
     return { name: "project", projectId: match[1]! };

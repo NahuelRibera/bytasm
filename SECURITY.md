@@ -97,3 +97,48 @@ sample.
 
 The target acknowledgement time is seven days. This is a single-maintainer
 project, so a fix may take longer.
+
+
+## v0.4 capa and HTML boundary
+
+capa 10.0.0 is a third-party static tool, not a Bytasm sandbox. Only the fixed
+vivisect PE x86/x64 backend and an attributed two-rule subset are selected;
+.NET, ELF, shellcode, dynamic reports, user rules/plugins and library signatures
+are unsupported in this integration. No network service receives files or hashes.
+The worker rechecks current admission and the blob hash before each child.
+The child also verifies sample/rule hashes. The strict bounded result envelope
+and parent provenance/pointer checks precede transactional persistence.
+
+Limits: 64 MiB input; 1 GiB address space on Linux; 100 CPU seconds in the capa
+bridge, 110-second internal CLI deadline, 120-second parent deadline;
+16 MiB per-file child limit, 8 MiB retained raw JSON, 64 KiB accepted stderr,
+16 MiB parent envelope; at most 16 matched rules and 32 recorded function
+locations per rule. The actual packaged subset contains two rules. Parent
+stdout/stderr have independent 64 KiB caps. On native Linux a same-UID thread-count
+backstop allows eight additional tasks; RLIMIT_NPROC is UID-scoped and
+ineffective for root. Supported Compose uses its verified 128-task cgroup
+cap instead: PID-namespace /proc cannot enumerate same-UID tasks in other
+containers, so deriving RLIMIT_NPROC from that count would prevent valid forks. Native macOS cannot enforce RLIMIT_AS and remains
+fixture-only. These controls do not block all file/network access or establish
+an isolated analysis boundary. Original bounded CLI output is an explicit
+local download; it may contain function addresses and private temporary paths.
+It is not copied into ordinary logs or inline in reports. capa's rule cache
+is restricted to a fresh private per-step directory by the pinned entry shim
+(XDG_CACHE_HOME alone is ignored by capa on macOS);
+no persisted or user/global pickled rule cache is read.
+
+A failed, unavailable or unsupported capa step never means no capabilities.
+Completed earlier steps survive; cancellation/restart use the existing worker
+transactions and process-group termination. capa supplies virtual addresses,
+not the file byte ranges displayed for YARA-X. Its rule text and ATT&CK/MBC
+labels remain untrusted observations. Packed programs, installers, wrappers
+and the absence of library signatures limit interpretation.
+
+Report HTML comes only from a hash-verified, schema-validated JSON snapshot.
+Jinja2 autoescaping is mandatory. There is no JavaScript, remote content, form
+or raw-HTML insertion. Header/meta CSP restricts sources; print and narrow
+layouts wrap file-derived text. Comparison reports can disclose changed strings
+and analyst-authored material: review before sharing. This work adds neither
+arbitrary binary admission nor a backup/archive import mechanism. See
+THIRD_PARTY_NOTICES.md for licensing review and the outstanding transitive
+license packaging clarification before image redistribution.

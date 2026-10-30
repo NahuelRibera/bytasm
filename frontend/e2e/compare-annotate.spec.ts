@@ -77,7 +77,7 @@ test("compare, cite a finding, revise, review activity and export at 360 px", as
   await page.getByRole("button", { name: "Export comparison JSON report", exact: true }).click();
   const download = await downloading;
   const report = JSON.parse(await readFile((await download.path())!, "utf8"));
-  expect(report.schema_version).toBe(3);
+  expect(report.schema_version).toBe(4);
   expect(report.scope.kind).toBe("comparison");
   const conclusion = report.annotations.find((item: { kind: string }) => item.kind === "conclusion");
   expect(conclusion.revision).toBe(2);

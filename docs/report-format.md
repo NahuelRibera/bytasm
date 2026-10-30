@@ -1,7 +1,8 @@
-# Bytasm JSON report, schema version 3
+# Bytasm JSON report, schema version 4
 
 One report describes a sample version or a comparison of two versions of the
-same sample. Version 3 adds `scope`, analyst `annotations` and optional
+same sample. Version 4 adds multi-tool evidence, deterministic `summary` and
+latest-run context to version 3's `scope`, analyst `annotations` and optional
 `comparison`. The primary version retains the metadata/pattern fields below.
 Version 2 (v0.2) keeps every version-1 field unchanged and adds one top-level field, `pattern_analysis`; a reader of version 1 that ignores unknown fields still reads the rest. Schema: [`schemas/report.schema.json`](../schemas/report.schema.json) (JSON Schema 2020-12, generated from `backend/src/bytasm/reports/model.py` by `make schemas`).
 
@@ -17,7 +18,7 @@ Version 2 (v0.2) keeps every version-1 field unchanged and adds one top-level fi
 
 | Field | Content |
 |---|---|
-| `report_kind`, `schema_version` | `bytasm.sample_version_report`, `3` |
+| `report_kind`, `schema_version` | `bytasm.sample_version_report`, `4` |
 | `generated_at` | UTC timestamp of this export (the only varying field) |
 | `generator` | `bytasm`, its version, `source_revision` (`git describe`, `-dirty` if uncommitted), `image_id` (null when run natively) |
 | `sample` | Project and sample names, version label, `sha256`, `size_bytes`, `format` (from the bytes), `declared_filename` (marked `untrusted_as_uploaded`), `blob_sha256_verified_at_export: true` |
@@ -63,6 +64,53 @@ are verified before export. Missing or incompatible analyses remain explicit.
 The former published schema is preserved at
 [`schemas/report-v2.schema.json`](../schemas/report-v2.schema.json). Existing
 stored reports keep their bytes and download URLs. Consumers must check
-`schema_version` before requiring the new fields. New exports use schema 3;
+`schema_version` before requiring the new fields. Historical v0.3 exports used schema 3; new exports use schema 4;
 there is no automatic rewrite of older reports. See the
 [v0.3 milestone](milestones/v0.3-compare-annotate.md) for contracts and limits.
+
+
+## Version 4: multi-tool evidence and sharing
+
+Schema 4 is a deliberate transition, not an edit to an old contract. The exact
+previous main schema is preserved at `schemas/report-v3.schema.json`; schema 2
+is unchanged. Stored v2/v3 JSON downloads retain their original bytes and hashes.
+Migration 0006 does not rewrite report artifacts. HTML is offered for new schema
+4 snapshots only; historical JSON remains downloadable and viewable as data.
+
+- `summary`: reviewed deterministic English templates derived from the same
+  identity, selected step statuses, rule counts and string counts in the report.
+  No AI, external lookup, risk score or runtime behavior inference is involved.
+- `analysis_context`: latest analysis ID/status and selected result-run ID.
+  Failed/cancelled latest runs are disclosed even when a previous successful or
+  partial run supplies the report's observations (the existing selection policy).
+- Full profiles add a `capa` step and `unsupported` / `unavailable` step states.
+  Each finding includes its tool, version and exact `rule_set_sha256`; the profile
+  snapshots tool/adapter versions and rule references. The top-level pattern
+  `rule_set` still names the YARA-X rules; capa provenance belongs to its own step.
+- capa findings use `kind: capability`, `tool: capa`; evidence uses
+  `kind: virtual_address`, an unsigned function virtual address and a pointer
+  into the original capa JSON. `file_offset` and `length` are null; no byte range,
+  function name or source code is fabricated. Rule-supplied ATT&CK/MBC labels are
+  metadata requiring interpretation, not claims of executed behavior.
+- Evidence ordering uses file offset or virtual address, then pattern and raw
+  pointer. Capabilities compare only when tool, adapter, rules and relevant args
+  agree; virtual-address changes remain visible. Incompatible/missing results
+  have no inferred change counts.
+
+`GET /api/v1/sample-versions/{id}/reports?offset=0&limit=25` lists immutable
+snapshots (limit 1–100). The preview reads that exact stored JSON. Existing
+`GET /api/v1/reports/{id}/download` verifies its hash before attachment download.
+`GET /api/v1/reports/{id}/html` verifies and schema-validates the same snapshot,
+then renders automatic Jinja2 escaping, including every recursive key/value.
+`?download=false` serves an inline preview. HTML is standalone: no JavaScript,
+forms, remote assets or event handlers; a CSP header and meta tag deny default
+sources and allow only embedded style. It has narrow-screen wrapping and print
+styles. Both previews and HTML disclose that comparison output can contain
+changed strings and analyst-authored text. Do not treat HTML bytes as canonical:
+the stored JSON SHA-256 identifies the source snapshot.
+
+Virtual-address evidence additionally carries `virtual_address_hex`, a canonical
+lowercase `0x` string derived from the exact unsigned 64-bit address. Clients
+should use it for display: JavaScript numbers cannot represent every U64 exactly.
+The native integer remains in canonical JSON for consumers with exact integers;
+React previews and capa panels use the exact hex representation.

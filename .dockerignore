@@ -1,5 +1,5 @@
 # The image needs backend/{pyproject.toml,uv.lock,src}, fixtures/MANIFEST.sha256,
-# rules/yara and frontend/dist only. Everything else stays out of the build context,
+# rules/{yara,capa} and frontend/dist only. Everything else stays out of the build context,
 # in particular local settings, data, caches and the fixture binaries.
 *
 !backend/pyproject.toml
@@ -7,6 +7,7 @@
 !backend/src/
 !fixtures/MANIFEST.sha256
 !rules/yara/
+!rules/capa/
 !frontend/dist/
 **/__pycache__
 **/*.py[cod]
