@@ -94,7 +94,17 @@ def sample_version_out(version: SampleVersion) -> SampleVersionOut:
             result_sha256=record.raw_output_sha256,
             entropy_method=record.entropy_method,
         ),
-        header=dict(record.header),
+        header={
+            **record.header,
+            "entry_point_hex": f"{record.header['entry_point']:#x}"
+            if record.header.get("entry_point") is not None
+            else None,
+            "declared_header_exact": {
+                key: f"{value:#x}"
+                for key, value in record.header.get("declared_header", {}).items()
+                if type(value) is int and key != "pe_timestamp"
+            },
+        },
         warnings=list(invocation.warnings),
         counts={
             "sections": len(invocation.sections),

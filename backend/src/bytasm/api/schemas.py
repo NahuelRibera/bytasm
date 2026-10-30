@@ -3,7 +3,10 @@
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, StringConstraints
+from pydantic import BaseModel, ConfigDict, StringConstraints, computed_field
+
+from bytasm.review import ReviewOut
+from bytasm.string_review import StringCategory, StringSort
 
 
 class _Out(BaseModel):
@@ -119,8 +122,19 @@ class SectionOut(_Out):
     entropy: float | None
     entropy_note: str | None
 
+    @computed_field  # type: ignore[prop-decorator]  # Pydantic computed property
+    @property
+    def virtual_address_hex(self) -> str:
+        return f"{self.virtual_address:#x}"
+
+    @computed_field  # type: ignore[prop-decorator]  # Pydantic computed property
+    @property
+    def virtual_size_decimal(self) -> str:
+        return str(self.virtual_size)
+
 
 class SectionsOut(BaseModel):
+    metadata_invocation_id: str | None = None
     entropy_method: str
     entropy_unit: Literal["bits_per_byte"] = "bits_per_byte"
     sections: list[SectionOut]
@@ -284,6 +298,7 @@ class RunOut(BaseModel):
     sample: RunSampleOut
     steps: list[RunStepOut]
     summary: list[str] = []
+    review: ReviewOut | None = None
     counts: RunCounts
 
 
@@ -344,7 +359,14 @@ class FindingsOut(BaseModel):
     notices: list[str]
 
 
+class StringSectionOut(BaseModel):
+    index: int
+    name: str
+
+
 class StringOut(BaseModel):
+    category: StringCategory = "other"
+    section: StringSectionOut | None = None
     offset: int
     encoding: Literal["ascii", "utf-16le"]
     length_chars: int
@@ -355,6 +377,11 @@ class StringOut(BaseModel):
 
 
 class StringsOut(BaseModel):
+    category: StringCategory | None = None
+    sort: StringSort = "offset"
+    category_counts: dict[str, int] = {}
+    category_scope: Literal["selected_run_stored_strings"] = "selected_run_stored_strings"
+    metadata_invocation_id: str | None = None
     version_id: str
     # The run whose strings step produced these rows; null if none has yet.
     run_id: str | None

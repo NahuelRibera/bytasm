@@ -23,6 +23,7 @@ from bytasm.compare import CompareError
 from bytasm.db.models import Report, SampleVersion
 from bytasm.reports.generate import export_report
 from bytasm.reports.model import ReportScope
+from bytasm.review import ReviewOut, report_review
 from bytasm.runner import workspace
 from bytasm.storage import IntegrityError
 
@@ -140,6 +141,33 @@ def html_report(request: Request, report_id: str, download: bool = True) -> Resp
             + f'; filename="bytasm-report-{sha[:16]}.html"',
         },
     )
+
+
+@router.get("/reports/{report_id}/review", response_model=ReviewOut)
+def review_report(request: Request, report_id: str) -> ReviewOut | JSONResponse:
+    """An explanatory view of the verified snapshot, never of later live data."""
+    from bytasm.reports.model import Report as ReportDocument
+
+    ctx: AppContext = request.app.state.ctx
+    with ctx.sessions() as session:
+        row = session.get(Report, report_id)
+        if row is None:
+            return problem("not_found", request_id=request.state.request_id)
+        sha = row.sha256
+    try:
+        document = json.loads(ctx.reports.read_verified(sha))
+        if not isinstance(document, dict):
+            raise ValueError("Invalid stored report")
+        if document.get("schema_version") != 4:
+            return problem(
+                "invalid_request",
+                detail="Explanatory views require schema 4; legacy JSON downloads are unchanged.",
+                request_id=request.state.request_id,
+            )
+        ReportDocument.model_validate(document)
+        return report_review(document)
+    except (IntegrityError, ValueError):
+        return problem("integrity_error", request_id=request.state.request_id)
 
 
 class ReportHistoryItem(BaseModel):

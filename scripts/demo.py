@@ -402,6 +402,20 @@ def run_demo(client: Client) -> str:
     if "default-src 'none'" not in {key.lower(): value for key, value in headers.items()}.get("content-security-policy", ""):
         raise DemoError("standalone HTML CSP missing")
     print("   three steps succeeded; capa static observation and schema 4 HTML verified")
+    step("12. Evidence-led explanations and scoped strings explorer")
+    reviewed = client.json("GET", f"/api/v1/runs/{full['id']}")["review"]
+    if reviewed["run_id"] != full["id"] or not reviewed["observations"]:
+        raise DemoError("run review scope or observations missing")
+    snapshot_review = client.json("GET", f"/api/v1/reports/{snapshot['id']}/review")
+    if snapshot_review["version_id"] != capa_version:
+        raise DemoError("snapshot review scope mismatch")
+    explorer = client.json("GET", f"/api/v1/sample-versions/{capa_version}/strings?run_id={full['id']}&sort=length&limit=5")
+    if explorer["run_id"] != full["id"] or len(explorer["items"]) > 5:
+        raise DemoError("explorer scope or bounds mismatch")
+    lengths = [item["length_chars"] for item in explorer["items"]]
+    if lengths != sorted(lengths, reverse=True):
+        raise DemoError("explorer ordering mismatch")
+    print("   exact source review, canonical snapshot guide and bounded sorted strings verified")
     return f"{client.base_url}/projects/{project['id']}/compare/{version['sample_id']}"
 
 

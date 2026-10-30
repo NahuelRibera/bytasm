@@ -42,7 +42,7 @@ test("rules → validate → run → findings with byte evidence", async ({ page
   await expectNoAxeViolations(page);
 
   await page.getByRole("button", { name: "Inspect url_reference" }).click();
-  const panel = page.getByRole("region", { name: /Evidence/ });
+  const panel = page.getByRole("region", { name: /^Evidence:/ });
   await expect(panel.getByRole("cell", { name: "https://" })).toBeVisible();
   await expect(panel.getByLabel("Source of rule url_reference")).toBeVisible();
   await expect(page.locator("#evidence-heading")).toBeFocused();
@@ -125,7 +125,7 @@ test.describe("narrow window", () => {
     await startRun(page);
     await expectNoHorizontalPageScroll(page);
     await page.getByRole("button", { name: "Inspect url_reference" }).click();
-    await expect(page.getByRole("region", { name: /Evidence/ })).toBeVisible();
+    await expect(page.getByRole("region", { name: /^Evidence:/ })).toBeVisible();
     await expectNoHorizontalPageScroll(page);
     await expectNoAxeViolations(page);
     await page.getByRole("link", { name: /Search the strings/ }).click();

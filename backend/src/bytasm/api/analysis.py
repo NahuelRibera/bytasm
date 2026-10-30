@@ -13,6 +13,7 @@ data for the UI to display as escaped text.
 
 import json
 import logging
+from collections import Counter
 from datetime import UTC, datetime
 from typing import Annotated, Literal
 
@@ -45,6 +46,7 @@ from bytasm.api.schemas import (
     RunsOut,
     RunStepOut,
     StringOut,
+    StringSectionOut,
     StringsOut,
     StringsSummaryOut,
 )
@@ -68,10 +70,12 @@ from bytasm.jobs.scan import (
 )
 from bytasm.notices import FINDING_NOTICES, STRINGS_NOTICES
 from bytasm.plain_summary import describe
+from bytasm.review import build_review
 from bytasm.rules import RuleSetError, load_rule_set, split_snapshot
 from bytasm.runner import workspace
 from bytasm.runner.supervisor import run_child
 from bytasm.storage import IntegrityError
+from bytasm.string_review import StringCategory, StringSort, category_of, containing_section
 
 router = APIRouter()
 log = logging.getLogger("bytasm.analysis")
@@ -240,6 +244,53 @@ def _strings_summary(invocation: ToolInvocation | None) -> StringsSummaryOut | N
     return StringsSummaryOut(**invocation.summary)
 
 
+def review_rows(session: Session, run: AnalysisRun) -> list[dict[str, object]]:
+    invocations = {inv.id: inv for inv in run.invocations if inv.status == "succeeded"}
+    rows = session.scalars(
+        select(Finding)
+        .where(Finding.run_id == run.id)
+        .order_by(Finding.rule_namespace, Finding.rule_id, Finding.id)
+        .limit(49)
+    )
+    findings = []
+    for finding in rows:
+        inv = invocations.get(finding.invocation_id)
+        ruleset = session.get(RuleSet, finding.rule_set_id)
+        if inv is None or ruleset is None:
+            continue
+        evidence = list(
+            session.scalars(
+                select(Evidence)
+                .where(Evidence.finding_id == finding.id)
+                .order_by(Evidence.id)
+                .limit(4)
+            )
+        )
+        findings.append(
+            {
+                "id": finding.id,
+                "fingerprint": finding.fingerprint,
+                "rule_id": finding.rule_id,
+                "tool": inv.tool_name,
+                "tool_version": inv.tool_version,
+                "adapter_version": inv.adapter_version,
+                "rule_version": ruleset.version,
+                "rule_set_sha256": ruleset.sha256,
+                "evidence_truncated": finding.evidence_truncated,
+                "evidence": [
+                    {
+                        "file_offset": item.file_offset,
+                        "length": item.length,
+                        "virtual_address": item.virtual_address,
+                        "raw_json_pointer": item.raw_json_pointer,
+                    }
+                    for item in evidence
+                ],
+            }
+        )
+    return findings
+
+
 def run_out(session: Session, run: AnalysisRun) -> RunOut:
     version = run.sample_version
     sample = version.sample
@@ -261,6 +312,10 @@ def run_out(session: Session, run: AnalysisRun) -> RunOut:
         .where(ToolInvocation.run_id == run.id)
     )
     views = summary.step_views(run)
+    observations = review_rows(session, run)
+    review = build_review(observations, run.id, version.id)
+    review.total = finding_count or 0
+    review.capped = review.total > len(review.observations)
     return RunOut(
         id=run.id,
         status=run.status,  # type: ignore[arg-type]  # constrained by the lifecycle
@@ -313,14 +368,12 @@ def run_out(session: Session, run: AnalysisRun) -> RunOut:
             {
                 "sha256": version.sha256,
                 "detected_format": version.detected_format,
+                "declared_filename": version.declared_filename,
                 "architecture": import_record(version).header["architecture"],
             },
             run.status,
             [{"tool": v.tool, "status": v.status} for v in views],
-            [
-                {"tool": "capa" if f.kind == "capability" else "yara-x"}
-                for f in session.scalars(select(Finding).where(Finding.run_id == run.id))
-            ],
+            observations,
             next(
                 (
                     v.invocation.summary
@@ -330,6 +383,7 @@ def run_out(session: Session, run: AnalysisRun) -> RunOut:
                 None,
             ),
         ),
+        review=review,
         counts=RunCounts(
             findings=finding_count or 0, evidence=evidence_count or 0, strings=string_count or 0
         ),
@@ -643,6 +697,8 @@ def _escape_like(text: str) -> str:
 def version_strings(
     request: Request,
     version_id: str,
+    category: Annotated[StringCategory | None, Query()] = None,
+    sort: Annotated[StringSort, Query()] = "offset",
     query: Annotated[str | None, Query(max_length=MAX_QUERY)] = None,
     encoding: Annotated[Literal["ascii", "utf-16le"] | None, Query()] = None,
     run_id: Annotated[str | None, Query(max_length=32)] = None,
@@ -656,8 +712,11 @@ def version_strings(
     """
     needle = (query or "").strip()
     with _ctx(request).sessions() as session:
-        if session.get(SampleVersion, version_id) is None:
+        version = session.get(SampleVersion, version_id)
+        if version is None:
             return _not_found(request, "sample version")
+        record = import_record(version)
+        categories: dict[str, int] = {}
         conditions = [
             AnalysisRun.sample_version_id == version_id,
             AnalysisRun.kind == "analysis",
@@ -678,36 +737,75 @@ def version_strings(
         items: list[StringOut] = []
         matched = 0
         if invocation is not None:
-            filters = [StringOccurrence.invocation_id == invocation.id]
-            if needle:
-                filters.append(
-                    StringOccurrence.value.ilike(f"%{_escape_like(needle)}%", escape="\\")
+            stored = list(
+                session.scalars(
+                    select(StringOccurrence)
+                    .where(StringOccurrence.invocation_id == invocation.id)
+                    .order_by(
+                        StringOccurrence.file_offset, StringOccurrence.encoding, StringOccurrence.id
+                    )
+                    .limit(MAX_STRINGS + 1)
                 )
-            if encoding is not None:
-                filters.append(StringOccurrence.encoding == encoding)
-            matched = (
-                session.scalar(select(func.count()).select_from(StringOccurrence).where(*filters))
-                or 0
             )
-            rows = session.scalars(
-                select(StringOccurrence)
-                .where(*filters)
-                .order_by(StringOccurrence.file_offset, StringOccurrence.encoding)
-                .offset(offset)
-                .limit(limit)
-            )
+            if len(stored) > MAX_STRINGS:
+                return problem("integrity_error", request_id=_rid(request))
+            categories = {"url_like": 0, "path_like": 0, "other": 0}
+            categories.update(Counter(category_of(row.value) for row in stored))
+            selected = [
+                row
+                for row in stored
+                if (not needle or needle.casefold() in row.value.casefold())
+                and (encoding is None or row.encoding == encoding)
+                and (category is None or category_of(row.value) == category)
+            ]
+
+            def order(row: StringOccurrence) -> tuple[object, ...]:
+                primary: object = (
+                    row.file_offset
+                    if sort == "offset"
+                    else -row.length_chars
+                    if sort == "length"
+                    else row.value.casefold()
+                    if sort == "value"
+                    else category_of(row.value)
+                )
+                return (primary, row.file_offset, row.encoding, row.id)
+
+            selected.sort(key=order)
+            matched = len(selected)
+            sections = [
+                {
+                    "index": section.index,
+                    "name": section.name,
+                    "file_offset": section.file_offset,
+                    "raw_size": section.raw_size,
+                }
+                for section in record.invocation.sections
+            ]
             items = [
                 StringOut(
                     offset=row.file_offset,
-                    encoding=row.encoding,  # type: ignore[arg-type]  # checked by the worker
+                    encoding=row.encoding,  # type: ignore[arg-type]  # worker-validated
                     length_chars=row.length_chars,
                     byte_length=row.byte_length,
                     value=row.value,
                     value_truncated=row.value_truncated,
+                    category=category_of(row.value),
+                    section=StringSectionOut.model_validate(section)
+                    if (
+                        section := containing_section(
+                            row.file_offset, row.byte_length, sections, version.size_bytes
+                        )
+                    )
+                    else None,
                 )
-                for row in rows
+                for row in selected[offset : offset + limit]
             ]
         return StringsOut(
+            category=category,
+            sort=sort,
+            category_counts=categories,
+            metadata_invocation_id=record.invocation.id,
             version_id=version_id,
             run_id=invocation.run_id if invocation else None,
             run_status=invocation.run.status if invocation else None,

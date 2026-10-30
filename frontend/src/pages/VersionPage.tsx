@@ -1,7 +1,8 @@
+import { SectionMap } from "../SectionMap";
 import { ReportLibrary } from "../ReportLibrary";
 import { useQuery } from "@tanstack/react-query";
 import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { api, type SampleVersion } from "../api";
+import { api, type SampleVersion, type StringCategory, type StringSort } from "../api";
 import {
   AdmittedPill,
   CopyButton,
@@ -36,9 +37,10 @@ export function VersionPage({
 }) {
   const version = useQuery({ queryKey: ["version", versionId], queryFn: () => api.version(versionId) });
   const [tab, setTab] = useState<Tab>(initialTab);
+  const sourceRun = new URLSearchParams(window.location.search).get("run_id") ?? undefined;
   const strings = useQuery({
-    queryKey: ["strings-summary", versionId],
-    queryFn: () => api.strings(versionId, { limit: 1 }),
+    queryKey: ["strings-summary", versionId, sourceRun],
+    queryFn: () => api.strings(versionId, { limit: 1, run_id: sourceRun }),
   });
 
   if (version.isPending) return <Loading label="Loading sample version…" />;
@@ -91,13 +93,13 @@ export function VersionPage({
         <Tabs
           current={tab}
           onChange={setTab}
-          counts={{ ...v.counts, strings: strings.data?.summary?.stored ?? 0 }}
+          counts={{ ...v.counts, strings: strings.data?.summary?.stored }}
         />
         <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} tabIndex={0}>
           {tab === "Sections" && <SectionsTable versionId={versionId} />}
           {tab === "Imports" && <ImportsList versionId={versionId} />}
           {tab === "Exports" && <ExportsList versionId={versionId} />}
-          {tab === "Strings" && <StringsTab versionId={versionId} />}
+          {tab === "Strings" && <StringsTab versionId={versionId} runId={sourceRun} onSection={() => setTab("Sections")} />}
         </div>
       </section>
     </>
@@ -124,7 +126,8 @@ function IdentityPanel({ v }: { v: SampleVersion }) {
           [
             "File name",
             <>
-              <span className="untrusted">{v.declared_filename ?? "—"}</span>{" "}
+              <span className="untrusted">{v.declared_filename?.split(/[\\/]/).pop() || "—"}</span>{" "}
+              {v.declared_filename && /[\\/]/.test(v.declared_filename) && <details><summary>Reveal original display name (may contain personal paths)</summary><span className="untrusted">{v.declared_filename}</span></details>}
               <span className="hint">as uploaded, untrusted</span>
             </>,
           ],
@@ -149,11 +152,11 @@ function MetadataPanel({ v }: { v: SampleVersion }) {
           ["Architecture", <>{header.architecture} <Declared /></>],
           ["Bitness", <>{header.bitness}-bit <Declared /></>],
           ["Endianness", <>{header.endianness} <Declared /></>],
-          ["Entry point", <><code>{hex(header.entry_point)}</code> <Declared /></>],
+          ["Entry point", <><code>{header.entry_point_hex ?? hex(header.entry_point)}</code> <Declared /></>],
           ...declared.map(([key, value]): [ReactNode, ReactNode] => [
             <code>{key}</code>,
             <>
-              <code>{typeof value === "number" && key !== "pe_timestamp" ? hex(value) : String(value)}</code>{" "}
+              <code>{typeof value === "number" && key !== "pe_timestamp" ? header.declared_header_exact?.[key] ?? hex(value) : String(value)}</code>{" "}
               <Declared />
             </>,
           ]),
@@ -202,7 +205,7 @@ function Tabs({
 }: {
   current: Tab;
   onChange: (tab: Tab) => void;
-  counts: Record<string, number>;
+  counts: Record<string, number | undefined>;
 }) {
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
   const count: Record<Tab, number | undefined> = {
@@ -237,23 +240,29 @@ function Tabs({
           onClick={() => onChange(tab)}
           onKeyDown={(event) => onKey(event, index)}
         >
-          {tab} <span className="count">{count[tab] ?? 0}</span>
+          {tab} <span className="count">{count[tab] ?? "not available"}</span>
         </button>
       ))}
     </div>
   );
 }
 
-function StringsTab({ versionId }: { versionId: string }) {
+function StringsTab({ versionId, runId, onSection }: { versionId: string; runId?: string; onSection: () => void }) {
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
   const [encoding, setEncoding] = useState<"" | "ascii" | "utf-16le">("");
   const [offset, setOffset] = useState(0);
+  const [category, setCategory] = useState<"" | StringCategory>("");
+  const [sort, setSort] = useState<StringSort>("offset");
+  const [showPaths, setShowPaths] = useState(false);
   const page = useQuery({
-    queryKey: ["strings", versionId, query, encoding, offset],
+    queryKey: ["strings", versionId, runId, query, encoding, offset, category, sort],
     queryFn: () =>
       api.strings(versionId, {
         query,
+        run_id: runId,
+        category: category || undefined,
+        sort: sort === "offset" ? undefined : sort,
         encoding: encoding || undefined,
         offset,
         limit: STRINGS_PAGE,
@@ -275,6 +284,9 @@ function StringsTab({ versionId }: { versionId: string }) {
     );
   }
   const last = Math.min(data.offset + data.items.length, data.matched);
+  const groups = sort === "category"
+    ? [...new Set(data.items.map(item => item.category ?? "other"))].map(category => ({ category, items: data.items.filter(item => (item.category ?? "other") === category) }))
+    : [{ category: "all", items: data.items }];
   return (
     <>
       <ul className="hint">
@@ -288,6 +300,8 @@ function StringsTab({ versionId }: { versionId: string }) {
         {data.summary?.truncated &&
           ` The file holds ${data.summary.total_found.toLocaleString("en")} strings; the first ${data.summary.stored.toLocaleString("en")} by offset were kept.`}
       </p>
+      <p className="hint">Heuristic categories describe text shape only, not its use or meaning. Counts cover all stored strings in this selected run before filtering: {Object.entries(data.category_counts ?? {}).map(([name, count]) => `${name}: ${count}`).join(" · ") || "not recorded"}.</p>
+      <label className="privacy-choice"><input type="checkbox" checked={showPaths} onChange={event => setShowPaths(event.target.checked)} />Show path-like values (may contain personal paths)</label>
       <form
         className="filter-row"
         role="search"
@@ -306,6 +320,10 @@ function StringsTab({ versionId }: { versionId: string }) {
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
+        <label htmlFor="strings-category">Heuristic category</label><select id="strings-category" value={category} onChange={event => { setCategory(event.target.value as "" | StringCategory); setOffset(0); }}>
+          <option value="">All categories</option><option value="url_like">URL-like</option><option value="path_like">Path-like</option><option value="other">Other text</option></select>
+        <label htmlFor="strings-sort">Sort / group</label><select id="strings-sort" value={sort} onChange={event => { setSort(event.target.value as StringSort); setOffset(0); }}>
+          <option value="offset">File offset</option><option value="length">Length, longest first</option><option value="value">Displayed prefix, A–Z</option><option value="category">Group by heuristic category</option></select>
         <label htmlFor="strings-encoding">Encoding</label>
         <select
           id="strings-encoding"
@@ -331,7 +349,7 @@ function StringsTab({ versionId }: { versionId: string }) {
       {data.items.length > 0 && (
         <div className="table-scroll" tabIndex={0} role="region" aria-label="Strings table">
           <table className="table table-dense strings-table">
-            <caption className="sr-only">Strings found in the file, by file offset</caption>
+            <caption>Strings found in the selected run; category groups and rows are paginated. Prefix sorting compares stored, possibly shortened values.</caption>
             <thead>
               <tr>
                 <th scope="col" className="num">File offset</th>
@@ -340,16 +358,19 @@ function StringsTab({ versionId }: { versionId: string }) {
                 <th scope="col">Value (untrusted text)</th>
               </tr>
             </thead>
-            <tbody>
-              {data.items.map((item) => (
+            {groups.map(group => <tbody key={group.category}>
+              {sort === "category" && <tr><th scope="rowgroup" colSpan={4}>{group.category} · heuristic group, current page</th></tr>}
+              {group.items.map((item) => (
                 <tr key={`${item.offset}-${item.encoding}`}>
                   <td className="num">
                     <code>{hex(item.offset)}</code>
+                    <div>{item.section ? <a href={`/versions/${versionId}#section-${item.section.index}`} onClick={onSection}>Section {item.section.index}: {item.section.name}</a> : <span className="hint">Unique containing raw section not established</span>}</div>
                   </td>
                   <td>{item.encoding === "ascii" ? "ASCII" : "UTF-16LE"}</td>
                   <td className="num">{item.length_chars.toLocaleString("en")}</td>
                   <td>
-                    <code className="untrusted string-value">{item.value}</code>
+                    <div className="hint">{item.category ?? "other"} (heuristic)</div>
+                    <code className="untrusted string-value">{item.category === "path_like" && !showPaths ? "Path-like text hidden; use the privacy control to reveal it." : item.value}</code>
                     {item.value_truncated && (
                       <div className="hint">
                         first 256 of {item.length_chars.toLocaleString("en")} characters shown
@@ -358,7 +379,7 @@ function StringsTab({ versionId }: { versionId: string }) {
                   </td>
                 </tr>
               ))}
-            </tbody>
+            </tbody>)}
           </table>
         </div>
       )}
@@ -391,6 +412,7 @@ function SectionsTable({ versionId }: { versionId: string }) {
   if (sections.data.sections.length === 0) return <Empty>This file declares no sections.</Empty>;
   return (
     <>
+      <SectionMap sections={sections.data.sections} versionId={versionId} invocationId={sections.data.metadata_invocation_id} />
       <p className="hint">
         <strong>Entropy</strong> is a measurement in bits per byte (0–8), computed by Bytasm over
         each section's bytes in the file ({sections.data.entropy_method}). It is not a verdict: high
@@ -415,7 +437,7 @@ function SectionsTable({ versionId }: { versionId: string }) {
           </thead>
           <tbody>
             {sections.data.sections.map((section) => (
-              <tr key={section.index}>
+              <tr id={`section-${section.index}`} key={section.index}>
                 <td className="num">{section.index}</td>
                 <td>
                   <code className="untrusted">{section.name}</code>
@@ -423,8 +445,8 @@ function SectionsTable({ versionId }: { versionId: string }) {
                 <td>{section.section_type ?? "—"}</td>
                 <td className="num"><code>{hex(section.file_offset)}</code></td>
                 <td className="num">{section.raw_size.toLocaleString("en")}</td>
-                <td className="num"><code>{hex(section.virtual_address)}</code></td>
-                <td className="num">{section.virtual_size.toLocaleString("en")}</td>
+                <td className="num"><code>{section.virtual_address_hex ?? hex(section.virtual_address)}</code></td>
+                <td className="num">{section.virtual_size_decimal ?? section.virtual_size.toLocaleString("en")}</td>
                 <td className="flags">{section.flags.join(", ") || "—"}</td>
                 <td className="num">
                   {section.entropy === null ? (
