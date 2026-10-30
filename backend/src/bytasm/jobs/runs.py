@@ -33,7 +33,7 @@ after it waits for the step's commit and then applies to the rest of the run.
 """
 
 from collections.abc import Iterable
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Final, Literal
 
 from sqlalchemy import select, update
@@ -41,7 +41,16 @@ from sqlalchemy.orm import Session
 
 from bytasm import __version__
 from bytasm.adapters import strings_result
-from bytasm.db.models import AnalysisRun, RuleSet, ToolInvocation, utcnow
+from bytasm.db.models import (
+    ActivityEvent,
+    AnalysisRun,
+    RuleSet,
+    Sample,
+    SampleVersion,
+    ToolInvocation,
+    utcnow,
+)
+from bytasm.jobs.messages import ADMISSION_MESSAGES, STEP_MESSAGES
 
 RunStatus = Literal["queued", "running", "succeeded", "partial", "failed", "cancelled"]
 ACTIVE: Final = frozenset({"queued", "running"})
@@ -104,7 +113,35 @@ def transition(
         .values(status=target, **values)
         .execution_options(synchronize_session=False)
     )
-    return bool(result.rowcount == 1)  # type: ignore[attr-defined]
+    changed = bool(result.rowcount == 1)  # type: ignore[attr-defined]
+    if changed:
+        record_activity(session, run_id, target)
+    return changed
+
+
+ACTIVITY_REASONS: Final = frozenset(ADMISSION_MESSAGES) | frozenset(STEP_MESSAGES)
+
+
+def record_activity(session: Session, run_id: str, event: str) -> None:
+    """Called only after creation or a winning conditional update; caller commits."""
+    project_id, version_id, status, reason = session.execute(
+        select(Sample.project_id, SampleVersion.id, AnalysisRun.status, AnalysisRun.failure_reason)
+        .join(SampleVersion, SampleVersion.sample_id == Sample.id)
+        .join(AnalysisRun, AnalysisRun.sample_version_id == SampleVersion.id)
+        .where(AnalysisRun.id == run_id)
+    ).one()
+    payload = {"run_id": run_id, "sample_version_id": version_id, "status": status}
+    if reason in ACTIVITY_REASONS:
+        payload["reason"] = reason
+    session.add(
+        ActivityEvent(
+            project_id=project_id,
+            actor_id="local",
+            type=f"analysis_run.{event}",
+            payload=payload,
+            at=datetime.now(UTC),
+        )
+    )
 
 
 def claim_step_commit(session: Session, run_id: str) -> bool:
@@ -249,14 +286,25 @@ def request_cancel(session: Session, run_id: str) -> CancelOutcome:
     if run.status == "running":
         if run.cancel_requested:
             return "already_requested"
-        session.execute(
+        result = session.execute(
             update(AnalysisRun)
-            .where(AnalysisRun.id == run_id, AnalysisRun.status == "running")
+            .where(
+                AnalysisRun.id == run_id,
+                AnalysisRun.status == "running",
+                AnalysisRun.cancel_requested.is_(False),
+            )
             .values(cancel_requested=True, cancel_requested_at=now)
             .execution_options(synchronize_session=False)
         )
-        session.commit()
-        return "requested"
+        if result.rowcount == 1:  # type: ignore[attr-defined]
+            record_activity(session, run_id, "cancel_requested")
+            session.commit()
+            return "requested"
+        session.rollback()
+        session.refresh(run)
+        return (
+            "already_requested" if run.status == "running" and run.cancel_requested else "finished"
+        )
     return "finished"
 
 

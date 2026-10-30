@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "./api";
 import { SelfBuiltBanner } from "./components";
 import { ImportPage } from "./pages/ImportPage";
+import { ComparePage } from "./pages/ComparePage";
 import { ProjectPage } from "./pages/ProjectPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
 import { RulesPage } from "./pages/RulesPage";
@@ -48,6 +49,7 @@ export function App() {
       <SelfBuiltBanner health={health.data} />
       <main id="main" className="main" tabIndex={-1}>
         {route.name === "projects" && <ProjectsPage />}
+        {route.name === "compare" && <ComparePage key={route.sampleId} projectId={route.projectId} sampleId={route.sampleId} />}
         {route.name === "project" && <ProjectPage projectId={route.projectId} />}
         {route.name === "import" && <ImportPage projectId={route.projectId} health={health.data} />}
         {route.name === "version" && (

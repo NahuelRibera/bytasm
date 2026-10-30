@@ -1,3 +1,4 @@
+import { AnnotationsSection } from "./AnnotationsSection";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { api, rawOutputUrl, type Finding, type Run, type RunStep } from "../api";
@@ -414,7 +415,14 @@ function FindingsSection({ run }: { run: Run }) {
     queryFn: () => api.findings(run.id, { q: query }),
     placeholderData: (previous) => previous,
   });
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(() => window.location.hash.startsWith("#finding-") ? window.location.hash.slice(9) : null);
+  useEffect(() => {
+    if (window.location.hash.startsWith("#evidence-") && findings.data) {
+      const identity = Number(window.location.hash.slice(10));
+      const match = findings.data.findings.find((item) => item.evidence.some((evidence) => evidence.id === identity));
+      if (match) setSelected(match.id);
+    }
+  }, [findings.data]);
   const openers = useRef<Record<string, HTMLButtonElement | null>>({});
 
   if (findings.isPending) return <Loading label="Loading findings…" />;
@@ -491,7 +499,7 @@ function FindingsSection({ run }: { run: Run }) {
             </thead>
             <tbody>
               {items.map((finding) => (
-                <tr key={finding.id} className={finding.id === selected ? "row-selected" : undefined}>
+                <tr id={`finding-${finding.id}`} key={finding.id} className={finding.id === selected ? "row-selected" : undefined}>
                   <td>
                     <span className="tool-badge">YARA-X</span> <code className="untrusted">{finding.rule_id}</code>
                   </td>
@@ -598,7 +606,7 @@ function EvidencePanel({ finding, run, onClose }: { finding: Finding; run: Run; 
             </thead>
             <tbody>
               {finding.evidence.map((item) => (
-                <tr key={item.id}>
+                <tr id={`evidence-${item.id}`} key={item.id}>
                   <td>
                     <code className="untrusted">{item.pattern_id}</code>
                     {item.xor_key !== null && <div className="hint">XOR key {hex(item.xor_key)}</div>}
@@ -637,6 +645,11 @@ function EvidencePanel({ finding, run, onClose }: { finding: Finding; run: Run; 
       {ruleSet.isPending && <Loading label="Loading the rule text…" />}
       {ruleSet.isError && <ErrorPanel error={ruleSet.error} title="The rule text could not be loaded" />}
       {file && <RuleSource file={file} headingLevel={4} />}
+      <AnnotationsSection key={finding.id} versionId={run.sample.version_id} targetType="finding" targetId={finding.id} />
+      {finding.evidence.map((item) => <details key={item.id} className="card" open={new URLSearchParams(window.location.search).has("annotations") && window.location.hash === `#evidence-${item.id}`} >
+        <summary>Annotations for evidence at {hex(item.file_offset)}</summary>
+        <AnnotationsSection versionId={run.sample.version_id} targetType="evidence" targetId={String(item.id)} />
+      </details>)}
     </section>
   );
 }

@@ -5,8 +5,8 @@ Import a file, browse its headers, sections, imports and strings, run the
 bundled YARA-X rules, and export a JSON report with byte evidence for each match.
 
 The backend uses FastAPI, SQLite and LIEF. The UI uses React and TypeScript.
-A separate worker extracts strings and runs YARA-X. The v0.2 pipeline is merged;
-the project is still in early development.
+A separate worker extracts strings and runs YARA-X. The project is still in early development. It also supports version comparison
+and analyst annotations with citations and revision history.
 
 ## Before you start
 
@@ -98,14 +98,16 @@ their results if a later step fails or is cancelled. The run page shows each
 step, a technical log, findings and validated raw JSON downloads. The Strings
 tab supports search, encoding filters and paging.
 
-Reports use schema version 2 and include metadata, provenance, string counts
-and findings with evidence. They omit string values. Exports re-check stored
+Reports use schema version 3 and include metadata, provenance, string counts,
+findings with evidence and analyst annotations. Single-version reports omit
+string values; comparison reports can include changed strings. Exports re-check stored
 file hashes and are reproducible apart from `generated_at`.
 See the [report format](docs/report-format.md) and
 [v0.2 milestone](docs/milestones/v0.2-pattern-matching.md) for details.
 
 Project creation also records a `project.created` audit event in the same
-transaction, with a local actor and an empty payload. There is no activity UI.
+transaction, with a local actor and an empty payload. The project page shows a
+read-only activity history of imports, analysis runs and analyst annotations.
 
 ### CLI and demo
 
@@ -131,6 +133,18 @@ make demo DEMO_ARGS="--url http://127.0.0.1:8000"
 ```
 
 See [docs/demo.md](docs/demo.md) for the walkthrough and cleanup.
+
+## Compare and annotate
+
+Import two versions into the same sample, then choose **Compare versions**.
+The comparison shows additions, removals and changes by category. Missing or
+incompatible analyses are explained instead of shown as zero results.
+
+On a version or inside a finding's evidence panel, choose **Add note / View
+annotations**. Notes and interpretations are plain text; conclusions also need
+confidence and a finding or evidence citation. **Revise** keeps the original
+text in revision history. The project activity records creation and revision
+without copying the annotation text. Export a comparison from its own page.
 
 ## Development
 
@@ -181,7 +195,8 @@ test-generated inputs.
 ADR-0003 still proposes SQLite for the worker queue and needs owner review.
 The UI version still reads `0.0.1`; its strings counter needs to distinguish
 unanalysed input from zero results. The UPX-style rule needs a positive test.
-Comparison and annotations are planned for v0.3. See the
+The v0.3 comparison and annotation workflows are described in the
+[milestone record](docs/milestones/v0.3-compare-annotate.md). See the
 [blueprint](docs/PROJECT_BLUEPRINT.md) for the wider scope.
 
 ## Licence

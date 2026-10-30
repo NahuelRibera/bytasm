@@ -12,7 +12,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.body_limit import RequestBodyLimitMiddleware
 
 from bytasm import __version__
-from bytasm.api import analysis, imports, reports, routes
+from bytasm.api import activity, analysis, annotations, compare, imports, reports, routes
 from bytasm.api.context import AppContext
 from bytasm.api.guards import LocalOnlyGuard
 from bytasm.api.maintenance import startup_sweep
@@ -98,6 +98,9 @@ def create_app(
         openapi_url="/api/openapi.json",
     )
     app.include_router(routes.router, prefix="/api/v1")
+    app.include_router(activity.router, prefix="/api/v1")
+    app.include_router(compare.router, prefix="/api/v1")
+    app.include_router(annotations.router, prefix="/api/v1")
     app.include_router(imports.router, prefix="/api/v1")
     app.include_router(reports.router, prefix="/api/v1")
     app.include_router(analysis.router, prefix="/api/v1")

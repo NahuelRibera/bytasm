@@ -36,6 +36,7 @@ EXPECTED_MATCHES = {
     "hello_v1-aarch64.elf": ["elf_dynamic_loader_path", "url_reference"],
     "hello_v1-x86_64-stripped.elf": ["elf_dynamic_loader_path", "url_reference"],
     "hello_v1-x86_64.elf": ["elf_dynamic_loader_path", "url_reference"],
+    "hello_v2-x86_64.elf": ["elf_dynamic_loader_path", "url_reference"],
     "hello_v1-x86_64.exe": ["pe_dos_stub_message", "pe_kernel32_import_name", "url_reference"],
     "hello_v1-x86_64.o": ["url_reference"],
 }

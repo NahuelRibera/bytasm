@@ -14,6 +14,7 @@ describe("Projects and project pages", () => {
       "POST /api/v1/projects": () => json(project, 201),
       [`GET /api/v1/projects/${PROJECT_ID}`]: () => json(project),
       [`GET /api/v1/projects/${PROJECT_ID}/samples`]: () => json([]),
+      [`GET /api/v1/projects/${PROJECT_ID}/activity?offset=0&limit=25`]: () => json({ items: [], next_offset: null }),
     });
     renderWithClient(<App />);
     expect(await screen.findByText(/No projects yet/)).toBeTruthy();

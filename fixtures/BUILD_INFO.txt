@@ -128,3 +128,31 @@ Open items
 - The x86-64 .o still uses the host's Apple clang, which is not pinned.
 - After rebuilding with any new toolchain, regenerate MANIFEST.sha256 in the
   same change (build.sh does this) and update this file.
+
+
+v0.3 comparison fixture (2026-10-29)
+------------------------------------
+
+bin/hello_v2-x86_64.elf  16,088 bytes
+  Source: src/hello_v2.c, self-authored for Bytasm. Preserves v1's URL
+  string and adds getenv("BYTASM_DEMO") plus the literal
+  "bytasm fixture v2: environment lookup". Never executed.
+  SHA-256: 689c997a3b2d6f3af9c54902d97860f277bde5a5b3322460b33ede78a4c4ef00
+  Toolchain: cached bytasm-fixture-toolchain:trixie-20261020
+  Image ID: sha256:47c1639029d85b693515686d2daeae9dcad22124ebd6a575e3724446ddb4173e
+  Same pinned GCC 14.2.0-19, binutils 2.44 and glibc 2.41 cross-toolchain
+  documented above. No image rebuild or download.
+  Exact compile command inside the container, working directory /src:
+    x86_64-linux-gnu-gcc -O0 -ffile-prefix-map=/src=. -o /out/hello_v2-x86_64.elf hello_v2.c
+  Docker client: 29.8.1. Both invocations used the exact command below,
+  with OUTPUT set in turn to /tmp/bytasm-v2-build-a and /tmp/bytasm-v2-build-b:
+    docker run --rm --network none --pull never -u 501:20 \
+      -e SOURCE_DATE_EPOCH=1761436800 \
+      -v "$PWD/fixtures/src:/src:ro" -v OUTPUT:/out -w /src \
+      bytasm-fixture-toolchain:trixie-20261020 \
+      x86_64-linux-gnu-gcc -O0 -ffile-prefix-map=/src=. \
+      -o /out/hello_v2-x86_64.elf hello_v2.c
+  Reproducibility: two independent container compiles into separate empty
+  output directories produced exactly equal bytes and the SHA-256 above.
+  Only this new binary was copied to fixtures/bin, with mode 0644.
+  All eight pre-existing manifest entries and binary bytes were preserved.

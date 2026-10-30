@@ -14,6 +14,7 @@ import {
   hex,
 } from "../components";
 import { Link } from "../router";
+import { AnnotationsSection } from "./AnnotationsSection";
 
 const TABS = ["Sections", "Imports", "Exports", "Strings"] as const;
 type Tab = (typeof TABS)[number];
@@ -70,6 +71,8 @@ export function VersionPage({
       </div>
       <ProvenancePanel v={v} />
       {analysis?.(v)}
+      <p><Link to={`/projects/${v.project_id}/compare/${v.sample_id}`}>Compare versions</Link></p>
+      <AnnotationsSection key={versionId} versionId={versionId} />
 
       {v.warnings.length > 0 && (
         <section className="notice notice-warn" aria-labelledby="warnings">

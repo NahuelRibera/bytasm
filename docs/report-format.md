@@ -1,6 +1,9 @@
-# Bytasm JSON report, schema version 2
+# Bytasm JSON report, schema version 3
 
-One report describes one imported sample version. Version 2 (v0.2) keeps every version-1 field unchanged and adds one top-level field, `pattern_analysis`; a reader of version 1 that ignores unknown fields still reads the rest. Schema: [`schemas/report.schema.json`](../schemas/report.schema.json) (JSON Schema 2020-12, generated from `backend/src/bytasm/reports/model.py` by `make schemas`).
+One report describes a sample version or a comparison of two versions of the
+same sample. Version 3 adds `scope`, analyst `annotations` and optional
+`comparison`. The primary version retains the metadata/pattern fields below.
+Version 2 (v0.2) keeps every version-1 field unchanged and adds one top-level field, `pattern_analysis`; a reader of version 1 that ignores unknown fields still reads the rest. Schema: [`schemas/report.schema.json`](../schemas/report.schema.json) (JSON Schema 2020-12, generated from `backend/src/bytasm/reports/model.py` by `make schemas`).
 
 ## Reproducibility
 
@@ -14,7 +17,7 @@ One report describes one imported sample version. Version 2 (v0.2) keeps every v
 
 | Field | Content |
 |---|---|
-| `report_kind`, `schema_version` | `bytasm.sample_version_report`, `1` |
+| `report_kind`, `schema_version` | `bytasm.sample_version_report`, `3` |
 | `generated_at` | UTC timestamp of this export (the only varying field) |
 | `generator` | `bytasm`, its version, `source_revision` (`git describe`, `-dirty` if uncommitted), `image_id` (null when run natively) |
 | `sample` | Project and sample names, version label, `sha256`, `size_bytes`, `format` (from the bytes), `declared_filename` (marked `untrusted_as_uploaded`), `blob_sha256_verified_at_export: true` |
@@ -26,7 +29,7 @@ One report describes one imported sample version. Version 2 (v0.2) keeps every v
 | `metadata.imports`, `exports`, `warnings` | As reported by the adapter |
 | `pattern_analysis` | The newest analysis run of this version whose status is `succeeded` or `partial` (blueprint J8), or `null` if there is none. Failed and cancelled runs are never reported. See below. |
 | `labels` | What each kind of value means (declared vs measured, untrusted text, pattern analysis) |
-| `limitations` | Static only, not executed; header values unverified; entropy is not a verdict; no verdict or score; self-authored inputs only; the parser process is not a sandbox; pattern matches are observations; strings appear as counts only |
+| `limitations` | Static only, not executed; header values unverified; entropy is not a verdict; no verdict or score; self-authored inputs only; the parser process is not a sandbox; pattern matches are observations; single-version exports contain string counts only, while comparison exports warn that changed string values and analyst text may be included |
 
 ## `pattern_analysis` (version 2)
 
@@ -40,3 +43,26 @@ One report describes one imported sample version. Version 2 (v0.2) keeps every v
 | `notices` | What a match means and does not mean |
 
 There is no verdict, risk score, severity, or "malicious/safe" field, and adding one would break the schema.
+
+## Version 3 additions
+
+An ordinary export has `scope: {kind: "sample_version", version_ids: [id]}`,
+`annotations` containing current analyst revisions and `comparison: null`.
+Use `POST /sample-versions/{b}/reports?compare_with={a}` for a same-sample
+comparison: scope names both versions, annotations cover both, and comparison
+contains the full changed-key result. Repeated occurrence displays are capped
+at 20 with explicit totals; comparison equality uses the full stored groups.
+
+Annotation snapshots contain author, kind, text, confidence, revision and
+validated finding/evidence citation references. They are separate from tool
+findings. Prior revisions remain in application history. Comparison exports
+may include changed extracted strings; single-version exports keep counts only.
+Both sample blobs, selected outputs, rule snapshots and citation source outputs
+are verified before export. Missing or incompatible analyses remain explicit.
+
+The former published schema is preserved at
+[`schemas/report-v2.schema.json`](../schemas/report-v2.schema.json). Existing
+stored reports keep their bytes and download URLs. Consumers must check
+`schema_version` before requiring the new fields. New exports use schema 3;
+there is no automatic rewrite of older reports. See the
+[v0.3 milestone](milestones/v0.3-compare-annotate.md) for contracts and limits.

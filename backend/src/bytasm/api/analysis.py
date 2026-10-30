@@ -370,6 +370,8 @@ def _create_run(ctx: AppContext, version_id: str) -> str:
             datetime.now(UTC),
         )
         session.add(run)
+        session.flush()
+        runs.record_activity(session, run.id, "queued")
         session.commit()
         return run.id
     except BaseException:
