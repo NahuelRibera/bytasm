@@ -1,6 +1,7 @@
 """Real parser structural declarations and separately checked measurements."""
 
-from conftest import ELF_X86_64, ELF_X86_64_OBJECT, PE_X86_64_EXE
+import pytest
+from conftest import ELF_X86_64, ELF_X86_64_OBJECT, FIXTURES_DIR, PE_X86_64_EXE
 from generated_inputs import minimal_pe64
 
 from bytasm.adapters.metadata_lief import extract_metadata
@@ -91,7 +92,9 @@ def test_bounded_version_strings_are_untrusted_declarations() -> None:
     from bytasm.adapters.structure_lief import extract_structure
 
     table = NS(key="040904b0", entries=[NS(key="ProductName", value="Authored fixture")])
-    node = NS(id=16, is_data=True, childs=[])
+    leaf = NS(id=1033, has_name=False, is_data=True, childs=[])
+    entry = NS(id=1, has_name=False, is_data=False, childs=[leaf])
+    node = NS(id=16, has_name=False, is_data=False, childs=[entry])
     binary = NS(
         optional_header=NS(dll_characteristics_lists=[]),
         has_signatures=False,
@@ -111,6 +114,7 @@ def test_bounded_version_strings_are_untrusted_declarations() -> None:
         {"table": "040904b0", "key": "ProductName", "value": "Authored fixture"}
     ]
     assert structure["declarations"]["version_resource_present"] is True
+    assert structure["declarations"]["resource_data_paths"] == ["16/1/1033"]
     assert "untrusted" in structure["explanations"]["version_resource_present"]
     table.entries = [NS(key="ProductName", value="x" * 5000)] * 129
     structure = extract_structure(binary, b"", "PE")
@@ -118,3 +122,38 @@ def test_bounded_version_strings_are_untrusted_declarations() -> None:
     assert len(structure["version_strings"][0]["value"]) == 4096
     assert set(structure["truncated"]) == {"version_strings", "version_string_length"}
     StructureResult.model_validate(structure)
+
+
+@pytest.mark.parametrize(
+    "fixture,paths,versions",
+    [
+        (
+            "pe_version_resource-x86_64.exe",
+            ["10/2/1033", "16/1/1033"],
+            [
+                ("CompanyName", "Bytasm fixture authors"),
+                ("FileDescription", "Bytasm static fixture, never executed"),
+                ("FileVersion", "0.9.0.1"),
+                ("ProductName", "Bytasm fixture"),
+                ("ProductVersion", "0.9.0"),
+            ],
+        ),
+        ("pe_resource_noversion-x86_64.exe", ["10/2/1033"], []),
+    ],
+)
+def test_compiled_pe_resources_with_real_lief(
+    fixture: str, paths: list[str], versions: list[tuple[str, str]]
+) -> None:
+    """Real LIEF over committed, never-executed, self-authored compiled bytes."""
+    structure = extract_metadata((FIXTURES_DIR / "bin" / fixture).read_bytes(), "PE")["structure"]
+    StructureResult.model_validate(structure)
+    declarations = structure["declarations"]
+    assert declarations["resource_data_paths"] == paths
+    assert declarations["version_resource_present"] is bool(versions)
+    assert declarations["signature_present"] is False
+    assert declarations["signature_validation"] == "not_performed"
+    assert [(v["table"], v["key"], v["value"]) for v in structure["version_strings"]] == [
+        ("040904b0", key, value) for key, value in versions
+    ]
+    assert structure["truncated"] == []
+    assert structure["provenance"] == "lief_static_declarations"

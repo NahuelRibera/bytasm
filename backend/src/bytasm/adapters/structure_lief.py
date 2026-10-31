@@ -61,22 +61,29 @@ def extract_structure(binary: Any, data: bytes, file_format: str) -> dict[str, A
         declarations["debug_types"] = [
             item.type.name for item in bounded(binary.debug, "debug_types")
         ]
+        # A data leaf's own id is its language; keep the exact directory path
+        # (type/id/language) instead. Named entries are labelled, not decoded.
         resources = []
-        pending = [(binary.resources, 0)] if binary.has_resources else []
+        pending: list[tuple[Any, int, tuple[str, ...]]] = (
+            [(binary.resources, 0, ())] if binary.has_resources else []
+        )
         visited = 0
         while pending and visited < LIMIT:
-            node, depth = pending.pop()
+            node, depth, path = pending.pop()
             visited += 1
             if node.is_data:
-                resources.append(node.id)
+                resources.append("/".join(path))
             if depth < 8:
                 children = bounded(node.childs, "resource_children")
-                pending.extend((child, depth + 1) for child in reversed(children))
+                pending.extend(
+                    (child, depth + 1, (*path, "named" if child.has_name else str(child.id)))
+                    for child in reversed(children)
+                )
             elif not node.is_data:
                 truncated.append("resource_depth")
         if pending:
             truncated.append("resource_nodes")
-        declarations["resource_data_ids"] = resources
+        declarations["resource_data_paths"] = resources
         declarations["version_resource_present"] = bool(
             binary.has_resources and any(node.id == 16 for node in binary.resources.childs)
         )
@@ -156,8 +163,9 @@ FIELD_EXPLANATIONS = {
     "tls_present": "PE TLS directory presence; callbacks are not executed.",
     "tls_callbacks": "Declared callback virtual addresses, not RVAs or file offsets; maximum 128.",
     "debug_types": "Declared PE debug-entry types; debug payloads and paths are not read.",
-    "resource_data_ids": (
-        "Data-leaf resource IDs from a bounded tree walk; not globally unique names."
+    "resource_data_paths": (
+        "Data-leaf directory paths (type/id/language) from a bounded tree walk; "
+        "named entries are labelled 'named'. Payloads are not read."
     ),
     "version_resource_present": (
         "RT_VERSION resource declaration; string values remain untrusted claims."

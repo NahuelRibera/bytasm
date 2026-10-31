@@ -31,6 +31,15 @@ from bytasm.runner.supervisor import run_child, yara_adapter_command
 
 EXPECTED_MATCHES = {
     "capa_environment-x86_64.exe": ["pe_dos_stub_message", "pe_kernel32_import_name"],
+    "capa_control_reference-x86_64.exe": ["pe_dos_stub_message", "pe_kernel32_import_name"],
+    "capa_control_unrelated-x86_64.exe": ["pe_dos_stub_message", "pe_kernel32_import_name"],
+    "capa_create_process-x86_64.exe": ["pe_dos_stub_message", "pe_kernel32_import_name"],
+    "capa_http_request-x86_64.exe": ["pe_dos_stub_message", "pe_kernel32_import_name"],
+    "capa_load_library-x86_64.exe": ["pe_dos_stub_message", "pe_kernel32_import_name"],
+    "capa_read_configuration-x86_64.exe": ["pe_dos_stub_message", "pe_kernel32_import_name"],
+    "capa_read_file-x86_64.exe": ["pe_dos_stub_message", "pe_kernel32_import_name"],
+    "pe_resource_noversion-x86_64.exe": ["pe_dos_stub_message", "pe_kernel32_import_name"],
+    "pe_version_resource-x86_64.exe": ["pe_dos_stub_message", "pe_kernel32_import_name"],
     "entropy_blob-aarch64.elf": ["elf_dynamic_loader_path"],
     "exports_v1-x86_64.dll": ["pe_dos_stub_message", "pe_kernel32_import_name"],
     "hello_v1-aarch64-stripped.elf": ["elf_dynamic_loader_path", "url_reference"],

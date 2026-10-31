@@ -305,3 +305,95 @@ def test_downgrade_refuses_to_discard_capa_citations(tmp_path: Path) -> None:
                 connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
                 == "0009"
             )
+
+
+AUTHORED_POSITIVES = (
+    ("capa_create_process-x86_64.exe", "create process via Windows API", "create-process.yml"),
+    ("capa_http_request-x86_64.exe", "send HTTP request via Windows API", "send-http-request.yml"),
+    ("capa_read_file-x86_64.exe", "read file via Windows API", "read-file.yml"),
+    (
+        "capa_read_configuration-x86_64.exe",
+        "read INI configuration via Windows API",
+        "read-configuration.yml",
+    ),
+    ("capa_load_library-x86_64.exe", "load library via Windows API", "load-library.yml"),
+)
+
+
+@pytest.mark.parametrize("fixture,rule,filename", AUTHORED_POSITIVES)
+def test_authored_rule_matches_compiled_call_site(
+    tmp_path: Path, fixture: str, rule: str, filename: str
+) -> None:
+    """Actual capa over a never-executed, self-authored PE; no injected features."""
+    from conftest import FIXTURES_DIR
+
+    from bytasm import capa_rules
+
+    data = (FIXTURES_DIR / "bin" / fixture).read_bytes()
+    with api_client(make_settings(tmp_path)) as client:
+        imported = do_import(client, create_project(client), data).json()["sample_version"]
+        run = client.post(
+            f"/api/v1/sample-versions/{imported['id']}/runs", json={"profile_id": "full-static"}
+        ).json()
+        assert process(ctx_of(client)) == "succeeded"
+        steps = client.get(f"/api/v1/runs/{run['id']}").json()["steps"]
+        assert [s["status"] for s in steps] == ["succeeded"] * 3
+        findings = client.get(f"/api/v1/runs/{run['id']}/findings?tool=capa").json()["findings"]
+        assert [f["rule_id"] for f in findings] == [rule]
+        # The authored noinline helper; independently checked with objdump.
+        assert [e["virtual_address_hex"] for e in findings[0]["evidence"]] == ["0x140001450"]
+        rules = client.get(f"/api/v1/rule-sets/{findings[0]['rule_set_id']}").json()
+        assert rules["sha256"] == capa_rules.snapshot()[1]
+        raw = client.get(f"/api/v1/invocations/{steps[-1]['invocation_id']}/raw").json()
+        assert raw["meta"]["sample"]["sha256"] == imported["sha256"]
+        assert list(raw["rules"]) == [rule]
+        # The filename differs from the rule name; the exact packaged text is kept.
+        assert raw["rules"][rule]["source"] == (capa_rules.RULES_DIR / filename).read_text()
+        assert raw["rules"][rule]["matches"][0][0] == {"type": "absolute", "value": 0x140001450}
+
+
+@pytest.mark.parametrize(
+    "fixture", ["capa_control_unrelated-x86_64.exe", "capa_control_reference-x86_64.exe"]
+)
+def test_benign_controls_have_no_capa_match(tmp_path: Path, fixture: str) -> None:
+    """Unrelated calls, API names as text and stored-but-uncalled imports do not match."""
+    from conftest import FIXTURES_DIR
+
+    data = (FIXTURES_DIR / "bin" / fixture).read_bytes()
+    with api_client(make_settings(tmp_path)) as client:
+        imported = do_import(client, create_project(client), data).json()["sample_version"]
+        run = client.post(
+            f"/api/v1/sample-versions/{imported['id']}/runs", json={"profile_id": "full-static"}
+        ).json()
+        assert process(ctx_of(client)) == "succeeded"
+        steps = client.get(f"/api/v1/runs/{run['id']}").json()["steps"]
+        assert [s["status"] for s in steps] == ["succeeded"] * 3
+        assert client.get(f"/api/v1/runs/{run['id']}/findings?tool=capa").json()["findings"] == []
+        raw = client.get(f"/api/v1/invocations/{steps[-1]['invocation_id']}/raw").json()
+        assert raw["rules"] == {}
+
+
+def test_compiled_match_reaches_pinned_answer_and_private_export(tmp_path: Path) -> None:
+    from conftest import FIXTURES_DIR
+
+    data = (FIXTURES_DIR / "bin" / "capa_read_file-x86_64.exe").read_bytes()
+    with api_client(make_settings(tmp_path)) as client:
+        imported = do_import(client, create_project(client), data).json()["sample_version"]
+        client.post(
+            f"/api/v1/sample-versions/{imported['id']}/runs", json={"profile_id": "full-static"}
+        )
+        assert process(ctx_of(client)) == "succeeded"
+        review = client.post(f"/api/v1/sample-versions/{imported['id']}/reviews", json={})
+        assert review.status_code == 201, review.text
+        pinned = review.json()
+        observation = next(
+            o for o in pinned["observations"] if o["rule_id"] == "read file via Windows API"
+        )
+        files = next(a for a in pinned["answers"] if a["id"] == "files")
+        matched = [o for o in files["observations"] if o["level"] == "static_rule_match"]
+        assert [o["evidence"]["finding_id"] for o in matched] == [observation["finding_id"]]
+        exported = client.post(f"/api/v1/reviews/{pinned['id']}/export/json", json={})
+        assert exported.status_code == 200, exported.text
+        answer = next(a for a in exported.json()["answers"] if a["id"] == "files")
+        assert any(o["level"] == "static_rule_match" for o in answer["observations"])
+        assert client.get(f"/api/v1/reviews/{pinned['id']}").json() == pinned

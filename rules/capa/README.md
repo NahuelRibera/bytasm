@@ -11,5 +11,9 @@ The authored rules match function-level API features emitted by capa, not an
 import inventory or a string occurrence. They cover process creation, HTTP
 requests, file reads, INI reads, and dynamic library loading. These are ordinary
 application capabilities and never establish malicious intent or execution.
-Feature-level positive and benign negative tests verify rule semantics; they are
-not claims of compiled-fixture or real extractor coverage for all five rules.
+Feature-level positive and benign negative tests verify rule semantics. Each
+authored rule also matches one self-authored, never-executed compiled PE fixture
+through the real capa 10.0.0 `full-static` path (`fixtures/BUILD_INFO.txt`);
+two benign controls (unrelated calls; API names as text and stored but uncalled
+imports) produce no match. Rule filenames differ from rule names: results are
+verified against the exact packaged rule text, never a derived filename.

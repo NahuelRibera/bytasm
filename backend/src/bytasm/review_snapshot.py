@@ -368,8 +368,8 @@ def create_snapshot(
     unknowns = [
         "No runtime behavior, publisher authenticity or safety verdict was established.",
         "Bundled coverage: five YARA text/format rules and seven capa code rules. "
-        "Real-provider fixture verifies environment features; other new capa rules use "
-        "authored API-feature fixtures. This is not comprehensive screening.",
+        "The five authored capa rules and the environment-query rule are verified "
+        "against self-authored compiled fixtures. This is not comprehensive screening.",
     ]
     if runs_more or body.run_offset:
         unknowns.append(

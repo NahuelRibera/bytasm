@@ -49,16 +49,17 @@ def parse_result(raw: bytes, step: StepInput, snapshot: bytes) -> CapaResult | N
             or meta["sample"]["sha256"] != step.sample_sha256
         ):
             return None
-        packaged = json.loads(snapshot)
-        allowed = set(packaged.values())
+        allowed = set(json.loads(snapshot).values())
         if set(document["rules"]) != {finding.name for finding in result.findings}:
             return None
         for finding in result.findings:
             original = document["rules"][finding.name]
+            # Exact packaged rule text, tied to the name capa parsed from it. Authored
+            # filenames need not match rule names, so never derive a filename.
             if (
                 original["source"] != finding.source
                 or finding.source not in allowed
-                or packaged.get(finding.name.replace(" ", "-") + ".yml") != finding.source
+                or original["meta"].get("name") != finding.name
             ):
                 return None
             if (

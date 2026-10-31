@@ -9,6 +9,15 @@ from conftest import ALL_FIXTURES, ELF_ENTROPY, REPO_ROOT, run_cli, sha256_of
 # file name -> (format, architecture, (declared_header key, value), entry_point)
 EXPECTED = {
     "capa_environment-x86_64.exe": ("PE", "x86_64", ("pe_machine", "AMD64"), 0x1400013F0),
+    "capa_control_reference-x86_64.exe": ("PE", "x86_64", ("pe_machine", "AMD64"), 0x1400013F0),
+    "capa_control_unrelated-x86_64.exe": ("PE", "x86_64", ("pe_machine", "AMD64"), 0x1400013F0),
+    "capa_create_process-x86_64.exe": ("PE", "x86_64", ("pe_machine", "AMD64"), 0x1400013F0),
+    "capa_http_request-x86_64.exe": ("PE", "x86_64", ("pe_machine", "AMD64"), 0x1400013F0),
+    "capa_load_library-x86_64.exe": ("PE", "x86_64", ("pe_machine", "AMD64"), 0x1400013F0),
+    "capa_read_configuration-x86_64.exe": ("PE", "x86_64", ("pe_machine", "AMD64"), 0x1400013F0),
+    "capa_read_file-x86_64.exe": ("PE", "x86_64", ("pe_machine", "AMD64"), 0x1400013F0),
+    "pe_resource_noversion-x86_64.exe": ("PE", "x86_64", ("pe_machine", "AMD64"), 0x1400013F0),
+    "pe_version_resource-x86_64.exe": ("PE", "x86_64", ("pe_machine", "AMD64"), 0x1400013F0),
     "hello_v1-aarch64.elf": ("ELF", "aarch64", ("elf_file_type", "DYN"), 0x660),
     "hello_v1-aarch64-stripped.elf": ("ELF", "aarch64", ("elf_file_type", "DYN"), 0x660),
     "entropy_blob-aarch64.elf": ("ELF", "aarch64", ("elf_file_type", "DYN"), 0x660),

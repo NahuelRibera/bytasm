@@ -49,6 +49,15 @@ HOSTILE_NAME = '<script>alert("bytasm")</script>'
 # file name -> (format, architecture)
 EXPECTED = {
     "capa_environment-x86_64.exe": ("PE", "x86_64"),
+    "capa_control_reference-x86_64.exe": ("PE", "x86_64"),
+    "capa_control_unrelated-x86_64.exe": ("PE", "x86_64"),
+    "capa_create_process-x86_64.exe": ("PE", "x86_64"),
+    "capa_http_request-x86_64.exe": ("PE", "x86_64"),
+    "capa_load_library-x86_64.exe": ("PE", "x86_64"),
+    "capa_read_configuration-x86_64.exe": ("PE", "x86_64"),
+    "capa_read_file-x86_64.exe": ("PE", "x86_64"),
+    "pe_resource_noversion-x86_64.exe": ("PE", "x86_64"),
+    "pe_version_resource-x86_64.exe": ("PE", "x86_64"),
     "hello_v1-aarch64.elf": ("ELF", "aarch64"),
     "hello_v1-aarch64-stripped.elf": ("ELF", "aarch64"),
     "entropy_blob-aarch64.elf": ("ELF", "aarch64"),
@@ -619,3 +628,52 @@ def test_startup_sweep_removes_stale_temp_dirs_and_orphan_blobs(tmp_path: Path) 
         assert not stale_tmp.exists()
         assert ctx.blobs.path(kept).exists(), "a referenced blob was swept"
         assert ctx.blobs.path(fresh).exists(), "a recent file was swept"
+
+
+@pytest.mark.parametrize(
+    "fixture,company",
+    [("pe_version_resource-x86_64.exe", True), ("pe_resource_noversion-x86_64.exe", False)],
+)
+def test_compiled_version_resource_import_review_and_export(
+    tmp_path: Path, fixture: str, company: bool
+) -> None:
+    """Real LIEF over compiled bytes → verified output → pinned review → private export."""
+    from conftest import FIXTURES_DIR
+    from test_analysis import process
+
+    data = (FIXTURES_DIR / "bin" / fixture).read_bytes()
+    with api_client(make_settings(tmp_path)) as client:
+        imported = do_import(client, create_project(client), data).json()["sample_version"]
+        client.post(
+            f"/api/v1/sample-versions/{imported['id']}/runs", json={"profile_id": "full-static"}
+        )
+        assert process(ctx_of(client)) == "succeeded"
+        pinned = client.post(f"/api/v1/sample-versions/{imported['id']}/reviews", json={}).json()
+        structure = pinned["structure"]
+        assert structure["provenance"] == "lief_static_declarations"
+        declarations = structure["declarations"]
+        assert declarations["version_resource_present"] is company
+        assert declarations["signature_present"] is False
+        assert "10/2/1033" in declarations["resource_data_paths"]
+        assert ("16/1/1033" in declarations["resource_data_paths"]) is company
+        values = {v["key"]: v["value"] for v in structure["version_strings"]}
+        assert values == (
+            {
+                "CompanyName": "Bytasm fixture authors",
+                "FileDescription": "Bytasm static fixture, never executed",
+                "FileVersion": "0.9.0.1",
+                "ProductName": "Bytasm fixture",
+                "ProductVersion": "0.9.0",
+            }
+            if company
+            else {}
+        )
+        export = f"/api/v1/reviews/{pinned['id']}/export/json"
+        minimized = client.post(export, json={})
+        assert minimized.status_code == 200 and minimized.json()["structure"] is None
+        assert "Bytasm fixture authors" not in minimized.text
+        partial = client.post(export, json={"technical_details": True}).json()
+        assert partial["structure"] is None
+        included = client.post(export, json={"technical_details": True, "string_values": True})
+        assert included.json()["structure"]["declarations"] == declarations
+        assert ("Bytasm fixture authors" in included.text) is company
