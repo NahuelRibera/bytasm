@@ -348,4 +348,5 @@ described in [SECURITY.md](SECURITY.md); external intake stays blocked by I1.
 The current local evidence increment adds versioned function references, structural
 metadata, pinned answers, comparison and private previews. See the
 [implementation and verification limits](docs/milestones/v0.9-evidence-increment.md),
-including pending real Ghidra verification and unchanged I1 admission restrictions.
+including the real Ghidra 12.2 and compiled-fixture verification and the unchanged
+I1 admission restrictions.
