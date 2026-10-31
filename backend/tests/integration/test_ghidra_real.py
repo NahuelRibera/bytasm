@@ -63,6 +63,40 @@ def test_real_no_sample_health_and_authorized_static_fixture(
                 (r.source.space, r.source.address) in instructions for r in function.references
             )
             assert all(r.provenance == "ghidra_instruction_reference" for r in function.references)
+            assert len(function.references) <= 64 and len(function.body_ranges) <= 64
+            for body in function.body_ranges:
+                assert body.provenance == "ghidra_function_body"
+                assert int(body.start.address, 16) <= int(body.end.address, 16)
+            if function.body_ranges and not function.external:
+                entry = int(function.entry.address, 16)
+                assert any(
+                    int(b.start.address, 16) <= entry <= int(b.end.address, 16)
+                    for b in function.body_ranges
+                )
+        references = [r for f in result.functions for r in f.references]
+        assert {"string", "data", "external_symbol"} <= {r.kind for r in references}
+        # Independent check: LIEF maps the authored literal's file offset to the
+        # program address Ghidra reports (Ghidra loads ELF PIE at 0x100000).
+        import lief
+
+        offset = data.find(b"bytasm fixture v1")
+        binary = lief.parse(data)
+        assert isinstance(binary, lief.PE.Binary | lief.ELF.Binary)
+        mapped = binary.offset_to_virtual_address(offset)
+        assert isinstance(mapped, int)
+        expected = mapped + (0 if isinstance(binary, lief.PE.Binary) else 0x100000)
+        strings = [r for r in references if r.kind == "string"]
+        assert strings and all(r.target.space == "ram" for r in strings)
+        assert {int(r.target.address, 16) for r in strings} == {expected}
+        assert all("bytasm fixture v1" in (r.preview or "") for r in strings)
+        thunks = [r for r in references if r.resolved_external_target is not None]
+        assert thunks, "Fixture must exercise exact thunk resolution"
+        for reference in thunks:
+            assert reference.kind == "external_symbol"
+            assert reference.resolved_external_provenance == "ghidra_function_thunk"
+            resolved = reference.resolved_external_target
+            assert resolved is not None and resolved.space == "EXTERNAL"
+            assert reference.target.space == "ram" and reference.target_name
         assert result.language_id == language
         assert result.function_count >= len(result.functions) > 0
         assert any(f.pseudocode_status == "available" and f.pseudocode for f in result.functions)
@@ -153,6 +187,25 @@ def test_real_import_worker_summary_function_and_export(tmp_path: Path) -> None:
             )
             assert "<script" not in rendered.text
             assert list(settings.tmp_dir.iterdir()) == []
+            # Pin the real ghidra-3 output: the exact string reference survives
+            # into the review; its value leaves only on explicit inclusion.
+            pinned = client.post(f"/api/v1/sample-versions/{version}/reviews", json={})
+            assert pinned.status_code == 201, pinned.text
+            review = pinned.json()
+            pinned_refs = [
+                r
+                for evidence in review["function_evidence"]
+                for r in evidence["references"]
+                if r["kind"] == "string" and "bytasm fixture v1" in (r["preview"] or "")
+            ]
+            assert pinned_refs and all(
+                r["provenance"] == "ghidra_instruction_reference" for r in pinned_refs
+            )
+            review_export = f"/api/v1/reviews/{review['id']}/export/json"
+            minimized = client.post(review_export, json={})
+            assert minimized.status_code == 200 and "bytasm fixture v1" not in minimized.text
+            included = client.post(review_export, json={"string_values": True})
+            assert "bytasm fixture v1" in included.text
             # Inspect a verified inventory entry outside the initial detail set.
             full = client.get(base + "/functions?limit=100").json()
             candidates = [

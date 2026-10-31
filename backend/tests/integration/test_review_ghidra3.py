@@ -62,3 +62,7 @@ def test_ghidra3_references_are_pinned_and_export_privacy_omits_values(tmp_path:
             client.post(export, json={"technical_details": False}).json()["function_evidence"] == []
         )
         assert client.get(f"/api/v1/reviews/{pinned['id']}").json() == pinned
+        # ghidra-3 keeps the selected-function report contract and its dossier.
+        analysis_export = client.get(f"/api/v1/runs/{run}/ghidra/export?format=json").json()
+        assert analysis_export["schema_version"] == "bytasm-ghidra-report-2"
+        assert analysis_export["analysis"]["schema_version"] == "ghidra-3"

@@ -428,7 +428,8 @@ def function_detail(request: Request, run_id: str, index: int) -> FunctionDetail
                     **result.functions[index].model_dump(),
                     "limitations": [
                         "Incoming and unresolved indirect references are not extracted. "
-                        "Data/external references require protocol ghidra-3.",
+                        "Data/external references require protocol ghidra-3; references "
+                        "to undefined memory, code or a data item's interior are omitted.",
                         "Body size is an address count and may cover discontiguous ranges.",
                         *(
                             [
@@ -471,7 +472,7 @@ def export(
         document = {
             "schema_version": (
                 "bytasm-ghidra-report-2"
-                if result.schema_version == "ghidra-2"
+                if result.schema_version in ("ghidra-2", "ghidra-3")
                 else "bytasm-ghidra-report-1"
             ),
             "overview": _overview(run, inv, result).model_dump(mode="json"),

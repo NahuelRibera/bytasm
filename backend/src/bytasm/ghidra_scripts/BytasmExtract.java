@@ -101,11 +101,13 @@ public class BytasmExtract extends HeadlessScript {
         out.endArray();
         out.name("calls_truncated").value(selected && (capped || instructions.hasNext()));
         // Exact outgoing listing references only. No name or proximity joins.
+        // Targets that are not the start of defined data or an external symbol
+        // (undefined memory, code, interior of a data item) are omitted, not emitted.
         out.name("references").beginArray();
         instructions = currentProgram.getListing().getInstructions(fn.getBody(), true);
         int refScanned = 0, refCount = 0;
         boolean refsCapped = false;
-        while (selected && instructions.hasNext() && refScanned++ < 64) {
+        while (selected && !refsCapped && instructions.hasNext() && refScanned++ < 64) {
             monitor.checkCancelled();
             Instruction ins = instructions.next();
             for (Reference reference : ins.getReferencesFrom()) {
@@ -194,7 +196,7 @@ public class BytasmExtract extends HeadlessScript {
             out.value("Pseudocode is Ghidra reconstruction, not original source code.");
             out.value("Details cover the first 16 internal functions or up to 8 explicitly selected entries; calls cover at most 64 instructions each.");
             out.value("Names and namespaces are limited to 256 characters; instruction bytes to 32 bytes.");
-            out.value("References cover at most 64 listing instructions and 64 exact targets per selected function; body ranges retain at most 64 inclusive ranges. Unresolved targets and interior data references are not inferred.");
+            out.value("References cover at most 64 listing instructions and 64 exact targets per selected function; body ranges retain at most 64 inclusive ranges. References to undefined memory, code or the interior of a data item are omitted, not reported as unresolved.");
             out.endArray(); out.endObject(); out.flush();
         } finally { decompiler.dispose(); }
     }
