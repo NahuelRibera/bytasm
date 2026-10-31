@@ -105,7 +105,7 @@ async def run_capa_step(deps: ScanDeps, step: StepInput) -> StepOutcome:
             (
                 "capa is static code analysis. Packed files, installers, wrappers "
                 "and missing library signatures can yield incomplete or misleading"
-                " observations. Only the packaged two-rule subset is evaluated."
+                " observations. Only the packaged seven-rule subset is evaluated."
             )
         ],
     }

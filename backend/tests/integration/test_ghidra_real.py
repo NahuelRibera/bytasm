@@ -54,6 +54,15 @@ def test_real_no_sample_health_and_authorized_static_fixture(
         result = outcome.result
         assert result is not None and result.input_sha256 == digest
         assert result.ghidra_version == "12.2"
+        assert result.schema_version == "ghidra-3"
+        assert any(f.body_ranges for f in result.functions if not f.external)
+        assert any(f.references for f in result.functions)
+        for function in result.functions:
+            instructions = {(i.address.space, i.address.address) for i in function.instructions}
+            assert all(
+                (r.source.space, r.source.address) in instructions for r in function.references
+            )
+            assert all(r.provenance == "ghidra_instruction_reference" for r in function.references)
         assert result.language_id == language
         assert result.function_count >= len(result.functions) > 0
         assert any(f.pseudocode_status == "available" and f.pseudocode for f in result.functions)

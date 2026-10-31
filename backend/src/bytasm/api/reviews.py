@@ -95,7 +95,9 @@ def refresh(request: Request, review_id: str) -> Snapshot | JSONResponse:
                 ctx,
                 session,
                 version,
-                CreateReview(scope=old.scope, run_id=old.exact_run_id),
+                CreateReview(
+                    scope=old.scope, run_id=old.exact_run_id, run_offset=old.source_run_offset
+                ),
                 old.id,
             )
     except (LookupError, IntegrityError, ValueError, OSError) as exc:
@@ -174,3 +176,16 @@ def byte_window(
             "coordinate": "file_offset_bytes",
         }
     )
+
+
+@router.get("/reviews/{left_id}/compare/{right_id}")
+def compare(request: Request, left_id: str, right_id: str) -> JSONResponse:
+    from bytasm.review_comparison import compare_reviews
+
+    try:
+        with _ctx(request).sessions() as session:
+            left, _ = read_snapshot(session, left_id)
+            right, _ = read_snapshot(session, right_id)
+        return JSONResponse(compare_reviews(left, right))
+    except (LookupError, IntegrityError, ValidationError) as exc:
+        return failure(request, exc)

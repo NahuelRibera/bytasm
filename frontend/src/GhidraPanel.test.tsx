@@ -130,3 +130,14 @@ it("explores exact one-hop evidence with unresolved targets and partial limits",
   expect(screen.getByText(/This view is partial/)).toBeTruthy();
   expect(screen.getByRole("link", { name: "Direct static call evidence 1" }).getAttribute("href")).toContain("#/functions/0/calls/0");
 });
+
+it("opens an exact stored function from a pinned-reference link", async () => {
+  window.history.replaceState({}, "", "/?ghidra_function=0");
+  try {
+    setup();
+    const evidence = await screen.findByRole("region", { name: "Selected function evidence" });
+    expect(await within(evidence).findByRole("heading", { name: HOSTILE })).toBeTruthy();
+  } finally {
+    window.history.replaceState({}, "", "/");
+  }
+});

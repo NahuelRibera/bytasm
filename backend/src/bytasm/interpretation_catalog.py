@@ -61,6 +61,47 @@ DETAILS = {
 }
 
 
+DETAILS.update(
+    {
+        "create process via Windows API": (
+            "Code refers to creating a process",
+            "Processes",
+            "Process creation can start a helper application.",
+            "Launchers, installers and ordinary tools start child processes.",
+            35,
+        ),
+        "send HTTP request via Windows API": (
+            "Code refers to sending an HTTP request",
+            "Network communication",
+            "An HTTP request can contact a service; no traffic was observed.",
+            "Clients, updaters and telemetry libraries commonly send HTTP requests.",
+            35,
+        ),
+        "read file via Windows API": (
+            "Code refers to reading a file",
+            "Files",
+            "File reads can supply application data or configuration.",
+            "File reads are routine in ordinary applications.",
+            25,
+        ),
+        "read INI configuration via Windows API": (
+            "Code refers to reading INI settings",
+            "Configuration and environment",
+            "INI queries can select application settings.",
+            "Desktop applications commonly read INI configuration.",
+            30,
+        ),
+        "load library via Windows API": (
+            "Code refers to loading a library",
+            "Dynamic loading",
+            "Dynamic loading can select code modules at runtime.",
+            "Plugin hosts and applications routinely load optional libraries.",
+            35,
+        ),
+    }
+)
+
+
 def rank_live_review(review: ReviewOut) -> None:
     weights: dict[str, int] = {}
     for item in review.observations:

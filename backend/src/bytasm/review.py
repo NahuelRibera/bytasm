@@ -8,6 +8,15 @@ from pydantic import BaseModel, Field
 
 YARA_SHA = "cca6936c3b56167d7d2c403171149b70b42cecfef3228a9090599b8948b3946a"
 CAPA_SHA = "c78c7ff8ad97ba7e6f2b74060e425bbcc830ea30c5fb5b2594acc9365d78d3a6"
+CAPA_CURATED_SHA = "9a7dbb7813c3e4c4bec1f991e821439ea60fa0210663aedbe5ae96242919ee62"
+INTERPRETATION_CATALOG_VERSION = "2.0.0"
+AUTHORED_CAPA = {
+    "create process via Windows API",
+    "send HTTP request via Windows API",
+    "read file via Windows API",
+    "read INI configuration via Windows API",
+    "load library via Windows API",
+}
 CATALOG = {
     "url_reference": (
         "The rule matched an HTTP or HTTPS URL prefix in the stored bytes.",
@@ -59,6 +68,35 @@ CATALOG = {
         ),
     ),
 }
+CATALOG.update(
+    {
+        "create process via Windows API": (
+            "The static rule matched a process-creation API feature in analyzed code.",
+            "Code may launch a process; ordinary launchers and installers do "
+            "this. Execution is unproven.",
+        ),
+        "send HTTP request via Windows API": (
+            "The static rule matched an HTTP-request API feature in analyzed code.",
+            "Code may send an HTTP request, as ordinary clients and updaters "
+            "do; no traffic was observed.",
+        ),
+        "read file via Windows API": (
+            "The static rule matched a file-read API feature in analyzed code.",
+            "Code may read files, as ordinary applications do; no access or "
+            "file contents were observed.",
+        ),
+        "read INI configuration via Windows API": (
+            "The static rule matched an INI-configuration query API feature in analyzed code.",
+            "Code may read configuration settings; this is normal application "
+            "behavior and is not execution.",
+        ),
+        "load library via Windows API": (
+            "The static rule matched a dynamic-library load API feature in analyzed code.",
+            "Code may load a library, as plugin hosts do; neither a loaded "
+            "module nor execution is proven.",
+        ),
+    }
+)
 GLOSSARY = {
     "Static observation": "Information read from a file without launching the executable.",
     "File offset": "A byte position measured from the beginning of the stored file.",
@@ -77,11 +115,13 @@ def safe_filename(value: str | None) -> str:
 
 def explanation(tool: str, version: str, rule: str, sha: str) -> tuple[str, str]:
     reviewed = (tool == "yara-x" and version == "1.22.1" and sha == YARA_SHA) or (
-        tool == "capa" and version == "10.0.0" and sha == CAPA_SHA
+        tool == "capa" and version == "10.0.0" and sha in {CAPA_SHA, CAPA_CURATED_SHA}
     )
     rule_belongs = (tool == "capa") == (
-        rule in {"query environment variable", "set environment variable"}
+        rule in {"query environment variable", "set environment variable"} | AUTHORED_CAPA
     )
+    if rule in AUTHORED_CAPA and sha != CAPA_CURATED_SHA:
+        reviewed = False
     if reviewed and rule_belongs and rule in CATALOG:
         return CATALOG[rule]
     return (

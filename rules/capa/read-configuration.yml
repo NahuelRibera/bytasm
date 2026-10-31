@@ -1,0 +1,14 @@
+rule:
+  meta:
+    name: read INI configuration via Windows API
+    namespace: host-interaction/configuration
+    authors:
+      - Bytasm contributors
+    scopes:
+      static: function
+      dynamic: unsupported
+    description: Static API-call feature; ordinary applications may use this API. Does not prove runtime behavior or malicious intent.
+  features:
+    - or:
+      - api: kernel32.GetPrivateProfileString
+      - api: kernel32.GetPrivateProfileInt

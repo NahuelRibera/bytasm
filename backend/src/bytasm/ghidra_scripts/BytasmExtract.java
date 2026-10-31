@@ -4,7 +4,7 @@ import ghidra.app.decompiler.DecompileOptions;
 import ghidra.app.decompiler.DecompInterface;
 import ghidra.app.decompiler.DecompileResults;
 import ghidra.framework.Application;
-import ghidra.program.model.address.Address;
+import ghidra.program.model.address.*;
 import ghidra.program.model.listing.*;
 import ghidra.program.model.symbol.*;
 import com.google.gson.stream.JsonWriter;
@@ -44,6 +44,17 @@ public class BytasmExtract extends HeadlessScript {
         out.name("namespace").value(bound(fn.getParentNamespace().getName(true), 256));
         out.name("namespace_truncated").value(fn.getParentNamespace().getName(true).length() > 256);
         out.name("body_size").value(fn.getBody().getNumAddresses());
+        out.name("body_ranges").beginArray();
+        AddressRangeIterator ranges = fn.getBody().getAddressRanges(true);
+        int rangeCount = 0;
+        while (ranges.hasNext() && rangeCount++ < 64) {
+            monitor.checkCancelled();
+            AddressRange range = ranges.next();
+            out.beginObject(); out.name("start"); address(range.getMinAddress());
+            out.name("end"); address(range.getMaxAddress());
+            out.name("provenance").value("ghidra_function_body"); out.endObject();
+        }
+        out.endArray(); out.name("body_ranges_truncated").value(ranges.hasNext());
         String code = null;
         if (selected && decompiler != null) {
             DecompileResults result = decompiler.decompileFunction(fn, 5, monitor);
@@ -89,6 +100,48 @@ public class BytasmExtract extends HeadlessScript {
         }
         out.endArray();
         out.name("calls_truncated").value(selected && (capped || instructions.hasNext()));
+        // Exact outgoing listing references only. No name or proximity joins.
+        out.name("references").beginArray();
+        instructions = currentProgram.getListing().getInstructions(fn.getBody(), true);
+        int refScanned = 0, refCount = 0;
+        boolean refsCapped = false;
+        while (selected && instructions.hasNext() && refScanned++ < 64) {
+            monitor.checkCancelled();
+            Instruction ins = instructions.next();
+            for (Reference reference : ins.getReferencesFrom()) {
+                if (refCount >= 64) { refsCapped = true; break; }
+                Address target = reference.getToAddress();
+                Data data = currentProgram.getListing().getDefinedDataAt(target);
+                Symbol symbol = currentProgram.getSymbolTable().getPrimarySymbol(target);
+                Function targetFunction = currentProgram.getFunctionManager().getFunctionAt(target);
+                Function resolved = targetFunction != null && targetFunction.isThunk()
+                    ? targetFunction.getThunkedFunction(true) : null;
+                Address resolvedExternal = resolved != null && resolved.isExternal()
+                    ? resolved.getEntryPoint() : null;
+                String kind = reference.isExternalReference() || target.isExternalAddress() || resolvedExternal != null
+                    ? "external_symbol" : data != null && data.hasStringValue()
+                    ? "string" : data != null ? "data" : null;
+                if (kind == null) continue;
+                String name = resolvedExternal != null ? resolved.getName(true) : symbol == null ? null : symbol.getName(true);
+                String preview = data == null ? null : data.getDefaultValueRepresentation();
+                out.beginObject(); out.name("source"); address(reference.getFromAddress());
+                out.name("target"); address(target);
+                out.name("kind").value(kind);
+                out.name("resolved_external_target");
+                if (resolvedExternal == null) out.nullValue(); else address(resolvedExternal);
+                out.name("resolved_external_provenance");
+                if (resolvedExternal == null) out.nullValue(); else out.value("ghidra_function_thunk");
+                out.name("reference_type").value(bound(reference.getReferenceType().toString(), 256));
+                out.name("provenance").value("ghidra_instruction_reference");
+                out.name("target_name"); if (name == null) out.nullValue(); else out.value(bound(name, 256));
+                out.name("target_name_truncated").value(name != null && name.length() > 256);
+                out.name("preview"); if (preview == null) out.nullValue(); else out.value(bound(preview, 512));
+                out.name("preview_truncated").value(preview != null && preview.length() > 512);
+                out.endObject(); refCount++;
+            }
+        }
+        out.endArray();
+        out.name("references_truncated").value(selected && (refsCapped || instructions.hasNext()));
         out.endObject();
     }
     @Override
@@ -111,7 +164,7 @@ public class BytasmExtract extends HeadlessScript {
         try (Writer file = Files.newBufferedWriter(Path.of(args[0]), StandardCharsets.UTF_8)) {
             out = new JsonWriter(file); out.setSerializeNulls(true);
             out.beginObject();
-            out.name("schema_version").value("ghidra-2");
+            out.name("schema_version").value("ghidra-3");
             out.name("input_sha256").value(args[1]);
             out.name("ghidra_version").value(Application.getApplicationVersion());
             out.name("provider_host").value(bound(System.getProperty("os.name") + " " + System.getProperty("os.arch"), 256));
@@ -141,7 +194,7 @@ public class BytasmExtract extends HeadlessScript {
             out.value("Pseudocode is Ghidra reconstruction, not original source code.");
             out.value("Details cover the first 16 internal functions or up to 8 explicitly selected entries; calls cover at most 64 instructions each.");
             out.value("Names and namespaces are limited to 256 characters; instruction bytes to 32 bytes.");
-            out.value("Imports, exports, data items and non-call references are not extracted in this profile.");
+            out.value("References cover at most 64 listing instructions and 64 exact targets per selected function; body ranges retain at most 64 inclusive ranges. Unresolved targets and interior data references are not inferred.");
             out.endArray(); out.endObject(); out.flush();
         } finally { decompiler.dispose(); }
     }

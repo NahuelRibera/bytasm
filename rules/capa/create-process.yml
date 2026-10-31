@@ -1,0 +1,14 @@
+rule:
+  meta:
+    name: create process via Windows API
+    namespace: process/create
+    authors:
+      - Bytasm contributors
+    scopes:
+      static: function
+      dynamic: unsupported
+    description: Static API-call feature; ordinary applications may use this API. Does not prove runtime behavior or malicious intent.
+  features:
+    - or:
+      - api: kernel32.CreateProcess
+      - api: kernel32.WinExec

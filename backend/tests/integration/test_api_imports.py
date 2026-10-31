@@ -272,6 +272,7 @@ def test_no_endpoint_can_change_the_input_policy(client: TestClient) -> None:
     routes = {(path, method) for path, item in spec["paths"].items() for method in item}
     assert routes == {
         # Pinned reviews and exact-function analyst overlays cannot alter admission.
+        ("/api/v1/reviews/{left_id}/compare/{right_id}", "get"),
         ("/api/v1/sample-versions/{version_id}/reviews", "get"),
         ("/api/v1/sample-versions/{version_id}/reviews", "post"),
         ("/api/v1/reviews/{review_id}", "get"),

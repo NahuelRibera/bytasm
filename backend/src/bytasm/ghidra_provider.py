@@ -35,7 +35,7 @@ LIMITS = ParserLimits(
 )
 OPTIONS: dict[str, Any] = {
     "id": "ghidra-static",
-    "version": 2,
+    "version": 3,
     "name": "Bounded Ghidra static review",
     "ghidra_version": "12.2",
     "analyzers": "Ghidra 12.2 loader defaults, single CPU, fresh project",
@@ -46,6 +46,8 @@ OPTIONS: dict[str, Any] = {
     "max_function_details": 16,
     "max_instructions_per_function": 64,
     "max_calls_per_function": 64,
+    "max_references_per_function": 64,
+    "max_body_ranges_per_function": 64,
     "max_pseudocode_characters": 4096,
     "max_decompiler_payload_mib": 1,
     "max_json_bytes": 2 * MIB,
@@ -76,7 +78,7 @@ def profile_options(selected: list[Address] | None = None) -> dict[str, Any]:
 def profile_snapshot(selected: list[Address] | None = None) -> dict[str, Any]:
     return {
         "id": OPTIONS["id"],
-        "version": 2,
+        "version": 3,
         "name": OPTIONS["name"] if selected is None else "Selected Ghidra function review",
         "steps": [
             {
@@ -177,7 +179,7 @@ def _parse(
     except ValidationError:
         return None
     if (
-        result.schema_version != "ghidra-2"
+        result.schema_version != "ghidra-3"
         or result.input_sha256 != expected_sha256
         or result.script_sha256 != script_digest()
         or result.profile_sha256 != profile_digest(selected)

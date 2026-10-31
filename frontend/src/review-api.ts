@@ -15,6 +15,11 @@ export interface PinnedObservation {
   output_sha256: string; tool: string; rule_id: string; evidence_capped: boolean;
 }
 export interface PinnedReview {
+  answers?: Array<{ id: string; title: string; observations: Array<{ level: string; observation: string; why_it_matters: string; alternative: string; evidence: Record<string, unknown>; missing: string; next_action: string }>; missing: string; next_action: string }>;
+  interpretation_version?: string;
+  structure?: Record<string, unknown> | null;
+  function_evidence?: Array<{ protocol_version?: string; entry: import("./ghidra-api").GhidraAddress; name: string; body_ranges?: import("./ghidra-api").GhidraFunction["body_ranges"]; references?: import("./ghidra-api").GhidraFunction["references"]; body_ranges_truncated?: boolean; references_truncated?: boolean; run_id: string; function_index: number; invocation_id: string; output_sha256: string; pointer: string }>;
+  source_run_offset?: number; source_runs_more?: boolean;
   id: string; created_at: string; supersedes_id: string | null;
   sample: { version_id: string; sha256: string; size_bytes: number };
   scope: "combined" | "exact_run"; exact_run_id: string | null; catalog_version: string;
@@ -38,10 +43,11 @@ async function request<T>(path: string, body?: unknown): Promise<T> {
   return response.json() as Promise<T>;
 }
 export const reviewApi = {
-  create: (versionId: string, runId?: string) => request<PinnedReview>(`sample-versions/${versionId}/reviews`,
-    runId ? { scope: "exact_run", run_id: runId } : { scope: "combined" }),
+  create: (versionId: string, runId?: string, runOffset = 0) => request<PinnedReview>(`sample-versions/${versionId}/reviews`,
+    runId ? { scope: "exact_run", run_id: runId } : { scope: "combined", run_offset: runOffset }),
+  compare: (left: string, right: string) => request<Record<string, unknown>>(`reviews/${left}/compare/${right}`),
   get: (id: string) => request<PinnedReview>(`reviews/${id}`),
   refresh: (id: string) => request<PinnedReview>(`reviews/${id}/refresh`, {}),
-  history: (versionId: string) => request<{ items: { id: string; created_at: string }[]; next_offset: number | null }>(`sample-versions/${versionId}/reviews`),
+  history: (versionId: string, offset = 0) => request<{ items: { id: string; created_at: string }[]; next_offset: number | null }>(`sample-versions/${versionId}/reviews${offset ? `?offset=${offset}` : ""}`),
   preview: (id: string, policy: PrivacyPolicy) => request<{ document: Record<string, unknown>; sha256: string; size_bytes: number }>(`reviews/${id}/export/preview`, policy),
 };

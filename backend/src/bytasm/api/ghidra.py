@@ -116,6 +116,7 @@ class FunctionPageOut(BaseModel):
 
 
 class FunctionDetailOut(BaseModel):
+    protocol_version: str
     run_id: str
     invocation_id: str
     index: int
@@ -417,6 +418,7 @@ def function_detail(request: Request, run_id: str, index: int) -> FunctionDetail
         if index >= len(result.functions):
             return _failure(request)
         return FunctionDetailOut(
+            protocol_version=result.schema_version,
             run_id=run_id,
             invocation_id=inv.id,
             index=index,
@@ -425,8 +427,8 @@ def function_detail(request: Request, run_id: str, index: int) -> FunctionDetail
                 {
                     **result.functions[index].model_dump(),
                     "limitations": [
-                        "Incoming, indirect and non-call references are "
-                        "not extracted by this profile.",
+                        "Incoming and unresolved indirect references are not extracted. "
+                        "Data/external references require protocol ghidra-3.",
                         "Body size is an address count and may cover discontiguous ranges.",
                         *(
                             [

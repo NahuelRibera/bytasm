@@ -179,10 +179,10 @@ def test_published_review_and_export_schemas_and_snapshot_integrity(tmp_path: Pa
         ]
         snapshot = client.post(f"/api/v1/sample-versions/{version['id']}/reviews", json={}).json()
         schemas = Path(__file__).resolve().parents[3] / "schemas"
-        jsonschema.validate(snapshot, json.loads((schemas / "review.schema.json").read_text()))
+        jsonschema.validate(snapshot, json.loads((schemas / "review-v2.schema.json").read_text()))
         exported = client.post(f"/api/v1/reviews/{snapshot['id']}/export/json", json={}).json()
         jsonschema.validate(
-            exported, json.loads((schemas / "review-export.schema.json").read_text())
+            exported, json.loads((schemas / "review-export-v2.schema.json").read_text())
         )
         with ctx_of(client).sessions() as session, session.begin():
             row = session.scalars(select(ReviewSnapshot)).first()

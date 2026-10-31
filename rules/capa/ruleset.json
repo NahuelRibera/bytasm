@@ -1,5 +1,5 @@
 {
-  "name": "capa-rules-bytasm-subset",
+  "name": "capa-rules-bytasm-curated",
   "version": "10.0.0",
   "upstream_commit": "805f9eaccfb6a4e1ddffc809d71d1e2b5ccc15e5",
   "source": "https://github.com/mandiant/capa-rules/tree/v10.0.0",
@@ -14,7 +14,34 @@
       "file": "set-environment-variable.yml",
       "source": "host-interaction/environment-variable/set-environment-variable.yml",
       "sha256": "6c3e693c80ce7a0f7fa205df7bfcc220540638087f6e69ba339144e94ff6aa89"
+    },
+    {
+      "file": "create-process.yml",
+      "source": "bytasm-authored/create-process.yml",
+      "sha256": "ae53613634f3e5fbccf79326bfa5decd30dad870b9b616f14c675d8221317a6c"
+    },
+    {
+      "file": "send-http-request.yml",
+      "source": "bytasm-authored/send-http-request.yml",
+      "sha256": "b91aff784ef92bbcea5a54998562a551e7260795152d876b1467f33396aa13fc"
+    },
+    {
+      "file": "read-file.yml",
+      "source": "bytasm-authored/read-file.yml",
+      "sha256": "142f000ebb28f4085c4dc928480a3800b1e02af25054efdb25335bc02ba3a626"
+    },
+    {
+      "file": "read-configuration.yml",
+      "source": "bytasm-authored/read-configuration.yml",
+      "sha256": "b55b215b731926484b49ed57e92c783ab4bf10c2b96f777f8381629f2b2731df"
+    },
+    {
+      "file": "load-library.yml",
+      "source": "bytasm-authored/load-library.yml",
+      "sha256": "3fee713684da4c4a6322815a475d6e10f38b87da0f38b1465f9566822525fe42"
     }
   ],
-  "sha256": "c78c7ff8ad97ba7e6f2b74060e425bbcc830ea30c5fb5b2594acc9365d78d3a6"
+  "sha256": "9a7dbb7813c3e4c4bec1f991e821439ea60fa0210663aedbe5ae96242919ee62",
+  "authored_subset_version": "1.0.0",
+  "authored_subset_license": "Apache-2.0"
 }

@@ -19,7 +19,7 @@ from bytasm.ghidra_protocol import GhidraResult
 
 def document() -> dict[str, Any]:
     return {
-        "schema_version": "ghidra-2",
+        "schema_version": "ghidra-3",
         "input_sha256": "a" * 64,
         "ghidra_version": "12.2",
         "language_id": "x86:LE:64:default",
@@ -347,3 +347,79 @@ def test_bridge_only_executes_fixed_tool_and_imports_sample_as_data(
         assert "BytasmExtract.java" in recorded
     else:
         assert "-import" not in recorded and "BytasmHealth.java" in recorded
+
+
+def test_v3_exact_references_and_discontiguous_body_ranges() -> None:
+    value = document()
+    fn = value["functions"][0]
+    fn["body_ranges"] = [
+        {
+            "start": {"space": "overlay", "address": "10"},
+            "end": {"space": "overlay", "address": "11"},
+        },
+        {"start": {"space": "ram", "address": "20"}, "end": {"space": "ram", "address": "21"}},
+    ]
+    fn["references"] = [
+        {
+            "source": fn["entry"],
+            "target": {"space": "EXTERNAL", "address": "1"},
+            "kind": "external_symbol",
+            "resolved_external_target": {"space": "EXTERNAL", "address": "2"},
+            "resolved_external_provenance": "ghidra_function_thunk",
+            "reference_type": "COMPUTED_CALL",
+            "provenance": "ghidra_instruction_reference",
+            "target_name": "<script>",
+        },
+        {
+            "source": fn["entry"],
+            "target": {"space": "ram", "address": "2000"},
+            "kind": "string",
+            "reference_type": "DATA",
+            "provenance": "ghidra_instruction_reference",
+            "preview": "untrusted text",
+        },
+    ]
+    result = GhidraResult.model_validate(value)
+    assert result.functions[0].references[0].target.space == "EXTERNAL"
+    assert len(result.functions[0].body_ranges) == 2
+    value["schema_version"] = "ghidra-2"
+    with pytest.raises(ValidationError, match="Legacy protocol"):
+        GhidraResult.model_validate(value)
+
+
+@pytest.mark.parametrize(
+    "damage", ["reference_cap", "range_cap", "cross_space", "provenance", "outside_window"]
+)
+def test_v3_reference_and_range_bounds(damage: str) -> None:
+    value = document()
+    fn = value["functions"][0]
+    reference = {
+        "source": fn["entry"],
+        "target": fn["entry"],
+        "kind": "data",
+        "reference_type": "READ",
+        "provenance": "ghidra_instruction_reference",
+    }
+    body_range = {"start": fn["entry"], "end": fn["entry"]}
+    if damage == "reference_cap":
+        fn["references"] = [reference] * 65
+    elif damage == "range_cap":
+        fn["body_ranges"] = [body_range] * 65
+    elif damage == "cross_space":
+        fn["body_ranges"] = [{**body_range, "end": {"space": "OTHER", "address": "1"}}]
+    elif damage == "outside_window":
+        fn["references"] = [{**reference, "source": {"space": "OTHER", "address": "00100000"}}]
+    else:
+        fn["references"] = [{**reference, "provenance": "name_similarity"}]
+    with pytest.raises(ValidationError):
+        GhidraResult.model_validate(value)
+
+
+@pytest.mark.parametrize("version", ["ghidra-1", "ghidra-2"])
+def test_historical_protocol_reader_still_accepts_original_records(version: str) -> None:
+    value = document()
+    value["schema_version"] = version
+    result = GhidraResult.model_validate(value)
+    assert result.functions[0].references == [] and result.functions[0].body_ranges == []
+    assert "references" not in result.model_dump()["functions"][0]
+    assert "body_ranges" not in result.model_dump()["functions"][0]

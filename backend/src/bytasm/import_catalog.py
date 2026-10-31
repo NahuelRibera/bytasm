@@ -1,7 +1,7 @@
 """Curated import-presence interpretations; never call paths or observed behavior.
 
 Self-authored Bytasm catalog. No upstream rule collection or third-party license
-is added. Exact LIEF 1.0.0 / metadata_lief 0.1.0 semantics only. No approximate
+is added. Exact LIEF 1.0.0 / metadata_lief 0.1.0/0.2.0 semantics only. No approximate
 name matching, demangling, resolved dependency claims or process execution.
 """
 
@@ -163,7 +163,7 @@ def classify_imports(
 ) -> list[dict[str, Any]]:
     if len(symbols) > 100_000 or any(not isinstance(s, str) or len(s) > 4096 for s in symbols):
         raise ValueError("Import inventory exceeds the metadata contract")
-    if tool_version != "1.0.0" or adapter_version != "0.1.0":
+    if tool_version != "1.0.0" or adapter_version not in {"0.1.0", "0.2.0"}:
         return []
     result = []
     for category, record in CATALOG.items():

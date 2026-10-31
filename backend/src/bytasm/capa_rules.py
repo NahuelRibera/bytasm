@@ -1,4 +1,6 @@
-"""Pinned, read-only upstream capa subset; no rule upload/configuration surface."""
+"""Pinned, read-only upstream and Bytasm-authored capa subset.
+
+No rule upload/configuration surface."""
 
 import hashlib
 import json

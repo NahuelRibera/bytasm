@@ -27,7 +27,7 @@ def test_capa_positive_full_profile_and_raw_provenance(tmp_path: Path) -> None:
         assert [f["rule_id"] for f in findings] == ["query environment variable"]
         rules = client.get(f"/api/v1/rule-sets/{findings[0]['rule_set_id']}")
         assert rules.status_code == 200
-        assert rules.json()["tool"] == "capa" and rules.json()["rule_count"] == 2
+        assert rules.json()["tool"] == "capa" and rules.json()["rule_count"] == 7
         assert rules.json()["installed_tool_version"] == "10.0.0"
         assert [key for key, _ in findings[0]["metadata"]] == ["source", "ATT&CK", "MBC"]
         assert findings[0]["evidence"][0]["virtual_address"] is not None

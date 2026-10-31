@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING, Any
 
 from bytasm.adapters.entropy import METHOD as ENTROPY_METHOD
 from bytasm.adapters.entropy import shannon_entropy
+from bytasm.adapters.structure_lief import extract_structure
 from bytasm.errors import PARSE_FAILED, InspectError
 from bytasm.intake.identify import Format, identify_format
 from bytasm.runner import child
@@ -32,7 +33,7 @@ if TYPE_CHECKING:
     import lief
 
 ADAPTER_NAME = "metadata_lief"
-ADAPTER_VERSION = "0.1.0"
+ADAPTER_VERSION = "0.2.0"
 
 # LIEF's architecture names, mapped to the lowercase names Bytasm reports.
 _ARCHITECTURES = {
@@ -68,6 +69,7 @@ def extract_metadata(data: bytes, expected_format: Format) -> dict[str, Any]:
     else:
         raise InspectError(PARSE_FAILED, f"LIEF could not parse the file as {expected_format}.")
 
+    metadata["structure"] = extract_structure(binary, data, expected_format)
     warnings: list[str] = []
     for section in metadata["sections"]:
         _add_entropy(section, data, warnings)

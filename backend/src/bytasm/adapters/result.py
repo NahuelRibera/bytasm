@@ -8,7 +8,7 @@ invalid, and nothing from it is used.
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StrictStr
 
 RESULT_SCHEMA_VERSION = 1
 
@@ -43,7 +43,31 @@ class ImportsResult(_Strict):
     functions: Annotated[list[Name], Field(max_length=_MAX_ITEMS)]
 
 
+StructureScalar = Name | StrictInt | StrictBool | None
+
+
+class VersionStringResult(_Strict):
+    table: Annotated[StrictStr, Field(max_length=256)]
+    key: Annotated[StrictStr, Field(max_length=256)]
+    value: Name
+
+
+class StructureResult(_Strict):
+    schema_version: Literal[1]
+    provenance: Literal["lief_static_declarations"]
+    declarations: Annotated[
+        dict[Name, StructureScalar | Annotated[list[StructureScalar], Field(max_length=128)]],
+        Field(max_length=32),
+    ]
+    measurements: Annotated[dict[Name, StructureScalar], Field(max_length=16)]
+    version_strings: Annotated[list[VersionStringResult], Field(max_length=128)] = []
+    explanations: Annotated[dict[Name, Name], Field(max_length=32)] = {}
+    truncated: Annotated[list[Name], Field(max_length=32)]
+    limitations: Name
+
+
 class MetadataResult(_Strict):
+    structure: StructureResult | None = None
     format: Literal["ELF", "PE"]
     architecture: Annotated[StrictStr, Field(max_length=64)]
     bitness: Literal[32, 64]

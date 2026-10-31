@@ -939,3 +939,7 @@ details.card > summary {
 .pinned-review .button,
 .byte-viewer .button,
 .function-review .button { white-space: normal; }
+.review-human-preview { overflow-wrap: anywhere; }
+.review-human-preview dd { margin-inline-start: 1rem; }
+.review-human-preview dl > div { margin-block: .75rem; }
+.pinned-review nav, .function-review nav { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
