@@ -93,3 +93,106 @@ def test_u64_round_trips_full_unsigned_range(value: int) -> None:
 def test_u64_refuses_out_of_range() -> None:
     with pytest.raises(ValueError):
         U64().process_bind_param(2**64, None)  # type: ignore[arg-type]
+
+
+def test_verified_output_crosses_scratch_filesystem_atomically(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import errno
+    import os
+
+    from bytasm.storage import ContentStore
+
+    store = ContentStore(tmp_path / "outputs")
+    scratch = tmp_path / "tmpfs"
+    scratch.mkdir()
+    data = b"bounded validated tool document"
+    digest = hashlib.sha256(data).hexdigest()
+    replace = os.replace
+    attempts = []
+
+    def cross_device(source: object, target: object) -> None:
+        source_path = Path(str(source))
+        attempts.append(source_path)
+        if source_path.parent == scratch:
+            raise OSError(errno.EXDEV, "Cross-device rename")
+        assert source_path.parent == store.path(digest).parent
+        assert source_path.stat().st_mode & 0o777 == 0o400
+        replace(source_path, Path(str(target)))
+
+    monkeypatch.setattr(os, "replace", cross_device)
+    assert store.put_bytes(data, digest, scratch)
+    assert len(attempts) == 2
+    assert store.read_verified(digest) == data
+    assert not list(scratch.iterdir())
+    assert not list(store.path(digest).parent.glob("*.part"))
+    assert not store.put_bytes(data, digest, scratch)
+
+
+def test_cross_device_failure_cleans_staging_without_replacing_old_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import errno
+    import os
+
+    store = ContentStore(tmp_path / "outputs")
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+    data = b"verified replacement"
+    digest = _sha(data)
+    target = store.path(digest)
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"old corrupt bytes")
+
+    def refuse(source: object, destination: object) -> None:
+        code = errno.EXDEV if Path(str(source)).parent == scratch else errno.ENOSPC
+        raise OSError(code, "Bounded test transfer failure")
+
+    monkeypatch.setattr(os, "replace", refuse)
+    with pytest.raises(OSError):
+        store.put_bytes(data, digest, scratch)
+    assert target.read_bytes() == b"old corrupt bytes"
+    assert not list(scratch.iterdir())
+    assert list(target.parent.iterdir()) == [target]
+
+
+def test_stale_destination_staging_cleanup_keeps_fresh_and_unrelated_files(tmp_path: Path) -> None:
+    import os
+    import time
+
+    store = ContentStore(tmp_path / "outputs")
+    directory = store.path("a" * 64).parent
+    directory.mkdir(parents=True)
+    old = directory / ("." + "a" * 64 + ".abcdefgh.part")
+    fresh = directory / ("." + "a" * 64 + ".12345678.part")
+    unrelated = directory / "analyst-notes.part"
+    for file in (old, fresh, unrelated):
+        file.write_bytes(b"private validated output")
+    for file in (old, unrelated):
+        os.utime(file, (time.time() - 7200,) * 2)
+    link = directory / ("." + "b" * 64 + ".abcdefgh.part")
+    link.symlink_to(unrelated)
+    assert store.remove_stale_staging(3600) == 1
+    assert not old.exists()
+    assert fresh.is_file() and unrelated.is_file() and link.is_symlink()
+
+
+def test_staging_cleanup_tolerates_a_concurrent_publisher(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = ContentStore(tmp_path / "outputs")
+    directory = store.path("a" * 64).parent
+    directory.mkdir(parents=True)
+    stage = directory / ("." + "a" * 64 + ".abcdefgh.part")
+    stage.write_bytes(b"verified bytes")
+    lstat = Path.lstat
+
+    def published(path: Path, *, follow_symlinks: bool = False) -> object:
+        if path == stage:
+            stage.unlink()
+            raise FileNotFoundError
+        return lstat(path)
+
+    monkeypatch.setattr(Path, "lstat", published)
+    assert store.remove_stale_staging(3600) == 0
+    assert not stage.exists()

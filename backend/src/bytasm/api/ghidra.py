@@ -7,13 +7,16 @@ import stat
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy.orm import Session
 
 from bytasm.api.context import AppContext
 from bytasm.api.problems import problem
 from bytasm.db.models import AnalysisRun, ToolInvocation
+from bytasm.function_inventory import InventoryQuery, page_inventory
+from bytasm.function_relationships import Relationships, relationships
 from bytasm.ghidra_protocol import Address, Function, GhidraResult
 from bytasm.jobs import summary
 from bytasm.reports.ghidra import canonical_json, html_export
@@ -21,6 +24,7 @@ from bytasm.storage import IntegrityError
 
 router = APIRouter()
 MAX_DOCUMENT_BYTES = 2 * 1024 * 1024
+MAX_EXPORT_BYTES = 16 * 1024 * 1024
 
 
 class ClaimOut(BaseModel):
@@ -68,6 +72,14 @@ class GhidraOverviewOut(BaseModel):
     function_count: int | None
     stored_functions: int
     functions_truncated: bool
+    selected_entries: list[Address] | None
+    source_output_sha256: str | None
+    source_run_id: str | None
+    detailed_functions: int
+    failed_details: int
+    retained_instructions: int
+    retained_calls: int
+    inventory_state: Literal["unavailable", "empty", "complete", "capped", "partial"]
 
 
 class FunctionItemOut(BaseModel):
@@ -96,6 +108,11 @@ class FunctionPageOut(BaseModel):
     offset: int
     limit: int
     items: list[FunctionItemOut]
+    next_cursor: str | None
+    identified: int
+    inventory_complete: bool
+    functions_truncated: bool
+    scope_sha256: str
 
 
 class FunctionDetailOut(BaseModel):
@@ -259,6 +276,28 @@ def _overview(
         function_count=result.function_count if result else None,
         stored_functions=len(result.functions) if result else 0,
         functions_truncated=result.functions_truncated if result else False,
+        selected_entries=inv.args.get("options", {}).get("selected_entries") if inv else None,
+        source_output_sha256=run.profile_snapshot.get("source_output_sha256"),
+        source_run_id=run.profile_snapshot.get("source_run_id"),
+        detailed_functions=sum(f.pseudocode_status == "available" for f in result.functions)
+        if result
+        else 0,
+        failed_details=sum(f.pseudocode_status == "failed" for f in result.functions)
+        if result
+        else 0,
+        retained_instructions=sum(len(f.instructions) for f in result.functions) if result else 0,
+        retained_calls=sum(len(f.calls) for f in result.functions) if result else 0,
+        inventory_state=(
+            "unavailable"
+            if result is None
+            else "partial"
+            if result.analysis_timed_out
+            else "capped"
+            if result.functions_truncated
+            else "empty"
+            if not result.functions
+            else "complete"
+        ),
     )
 
 
@@ -282,7 +321,13 @@ def functions(
     request: Request,
     run_id: str,
     q: Annotated[str, Query(max_length=128)] = "",
-    offset: Annotated[int, Query(ge=0, le=256)] = 0,
+    offset: Annotated[int, Query(ge=0, le=1024)] = 0,
+    cursor: Annotated[str | None, Query(max_length=256)] = None,
+    field: Literal["all", "name", "namespace", "address"] = "all",
+    exact: bool = False,
+    external: bool | None = None,
+    pseudocode: Literal["available", "not_selected", "failed"] | None = None,
+    has_calls: bool | None = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> FunctionPageOut | JSONResponse:
     ctx = _ctx(request)
@@ -295,15 +340,50 @@ def functions(
             result = _read(ctx, run, inv)
         except IntegrityError:
             return _failure(request, "integrity_error")
-        selected = [
-            (i, f) for i, f in enumerate(result.functions) if q.casefold() in f.name.casefold()
-        ]
-        return FunctionPageOut(
+        scope = hashlib.sha256(
+            json.dumps(
+                [
+                    run.sample_version.sample.project_id,
+                    run.sample_version_id,
+                    run.sample_version.sha256,
+                    run.id,
+                    inv.id,
+                    inv.raw_output_sha256,
+                    result.ghidra_version,
+                    result.profile_sha256,
+                    result.script_sha256,
+                ]
+            ).encode()
+        ).hexdigest()
+        try:
+            page = page_inventory(
+                result,
+                scope,
+                InventoryQuery(
+                    q=q,
+                    field=field,
+                    exact=exact,
+                    external=external,
+                    pseudocode=pseudocode,
+                    has_calls=has_calls,
+                ),
+                offset,
+                limit,
+                cursor,
+            )
+        except ValueError:
+            return _failure(request, "invalid_request")
+        response = FunctionPageOut(
             run_id=run_id,
-            matched=len(selected),
+            matched=page.matched,
             total=len(result.functions),
-            offset=offset,
+            offset=page.offset,
             limit=limit,
+            next_cursor=page.next_cursor,
+            identified=result.function_count,
+            inventory_complete=not result.functions_truncated and not result.analysis_timed_out,
+            functions_truncated=result.functions_truncated,
+            scope_sha256=scope,
             items=[
                 FunctionItemOut.model_validate(
                     {
@@ -311,14 +391,18 @@ def functions(
                         **f.model_dump(exclude={"pseudocode", "instructions", "calls"}),
                     }
                 )
-                for i, f in selected[offset : offset + limit]
+                for i, f in page.items
             ],
         )
+        # Hard serialized-byte budget independent of Unicode expansion.
+        if len(response.model_dump_json().encode()) > 512 * 1024:
+            return _failure(request, "invalid_request")
+        return response
 
 
 @router.get("/runs/{run_id}/ghidra/functions/{index}", response_model=FunctionDetailOut)
 def function_detail(request: Request, run_id: str, index: int) -> FunctionDetailOut | JSONResponse:
-    if not 0 <= index < 256:
+    if not 0 <= index < 1024:
         return _failure(request)
     ctx = _ctx(request)
     with ctx.sessions() as session:
@@ -337,7 +421,32 @@ def function_detail(request: Request, run_id: str, index: int) -> FunctionDetail
             invocation_id=inv.id,
             index=index,
             citation=f"/api/v1/invocations/{inv.id}/raw#/functions/{index}",
-            function=FunctionDetailRecord.model_validate(result.functions[index].model_dump()),
+            function=FunctionDetailRecord.model_validate(
+                {
+                    **result.functions[index].model_dump(),
+                    "limitations": [
+                        "Incoming, indirect and non-call references are "
+                        "not extracted by this profile.",
+                        "Body size is an address count and may cover discontiguous ranges.",
+                        *(
+                            [
+                                "Instructions and calls were not collected "
+                                "for this inventory-only function."
+                            ]
+                            if result.functions[index].pseudocode_status == "not_selected"
+                            else []
+                        ),
+                        *(
+                            [
+                                "External function pseudocode may be unavailable; "
+                                "no implementation body is inferred."
+                            ]
+                            if result.functions[index].external
+                            else []
+                        ),
+                    ],
+                }
+            ),
         )
 
 
@@ -358,12 +467,18 @@ def export(
         except IntegrityError:
             return _failure(request, "integrity_error")
         document = {
-            "schema_version": "bytasm-ghidra-report-1",
+            "schema_version": (
+                "bytasm-ghidra-report-2"
+                if result.schema_version == "ghidra-2"
+                else "bytasm-ghidra-report-1"
+            ),
             "overview": _overview(run, inv, result).model_dump(mode="json"),
             "analysis": result.model_dump(mode="json"),
         }
     canonical = canonical_json(document)
     content = canonical if format == "json" else html_export(json.loads(canonical))
+    if len(content) > MAX_EXPORT_BYTES:
+        return _failure(request, "report_too_large")
     return Response(
         content,
         media_type="application/json" if format == "json" else "text/html",
@@ -376,3 +491,61 @@ def export(
             "X-Content-Type-Options": "nosniff",
         },
     )
+
+
+class SelectionIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    indices: Annotated[
+        list[Annotated[int, Field(strict=True, ge=0, le=1023)]], Field(min_length=1, max_length=8)
+    ]
+
+
+class SelectionOut(BaseModel):
+    run_id: str
+    source_run_id: str
+    reused: bool
+
+
+@router.post("/runs/{run_id}/ghidra/inspections", response_model=SelectionOut, status_code=202)
+async def inspect_functions(
+    request: Request, run_id: str, body: SelectionIn
+) -> SelectionOut | JSONResponse:
+    from bytasm.function_selection import SelectionRefused, queue_selection
+    from bytasm.ghidra_health import effective_diagnostic
+
+    ctx = _ctx(request)
+    # Refuse missing/wrong-profile sources before probing operational state.
+    with ctx.sessions() as session:
+        if _run(session, run_id) is None:
+            return _failure(request)
+    diagnostic = await effective_diagnostic(ctx.settings)
+    if not diagnostic.available or not diagnostic.analysis_enabled:
+        return _failure(request, "provider_unavailable")
+    try:
+        target, reused = await run_in_threadpool(queue_selection, ctx, run_id, body.indices)
+    except SelectionRefused as exc:
+        return _failure(request, exc.code)
+    return SelectionOut(run_id=target, source_run_id=run_id, reused=reused)
+
+
+@router.get("/runs/{run_id}/ghidra/functions/{index}/relationships", response_model=Relationships)
+def function_relationships(
+    request: Request,
+    run_id: str,
+    index: int,
+    node_limit: Annotated[int, Query(ge=2, le=33)] = 33,
+    edge_limit: Annotated[int, Query(ge=1, le=64)] = 32,
+) -> Relationships | JSONResponse:
+    ctx = _ctx(request)
+    with ctx.sessions() as session:
+        run = _run(session, run_id)
+        inv = _invocation(run) if run else None
+        if run is None or inv is None or inv.status != "succeeded":
+            return _failure(request)
+        try:
+            result = _read(ctx, run, inv)
+            return relationships(result, run_id, inv.id, index, node_limit, edge_limit)
+        except IntegrityError:
+            return _failure(request, "integrity_error")
+        except ValueError:
+            return _failure(request)

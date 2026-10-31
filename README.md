@@ -261,10 +261,30 @@ admitted fixtures on a configured offline Linux worker. Doctor runs a harmless
 Headless/native self-test; configuration metadata alone never means available.
 The run page shows a plain-language summary, searchable function inventory,
 pseudocode, instructions, exact static-call relationships and separate JSON/HTML
-exports. Details cover the first 16 functions; inventory is capped at 256.
+exports. Initial details cover the first 16 internal functions; inventory is
+capped at 1024. Explicit selected sets can request additional bounded dossiers.
 
 Nothing is installed or bundled automatically. Native macOS/Windows analysis
 and arbitrary-file admission remain unavailable. Follow the
 [setup and status guide](docs/ghidra-setup.md), optional Compose example and
-[current milestone](docs/milestones/v0.5-ghidra-static-review.md) for precise
+[current milestone](docs/milestones/v0.6-function-workbench.md) for precise
 limits, verified platforms, deferred scope and residual parser risks.
+
+
+### Function workbench increment (v0.6, under review)
+
+Ghidra review now retains up to 1024 inventory entries with bounded identity
+search, stored facets and exact-run pagination. Select up to eight verified
+entries to request a new bounded detail run; matching active/completed requests
+reuse their job. Search and stored-evidence browsing never launch Ghidra.
+Explore one hop of retained direct static calls with evidence links and a
+keyboard-usable table. The overview distinguishes retained details, failed
+reconstruction, inventory caps and unknown output. Selected reports retain source
+run provenance. No behavior verdict or whole-program coverage is inferred.
+
+Existing fixture/self_built admission, baseline comparisons, annotations and
+historical report schemas remain intact. Function bookmarks/notes, Ghidra version
+matching, complete xrefs and arbitrary-file intake remain deferred. See the
+[current milestone](docs/milestones/v0.6-function-workbench.md) for exact scope,
+verification, known risks and follow-up, and the [API](docs/api-v0.5-ghidra.md) for
+selection/cursor semantics.

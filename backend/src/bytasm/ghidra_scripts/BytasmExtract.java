@@ -8,12 +8,19 @@ import ghidra.program.model.address.Address;
 import ghidra.program.model.listing.*;
 import ghidra.program.model.symbol.*;
 import com.google.gson.stream.JsonWriter;
+import com.google.gson.*;
+import java.util.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 
 public class BytasmExtract extends HeadlessScript {
     private JsonWriter out;
+    private Set<String> selected = new HashSet<>();
+    private boolean selected(Function fn, int index) {
+        return selected.isEmpty() ? index < 16 && !fn.isExternal() : selected.contains(
+            fn.getEntryPoint().getAddressSpace().getName() + ":" + fn.getEntryPoint().toString(false));
+    }
     private String bound(String value, int cap) {
         return value.length() > cap ? value.substring(0, cap) : value;
     }
@@ -87,9 +94,15 @@ public class BytasmExtract extends HeadlessScript {
     @Override
     public void run() throws Exception {
         String[] args = getScriptArgs();
-        if (args.length != 4 || currentProgram == null) throw new IllegalArgumentException("Invalid extraction context");
+        if (args.length != 5 || currentProgram == null) throw new IllegalArgumentException("Invalid extraction context");
         if (!Application.getApplicationVersion().equals("12.2")) throw new IllegalStateException("Unsupported Ghidra");
         if (!currentProgram.getExecutableSHA256().equals(args[1])) throw new IllegalStateException("Input identity mismatch");
+        JsonArray entries = JsonParser.parseString(Files.readString(Path.of(args[4]))).getAsJsonArray();
+        if (entries.size() > 8) throw new IllegalArgumentException("Selection exceeds bounds");
+        for (JsonElement element : entries) {
+            JsonObject entry = element.getAsJsonObject();
+            selected.add(entry.get("space").getAsString() + ":" + entry.get("address").getAsString());
+        }
         DecompInterface decompiler = new DecompInterface();
         DecompileOptions options = new DecompileOptions();
         options.setMaxPayloadMBytes(1);
@@ -98,7 +111,7 @@ public class BytasmExtract extends HeadlessScript {
         try (Writer file = Files.newBufferedWriter(Path.of(args[0]), StandardCharsets.UTF_8)) {
             out = new JsonWriter(file); out.setSerializeNulls(true);
             out.beginObject();
-            out.name("schema_version").value("ghidra-1");
+            out.name("schema_version").value("ghidra-2");
             out.name("input_sha256").value(args[1]);
             out.name("ghidra_version").value(Application.getApplicationVersion());
             out.name("provider_host").value(bound(System.getProperty("os.name") + " " + System.getProperty("os.arch"), 256));
@@ -109,14 +122,16 @@ public class BytasmExtract extends HeadlessScript {
             int total = manager.getFunctionCount();
             FunctionIterator functions = manager.getFunctions(true);
             out.name("functions").beginArray(); int count = 0;
-            while (functions.hasNext() && count < 256) {
-                monitor.checkCancelled(); function(functions.next(), opened ? decompiler : null, count < 16); count++;
+            while (functions.hasNext() && count < 1024) {
+                monitor.checkCancelled(); Function fn = functions.next();
+                function(fn, opened ? decompiler : null, selected(fn, count)); count++;
             }
             // getFunctionCount includes external functions. Include their exact
             // identities after internal functions so the denominator matches.
             functions = manager.getExternalFunctions();
-            while (functions.hasNext() && count < 256) {
-                monitor.checkCancelled(); function(functions.next(), null, false); count++;
+            while (functions.hasNext() && count < 1024) {
+                monitor.checkCancelled(); Function fn = functions.next();
+                function(fn, null, selected(fn, count)); count++;
             }
             out.endArray(); out.name("function_count").value(total);
             out.name("functions_truncated").value(total > count);
@@ -124,7 +139,7 @@ public class BytasmExtract extends HeadlessScript {
             out.name("limitations").beginArray();
             out.value("Static analysis does not establish runtime behavior or intent.");
             out.value("Pseudocode is Ghidra reconstruction, not original source code.");
-            out.value("Details cover the first 16 functions; direct calls cover at most 64 instructions per selected function.");
+            out.value("Details cover the first 16 internal functions or up to 8 explicitly selected entries; calls cover at most 64 instructions each.");
             out.value("Names and namespaces are limited to 256 characters; instruction bytes to 32 bytes.");
             out.value("Imports, exports, data items and non-call references are not extracted in this profile.");
             out.endArray(); out.endObject(); out.flush();

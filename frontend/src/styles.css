@@ -884,4 +884,9 @@ details.card > summary {
   .ghidra-workspace .actions { align-items: stretch; }
   .ghidra-workspace .actions > .button { white-space: normal; }
 }
-.ghidra-workspace button { position: relative; }
+.ghidra-workspace :is(button, a) { position: relative; }
+
+/* Deliberate selected-job action stays distinct from stored-evidence browsing. */
+.function-selection { border-block: 1px solid var(--border); padding-block: 1rem; margin-block: 1rem; }
+.function-selection p { max-width: 75ch; }
+.ghidra-workspace input[type="checkbox"] { width: 1.25rem; height: 1.25rem; }

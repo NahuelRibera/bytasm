@@ -50,11 +50,31 @@ class Function(Record):
     def consistent_pseudocode(self) -> "Function":
         if (self.pseudocode is not None) != (self.pseudocode_status == "available"):
             raise ValueError("Pseudocode availability mismatch")
+        if self.pseudocode_status == "not_selected" and (
+            self.instructions
+            or self.calls
+            or self.pseudocode_truncated
+            or self.instructions_truncated
+            or self.calls_truncated
+        ):
+            raise ValueError("Inventory-only function contains unexpected details")
         return self
 
 
 class GhidraResult(Record):
-    schema_version: Literal["ghidra-1"]
+    model_config = ConfigDict(
+        extra="forbid",
+        strict=True,
+        json_schema_extra={
+            "allOf": [
+                {
+                    "if": {"properties": {"schema_version": {"const": "ghidra-1"}}},
+                    "then": {"properties": {"functions": {"maxItems": 256}}},
+                }
+            ],
+        },
+    )
+    schema_version: Literal["ghidra-1", "ghidra-2"]
     input_sha256: Digest
     ghidra_version: Literal["12.2"]
     language_id: Text
@@ -62,7 +82,7 @@ class GhidraResult(Record):
     provider_host: Text = "unavailable"
     profile_sha256: Digest
     script_sha256: Digest
-    functions: Annotated[list[Function], Field(max_length=256)]
+    functions: Annotated[list[Function], Field(max_length=1024)]
     function_count: Annotated[int, Field(ge=0)]
     functions_truncated: bool
     analysis_timed_out: bool
@@ -70,6 +90,8 @@ class GhidraResult(Record):
 
     @model_validator(mode="after")
     def consistent_inventory(self) -> "GhidraResult":
+        if self.schema_version == "ghidra-1" and len(self.functions) > 256:
+            raise ValueError("Legacy inventory exceeds bounds")
         if self.function_count < len(self.functions):
             raise ValueError("Invalid function count")
         if self.functions_truncated != (self.function_count > len(self.functions)):

@@ -55,6 +55,7 @@ EXPECTED = {
     "hello_v1-x86_64.o": ("ELF", "x86_64"),
     "hello_v1-x86_64.elf": ("ELF", "x86_64"),
     "hello_v2-x86_64.elf": ("ELF", "x86_64"),
+    "inventory_many-x86_64.elf": ("ELF", "x86_64"),
     "hello_v1-x86_64-stripped.elf": ("ELF", "x86_64"),
     "hello_v1-x86_64.exe": ("PE", "x86_64"),
     "exports_v1-x86_64.dll": ("PE", "x86_64"),
@@ -308,6 +309,8 @@ def test_no_endpoint_can_change_the_input_policy(client: TestClient) -> None:
         ("/api/v1/runs/{run_id}/ghidra/functions", "get"),
         ("/api/v1/runs/{run_id}/ghidra/functions/{index}", "get"),
         ("/api/v1/runs/{run_id}/ghidra/export", "get"),
+        ("/api/v1/runs/{run_id}/ghidra/inspections", "post"),
+        ("/api/v1/runs/{run_id}/ghidra/functions/{index}/relationships", "get"),
         # v0.2: read-only views of stored results.
         ("/api/v1/sample-versions/{version_id}/strings", "get"),
         ("/api/v1/invocations/{invocation_id}/raw", "get"),

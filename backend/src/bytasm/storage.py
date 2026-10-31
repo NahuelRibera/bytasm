@@ -6,8 +6,12 @@ served over HTTP; files leave it only through API endpoints that re-verify
 the hash first.
 """
 
+import errno
 import hashlib
 import os
+import re
+import stat
+import tempfile
 import time
 from collections.abc import Iterator
 from pathlib import Path
@@ -63,16 +67,38 @@ class ContentStore:
         return True
 
     def put_bytes(self, data: bytes, sha256: str, scratch_dir: Path) -> bool:
-        """Store `data` via a temp file in `scratch_dir` (same filesystem)."""
+        """Store verified bytes atomically, including a separate tmpfs scratch store."""
         if hashlib.sha256(data).hexdigest() != sha256:
             raise IntegrityError("data does not match the given SHA-256")
         if self.contains_valid(sha256):
             return False
         temp = scratch_dir / f".{sha256}.part"
         fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(fd, "wb") as handle:
-            handle.write(data)
-        return self.place(temp, sha256)
+        staged: Path | None = None
+        try:
+            with os.fdopen(fd, "wb") as handle:
+                handle.write(data)
+            try:
+                return self.place(temp, sha256)
+            except OSError as exc:
+                if exc.errno != errno.EXDEV:
+                    raise
+            # A worker's bounded tmpfs can differ from its persistent store.
+            # Transfer only these already hash-verified bytes, then rename on
+            # the destination filesystem. Never expose a partially copied final
+            # content-addressed file or copy a parser-controlled directory.
+            target = self.path(sha256)
+            fd, name = tempfile.mkstemp(prefix=f".{sha256}.", suffix=".part", dir=target.parent)
+            staged = Path(name)
+            with os.fdopen(fd, "wb") as handle:
+                handle.write(data)
+                handle.flush()
+                os.fsync(handle.fileno())
+            return self.place(staged, sha256)
+        finally:
+            temp.unlink(missing_ok=True)
+            if staged is not None:
+                staged.unlink(missing_ok=True)
 
     def read_verified(self, sha256: str) -> bytes:
         """Return the stored bytes, or raise IntegrityError if they changed."""
@@ -110,3 +136,26 @@ class ContentStore:
         for path in base.glob("*/*/*"):
             if path.is_file() and len(path.name) == 64 and set(path.name) <= _HEX:
                 yield path.name, now - path.stat().st_mtime
+
+    def remove_stale_staging(self, max_age: float) -> int:
+        """Recover only old regular transfer files owned by put_bytes's naming contract."""
+        base = self.root / "sha256"
+        if not base.is_dir() or base.is_symlink():
+            return 0
+        now = time.time()
+        removed = 0
+        for path in base.glob("*/*/.*.part"):
+            if (
+                re.fullmatch(r"\.[0-9a-f]{64}\.[a-z0-9_]{8}\.part", path.name) is None
+                or path.parent.is_symlink()
+                or path.parent.parent.is_symlink()
+            ):
+                continue
+            try:
+                info = path.lstat()
+            except FileNotFoundError:
+                continue
+            if stat.S_ISREG(info.st_mode) and now - info.st_mtime > max_age:
+                path.unlink(missing_ok=True)
+                removed += 1
+        return removed

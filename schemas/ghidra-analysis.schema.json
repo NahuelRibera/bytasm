@@ -187,9 +187,30 @@
     }
   },
   "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "schema_version": {
+            "const": "ghidra-1"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "functions": {
+            "maxItems": 256
+          }
+        }
+      }
+    }
+  ],
   "properties": {
     "schema_version": {
-      "const": "ghidra-1",
+      "enum": [
+        "ghidra-1",
+        "ghidra-2"
+      ],
       "title": "Schema Version",
       "type": "string"
     },
@@ -233,7 +254,7 @@
       "items": {
         "$ref": "#/$defs/Function"
       },
-      "maxItems": 256,
+      "maxItems": 1024,
       "title": "Functions",
       "type": "array"
     },

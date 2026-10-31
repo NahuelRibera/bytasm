@@ -115,3 +115,18 @@ The pinned ida-settings3.5.2 source pyproject and installed metadata were
 rechecked; they still do not establish a library license. The existing
 redistribution blocker is unchanged. No package/image distribution clearance is
 claimed and no upstream communication was sent.
+
+## v0.6 function workbench
+
+No runtime or frontend dependency, third-party script, rule or tool distribution
+is added. inventory_many.c and its static ELF fixture are self-authored for
+Bytasm; BUILD_INFO.txt records the existing pinned cross-toolchain and two-build
+reproducibility. Earlier fixtures remain unchanged. The Java extraction changes
+are self-authored against the same caller-installed Ghidra 12.2 API.
+
+Temporary verification reuses the exact Ghidra and Temurin archive digests above.
+The Linux ARM64 native decompiler is compiled from that verified archive's
+included source outside the repository; it is not bundled in an application
+image or repository. Component-specific licensing and the unresolved ida-settings
+distribution blocker remain unchanged. Neither a vulnerability audit nor local
+tool verification resolves license or redistribution permission.

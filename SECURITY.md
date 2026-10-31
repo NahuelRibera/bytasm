@@ -199,3 +199,37 @@ and container teardown are backstops, not a complete sandbox. API import isolati
 and writable-volume separation still block arbitrary-file admission. Exported
 Ghidra reports can disclose names, addresses and pseudocode; review before sharing.
 See ADR-0005 and the current milestone for verification and unrun checks.
+
+
+## Selected-function workbench
+
+Explicit selected-detail requests accept only one to eight unique indices into a
+hash-verified source inventory. The API derives exact address-space pairs; the
+worker pins the selection in its options digest and checks the returned detail
+set. Selection files are private fixed-path JSON, never scripts or shell text.
+Each request reuses existing admission/hash checks and an offline, bounded fresh
+Headless project. Search/graph reads use stored records only. Repeated exact
+requests share an active/completed run; this is evidence reuse, not permission
+to bypass admission. Failed/cancelled requests do not become cached successes.
+
+Inventory retention is at most 1024 entries. Pages and one-hop relationship
+expansion enforce server bounds and preserve source evidence indices. Cursors
+are identity-bound checksums, not access-control tokens. The application remains
+local and single-user without project authentication. Names, pseudocode, paths
+and exports stay sensitive; the UI warns before export. Function review notes,
+collections and Ghidra matching are not implemented by this increment.
+
+The I1 decision and residual parser/shared-volume/same-kernel risks above remain.
+Larger inventory and explicit retries can consume additional local resources;
+they retain the 180-second/2-MiB-output job bounds and one active run per version.
+No Ghidra/JDK is bundled, no analyzed file is executed, and no new network path
+for sample-derived content is introduced.
+
+Validated output can cross from bounded worker tmpfs to persistent content-addressed
+storage through a private destination staging file and atomic rename. Only bytes
+already checked against their SHA-256 are transferred; parser projects/directories
+are not persisted. Normal/failure cleanup removes staging, and age-based startup
+recovery removes only old regular files matching the reserved staging pattern.
+Disk or permission failure does not expose a partial final content-addressed file.
+This handles filesystem transfer reliability, not arbitrary-input isolation or
+proven power-loss durability.

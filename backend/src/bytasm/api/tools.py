@@ -45,7 +45,8 @@ async def tools(request: Request) -> ToolsOut:
                 "name": "Ghidra function review",
                 "steps": ["ghidra"],
                 "limitations": (
-                    "Bounded function inventory and first 16 function details. "
+                    "Up to 1024 inventory entries and first 16 function details; "
+                    "explicit sets of up to 8 can be inspected in a new bounded run. "
                     "Static evidence, not runtime behavior. Requires the configured offline worker."
                 ),
             }

@@ -54,7 +54,7 @@ it("uses bounded server pagination and describes empty filters without implying 
   await user.click(await screen.findByRole("button", { name: "Next functions" }));
   expect(await screen.findByText("global::last_function")).toBeTruthy();
   expect(screen.getByRole("button", { name: "Next functions" })).toHaveProperty("disabled", true);
-  await user.type(screen.getByLabelText("Function name"), "absent");
+  await user.type(screen.getByLabelText("Function name, namespace or address"), "absent");
   await user.click(screen.getByRole("button", { name: "Search functions" }));
   expect(await screen.findByText(/No stored function matches this search/)).toBeTruthy();
   expect(calls.some(call => call.url.endsWith("?q=absent&offset=0&limit=25"))).toBe(true);
@@ -94,4 +94,39 @@ it("keeps an unverified Ghidra profile out of the selection", async () => {
   renderWithClient(<AnalysisPanel version={version()} />);
   await screen.findByText("No analysis runs yet for this version.");
   expect(screen.queryByRole("option", { name: "Ghidra static review" })).toBeNull();
+});
+
+it("requests an explicit selected set through the typed API and links to its queued run", async () => {
+  const user = userEvent.setup();
+  const calls = installFetch({
+    [`GET ${base}`]: () => json(overview),
+    [`GET ${base}/functions?offset=0&limit=25`]: () => json({ run_id: RUN_ID, matched: 1, total: 1, offset: 0, limit: 25, items: [{ ...detail.function, index: 0 }] }),
+    [`POST ${base}/inspections`]: () => json({ run_id: "selected-run", source_run_id: RUN_ID, reused: false }, 202),
+  });
+  renderWithClient(<GhidraPanel run={run({ profile_id: "ghidra-static" })} />);
+  const request = await screen.findByRole("button", { name: "Request details (0/8 selected)" });
+  expect(request).toHaveProperty("disabled", true);
+  await user.click(await screen.findByRole("checkbox", { name: `Select ${HOSTILE} at ram:00401000` }));
+  await user.click(screen.getByRole("button", { name: "Request details (1/8 selected)" }));
+  expect((await screen.findByRole("link", { name: "Open selected-function run" })).getAttribute("href")).toBe("/runs/selected-run");
+  const post = calls.find(call => call.init?.method === "POST");
+  expect(JSON.parse(String(post?.init?.body))).toEqual({ indices: [0] });
+  expect((post?.init?.headers as Record<string, string>)["X-Bytasm-Request"]).toBe("1");
+  expect(screen.getByText(/Before exporting or sharing/)).toBeTruthy();
+});
+
+it("explores exact one-hop evidence with unresolved targets and partial limits", async () => {
+  const user = userEvent.setup();
+  installFetch({
+    [`GET ${base}`]: () => json(overview),
+    [`GET ${base}/functions?offset=0&limit=25`]: () => json({ run_id: RUN_ID, matched: 1, total: 1, offset: 0, limit: 25, items: [{ ...detail.function, index: 0 }] }),
+    [`GET ${base}/functions/0`]: () => json(detail),
+    [`GET ${base}/functions/0/relationships`]: () => json({ run_id: RUN_ID, center_index: 0, node_limit: 33, edge_limit: 32, retained_matches: 1, truncated: false, inventory_complete: false, limitations: ["Retained calls only."], edges: [{ source_index: 0, target_index: null, call_site: address, target: { space: "external", address: "00000001" }, reference_type: "direct_static_call", citation: "/api/v1/invocations/inv/raw#/functions/0/calls/0" }] }),
+  });
+  renderWithClient(<GhidraPanel run={run({ profile_id: "ghidra-static" })} />);
+  await user.click(await screen.findByRole("button", { name: `Inspect ${HOSTILE}` }));
+  await user.click(await screen.findByRole("button", { name: "Explore one-hop relationships" }));
+  expect(await screen.findByText("No exact inventory entry; unresolved here")).toBeTruthy();
+  expect(screen.getByText(/This view is partial/)).toBeTruthy();
+  expect(screen.getByRole("link", { name: "Direct static call evidence 1" }).getAttribute("href")).toContain("#/functions/0/calls/0");
 });

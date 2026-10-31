@@ -184,3 +184,17 @@ bin/capa_environment-x86_64.exe  14,336 bytes; mode 0644
   "query environment variable" at function virtual address 0x140001450.
   This demonstrates a static API feature matched by that rule, not execution
   of the environment query, a general behavior detector, or a safety verdict.
+
+v0.6 inventory fixture (2026-10-30)
+---------------------------------
+
+bin/inventory_many-x86_64.elf is compiled from self-authored inventory_many.c.
+Four hundred named noinline/used functions exercise inventory beyond 256 records
+and explicit selection beyond the initial detail window. It is never executed.
+SHA-256: 0148454cba98bda8f1ec99f334cf16c8d570618f669ac4114b1ef22c03454852
+Pinned image: bytasm-fixture-toolchain:trixie-20261020, already documented above.
+Compiler: x86_64-linux-gnu-gcc 14.2.0-19cross1, -O0 -ffile-prefix-map=/src=.
+SOURCE_DATE_EPOCH=1761436800; source mounted read-only; --network none --pull never.
+Two separate compilations into backend/.pytest_cache/v06/fixture-a and fixture-b
+produced identical bytes; committed mode is 0644. Earlier fixture bytes/hashes
+were not changed. fixtures/build/build.sh includes the same compile command.

@@ -15,6 +15,7 @@ EXPECTED = {
     "hello_v1-x86_64.o": ("ELF", "x86_64", ("elf_file_type", "REL"), None),
     "hello_v1-x86_64.elf": ("ELF", "x86_64", ("elf_file_type", "DYN"), 0x1050),
     "hello_v2-x86_64.elf": ("ELF", "x86_64", ("elf_file_type", "DYN"), 0x1060),
+    "inventory_many-x86_64.elf": ("ELF", "x86_64", ("elf_file_type", "DYN"), 0x1040),
     "hello_v1-x86_64-stripped.elf": ("ELF", "x86_64", ("elf_file_type", "DYN"), 0x1050),
     "hello_v1-x86_64.exe": ("PE", "x86_64", ("pe_machine", "AMD64"), 0x1_4000_13F0),
     "exports_v1-x86_64.dll": ("PE", "x86_64", ("pe_machine", "AMD64"), 0x1_E01E_1330),

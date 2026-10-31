@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from bytasm.ghidra_protocol import Address
 from bytasm.ghidra_provider import analyze, profile_snapshot
 from bytasm.jobs.steps import ScanDeps, StepInput, StepOutcome
 
@@ -38,7 +39,26 @@ def supported(data: bytes) -> bool:
 
 
 async def run_ghidra_step(deps: ScanDeps, step: StepInput) -> StepOutcome:
-    current = profile_snapshot()
+    selection = step.step.get("options", {}).get("selected_entries")
+    try:
+        selected = [Address.model_validate(a) for a in selection] if selection is not None else None
+        current = profile_snapshot(selected)
+    except (ValueError, TypeError):
+        return StepOutcome(
+            "failed",
+            "profile_integrity",
+            {
+                "tool_name": "ghidra",
+                "tool_version": "12.2",
+                "adapter_name": "ghidra_headless",
+                "adapter_version": "1",
+                "args": {},
+                "exit_code": None,
+                "duration_ms": 0,
+                "warnings": [],
+                "rule_set_id": None,
+            },
+        )
     expected = current["steps"][0]
     fields: dict[str, Any] = {
         "tool_name": "ghidra",
@@ -62,7 +82,12 @@ async def run_ghidra_step(deps: ScanDeps, step: StepInput) -> StepOutcome:
         return StepOutcome("failed", "profile_integrity", fields)
     if not supported(step.data):
         return StepOutcome("unsupported", "unsupported_format", fields)
-    outcome = await analyze(deps.ghidra, step.workdir, step.sample_sha256, step.should_stop)
+    if selected is None:
+        outcome = await analyze(deps.ghidra, step.workdir, step.sample_sha256, step.should_stop)
+    else:
+        outcome = await analyze(
+            deps.ghidra, step.workdir, step.sample_sha256, step.should_stop, selected
+        )
     fields.update(exit_code=outcome.exit_code, duration_ms=outcome.duration_ms)
     if outcome.status != "succeeded" or outcome.result is None:
         status: str = outcome.status if outcome.status in ("cancelled", "timed_out") else "failed"

@@ -23,26 +23,38 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 FIXTURE_SHA256 = "23bd6f9ee9dc6691bb6f4f7d0ab28a60f84ba4eb4e38b2ed8e88f0cc9bba4c80"
 
 
-def test_real_no_sample_health_and_authorized_static_fixture(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "fixture_name,language",
+    [
+        ("hello_v1-x86_64.elf", "x86:LE:64:default"),
+        ("hello_v1-aarch64.elf", "AARCH64:LE:64:v8A"),
+        ("hello_v1-x86_64.exe", "x86:LE:64:default"),
+    ],
+)
+def test_real_no_sample_health_and_authorized_static_fixture(
+    tmp_path: Path,
+    fixture_name: str,
+    language: str,
+) -> None:
     config = GhidraConfiguration.from_env()
     assert isolation_status() is None, "Run inside the documented offline Linux worker"
     health = asyncio.run(provider_health(config, tmp_path))
     assert health["health_check"] == "passed" and health["analysis_enabled"], health
     assert not list(tmp_path.iterdir()), "Self-check project/preferences must be removed"
-    data = (REPO_ROOT / "fixtures/bin/hello_v1-x86_64.elf").read_bytes()
-    assert hashlib.sha256(data).hexdigest() == FIXTURE_SHA256
+    data = (REPO_ROOT / "fixtures/bin" / fixture_name).read_bytes()
+    digest = hashlib.sha256(data).hexdigest()
     manifest = (REPO_ROOT / "fixtures/MANIFEST.sha256").read_text()
-    assert f"{FIXTURE_SHA256}  bin/hello_v1-x86_64.elf" in manifest
+    assert f"{digest}  bin/{fixture_name}" in manifest
     work = workspace.create_workdir(tmp_path)
     try:
         sample = workspace.write_input(work, data)
         assert sample.stat().st_mode & 0o111 == 0
-        outcome = asyncio.run(analyze(config, work, FIXTURE_SHA256, lambda: False))
+        outcome = asyncio.run(analyze(config, work, digest, lambda: False))
         assert outcome.status == "succeeded", outcome.reason
         result = outcome.result
-        assert result is not None and result.input_sha256 == FIXTURE_SHA256
+        assert result is not None and result.input_sha256 == digest
         assert result.ghidra_version == "12.2"
-        assert result.language_id == "x86:LE:64:default"
+        assert result.language_id == language
         assert result.function_count >= len(result.functions) > 0
         assert any(f.pseudocode_status == "available" and f.pseudocode for f in result.functions)
         assert any(f.instructions for f in result.functions)
@@ -132,6 +144,54 @@ def test_real_import_worker_summary_function_and_export(tmp_path: Path) -> None:
             )
             assert "<script" not in rendered.text
             assert list(settings.tmp_dir.iterdir()) == []
+            # Inspect a verified inventory entry outside the initial detail set.
+            full = client.get(base + "/functions?limit=100").json()
+            candidates = [
+                item
+                for item in full["items"]
+                if item["pseudocode_status"] == "not_selected" and not item["external"]
+            ]
+            assert candidates, "The fixture must exercise on-demand internal detail"
+            index = candidates[-1]["index"]
+            selected = client.post(base + "/inspections", json={"indices": [0, index]})
+            assert selected.status_code == 202
+            selected_id = selected.json()["run_id"]
+            assert selected_id != run_id and not selected.json()["reused"]
+            duplicate = client.post(base + "/inspections", json={"indices": [0, index]})
+            assert duplicate.json()["run_id"] == selected_id and duplicate.json()["reused"]
+            deadline = time.monotonic() + 200
+            while True:
+                selected_run = client.get(f"/api/v1/runs/{selected_id}").json()
+                if selected_run["status"] not in ("queued", "running"):
+                    break
+                assert worker.poll() is None and time.monotonic() < deadline
+                time.sleep(0.2)
+            assert selected_run["status"] == "succeeded", selected_run["status"]
+            selected_base = f"/api/v1/runs/{selected_id}/ghidra"
+            selected_detail = client.get(selected_base + f"/functions/{index}").json()
+            assert selected_detail["function"]["entry"] == candidates[-1]["entry"]
+            assert selected_detail["function"]["pseudocode_status"] == "available"
+            # Ghidra can reconstruct a function without retaining any listing
+            # instructions. Verify the other selected, populated function too.
+            populated = client.get(selected_base + "/functions/0").json()["function"]
+            assert populated["pseudocode_status"] == "available" and populated["instructions"]
+            selected_overview = client.get(selected_base).json()
+            assert selected_overview["source_run_id"] == run_id
+            assert selected_overview["detailed_functions"] == 2
+            assert {tuple(entry.values()) for entry in selected_overview["selected_entries"]} == {
+                tuple(detail["function"]["entry"].values()),
+                tuple(candidates[-1]["entry"].values()),
+            }
+            graph = client.get(selected_base + f"/functions/{index}/relationships").json()
+            assert graph["center_index"] == index and len(graph["edges"]) <= 32
+            export = client.get(selected_base + "/export?format=json")
+            assert export.json()["schema_version"] == "bytasm-ghidra-report-2"
+            assert export.json()["overview"] == selected_overview
+            assert (
+                client.get(base + f"/functions/{index}").json()["function"]["pseudocode_status"]
+                == "not_selected"
+            )
+            assert list(settings.tmp_dir.iterdir()) == []
         finally:
             worker.terminate()
             try:
@@ -177,4 +237,40 @@ def test_real_headless_deadline_cancellation_and_cleanup(
         assert time.monotonic() - started < 10
     finally:
         assert cleanup_workdir(work)
+    assert not list(tmp_path.iterdir())
+
+
+def test_real_inventory_beyond_256_and_selected_dossier(tmp_path: Path) -> None:
+    """A never-executed authored fixture verifies the expanded retention window."""
+    config = GhidraConfiguration.from_env()
+    assert isolation_status() is None
+    data = (REPO_ROOT / "fixtures/bin/inventory_many-x86_64.elf").read_bytes()
+    digest = hashlib.sha256(data).hexdigest()
+    assert digest == "0148454cba98bda8f1ec99f334cf16c8d570618f669ac4114b1ef22c03454852"
+    work = workspace.create_workdir(tmp_path)
+    try:
+        workspace.write_input(work, data)
+        baseline = asyncio.run(analyze(config, work, digest, lambda: False))
+        assert baseline.status == "succeeded", baseline.reason
+        result = baseline.result
+        assert result is not None and 400 < len(result.functions) <= 1024
+        assert not result.functions_truncated
+        index, fn = next(
+            (i, f) for i, f in enumerate(result.functions) if f.name == "inventory_39_9"
+        )
+        assert index > 256 and fn.pseudocode_status == "not_selected"
+    finally:
+        workspace.remove_workdir(work)
+    work = workspace.create_workdir(tmp_path)
+    try:
+        workspace.write_input(work, data)
+        selected = asyncio.run(analyze(config, work, digest, lambda: False, [fn.entry]))
+        assert selected.status == "succeeded", selected.reason
+        assert selected.result is not None
+        detailed = [f for f in selected.result.functions if f.pseudocode_status != "not_selected"]
+        assert len(detailed) == 1
+        assert detailed[0].entry == fn.entry and detailed[0].name == "inventory_39_9"
+        assert detailed[0].pseudocode_status == "available" and detailed[0].instructions
+    finally:
+        workspace.remove_workdir(work)
     assert not list(tmp_path.iterdir())
