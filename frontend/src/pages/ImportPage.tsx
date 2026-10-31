@@ -1,12 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { ApiError, api, type Health, type ImportMetadata } from "../api";
-import { ErrorPanel, Loading } from "../components";
+import { ErrorPanel, Loading, formatBytes } from "../components";
 import { Link, navigate } from "../router";
 
 export const INPUT_POLICY_DISCLOSURE =
   "This version is for Bytasm's test fixtures and programs you compiled yourself from your " +
-  "own source. Do not import downloaded, received, third-party, or suspicious files. v0.1 has " +
+  "own source. Do not import downloaded, received, third-party, or suspicious files. Bytasm has " +
   "no isolation boundary for them, and a crafted file could exploit a parser bug. Bytasm never " +
   "runs the files it imports.";
 
@@ -110,6 +110,17 @@ export function ImportPage({ projectId, health }: { projectId: string; health?: 
         )}
       </section>
 
+      <section className="card" aria-labelledby="before-import">
+        <h2 id="before-import">Before inspection</h2>
+        <p>Start with <code>fixtures/bin/hello_v1-x86_64.exe</code> from this repository. Downloaded installers, archives, mods and unfamiliar tools remain unsupported until isolation gate I1 is independently verified.</p>
+        <p>Import reads headers and sections with LIEF. You can then explicitly request strings and YARA-X, optional capa, or a verified Ghidra provider. <Link to="/tools">Check actual tools and provider availability</Link>.</p>
+        <details><summary>Privacy, storage and security limits</summary>
+          <p>The file, its hash, your statement and extracted evidence are saved in the server's local data directory. Strings and reports can contain private information. Nothing is sent to a remote analysis service; imported URLs are not fetched.</p>
+          <p>Stopping the app keeps this data. Hiding text does not delete it. Review report contents before sharing. There is no automatic per-file deletion workflow.</p>
+          <p>Network isolation depends on deployment: the Compose worker is configured offline, but the API and native parsers retain network and filesystem access. A parser exploit could access application data. This mode is not a sandbox. The file is never run.</p>
+        </details>
+      </section>
+
       <form className="card form" onSubmit={submit} noValidate>
         <div className="field">
           <label htmlFor="import-file">
@@ -125,6 +136,8 @@ export function ImportPage({ projectId, health }: { projectId: string; health?: 
             The file name is recorded as uploaded and treated as untrusted text.
           </small>
         </div>
+
+        {file && <p className="hint" aria-live="polite">Selected untrusted name: <span className="untrusted">{file.name}</span> · {formatBytes(file.size)}. The server checks the exact SHA-256 against the applicable policy before metadata parsing; choosing a file does not upload it.</p>}
 
         <fieldset className="field">
           <legend>Add it to</legend>
@@ -190,7 +203,7 @@ export function ImportPage({ projectId, health }: { projectId: string; health?: 
             wrote or control
           </label>
           <p className="hint">
-            This is the only basis in v0.1. Other bases need an isolation boundary first.
+            This is the only supported basis. Other bases need an isolation boundary first.
           </p>
           <label className="field">
             <span>Statement</span>

@@ -183,3 +183,13 @@ Unselected functions remain inventory entries. Missing instructions/pseudocode a
 caps are explicit. Expanded HTML that exceeds 16 MiB returns 413/report_too_large,
 not an integrity failure or truncated success; canonical JSON remains available
 when it fits its own bound. Historical schemas 2/3/4 use their existing renderer.
+
+
+## Guided overview compatibility (2026-10-31)
+
+The live version overview selects the latest recorded analysis run, or the exact
+`run_id` in a page link, including unsuccessful states. It does not alter the
+sample-report selection rules above or stored JSON/HTML bytes. A report can
+therefore describe a different run; the overview explicitly directs the user to
+review the report preview and its source identities. This is a presentation-only
+increment: no new report contract, migration or historical reserialization.

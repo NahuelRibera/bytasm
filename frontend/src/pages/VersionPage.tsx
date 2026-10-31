@@ -1,3 +1,4 @@
+import { InspectionOverview } from "../InspectionOverview";
 import { SectionMap } from "../SectionMap";
 import { ReportLibrary } from "../ReportLibrary";
 import { useQuery } from "@tanstack/react-query";
@@ -68,6 +69,7 @@ export function VersionPage({
         {actions}
       </header>
 
+      <InspectionOverview key={`${versionId}:${sourceRun ?? "latest"}`} version={v} runId={sourceRun} />
       <div className="grid-2">
         <IdentityPanel v={v} />
         <MetadataPanel v={v} />

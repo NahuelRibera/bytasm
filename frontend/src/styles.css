@@ -890,3 +890,22 @@ details.card > summary {
 .function-selection { border-block: 1px solid var(--border); padding-block: 1rem; margin-block: 1rem; }
 .function-selection p { max-width: 75ch; }
 .ghidra-workspace input[type="checkbox"] { width: 1.25rem; height: 1.25rem; }
+
+/* Guided reading layer; technical panels retain the existing visual system. */
+.inspection-overview { border-top: 3px solid var(--accent); }
+.inspection-overview .eyebrow { color: var(--text-muted); font-size: .8rem; font-weight: 650; letter-spacing: .04em; }
+.inspection-overview .inspection-intro { font-size: 1.1rem; max-width: 72ch; }
+.inspection-state { background: var(--surface-2); padding: 1rem 1.25rem; margin: 1.25rem 0; border-radius: var(--radius); }
+.inspection-state h3 { margin-top: 0; }
+.inspection-state p { margin-bottom: 0; }
+.inspection-overview .table th { min-width: 9rem; }
+.inspection-overview .table th[scope="row"] { font-weight: 500; }
+.inspection-overview .table details { font-size: .85rem; max-width: 30rem; }
+.inspection-overview code { overflow-wrap: anywhere; }
+.inspection-guidance { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; border-top: 1px solid var(--border); margin-top: 1.5rem; }
+.inspection-guidance > div { min-width: 0; }
+.inspection-overview p { overflow-wrap: anywhere; }
+@media (max-width: 680px) {
+  .inspection-guidance { grid-template-columns: 1fr; gap: 0; }
+  .inspection-overview .inspection-intro { font-size: 1rem; }
+}

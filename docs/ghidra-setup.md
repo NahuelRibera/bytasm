@@ -117,3 +117,13 @@ Screenshots and the selected report stay in backend/.pytest_cache/v06/browser-re
 for local review. This is a development verification helper, not deployment or
 third-party intake. Worker scratch uses a separate noexec tmpfs, so the lane also
 checks publication of verified output onto a different persistent filesystem.
+
+
+## Guided overview links
+
+The version overview links a Ghidra run to **Explore retained functions and
+limits**. This reads stored evidence only; search, pagination and expansion keep
+the existing parser-free behavior. Starting a fresh profile or requesting selected
+details remains an explicit action. A completed job is not whole-program coverage.
+No new provider/platform verification is implied by this presentation increment;
+see its [current verification record](milestones/v0.7-guided-overview.md).

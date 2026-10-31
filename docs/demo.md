@@ -162,3 +162,27 @@ verified local tools/a test image. It runs real health, admitted-fixture extract
 API-to-worker export and bounded cancellation/timeout tests in an offline,
 non-root container. It performs no downloads. The frontend accessibility test
 uses explicitly synthetic API records and is separate from real-tool evidence.
+
+
+## Guided overview (2026-10-31 increment)
+
+1. Import `fixtures/bin/hello_v1-x86_64.exe` from the repository. Read **Before
+   inspection** for local retention and deployment network limits; selecting the
+   file alone does not upload it.
+2. On the version page read **What do we know about this file?** It initially
+   says **Header metadata only**. Follow the header/hash links to exact values.
+3. Follow **Choose a static inspection**, select Quick static review and start
+   the run. This launches static tools, never the sample.
+4. From the finished run, open its strings link. The overview now names that
+   exact run and each completed/missing check. Review **What was observed**,
+   **What remains unknown** and **What to do next**.
+5. Follow a reviewed observation to exact finding evidence, or expand **Exact
+   step provenance** with Enter to reach the invocation/output digest and JSON.
+6. Ghidra is optional; check Tools. If available, explicitly start its profile
+   and open retained functions and limits. An unavailable provider is not an
+   empty function inventory.
+7. Preview a report separately and check its selected run. Report scope is not
+   automatically changed by the run selected in the version-page URL.
+
+No downloaded executables, archive inspection or sample execution is authorized
+by this demo. Old milestone test tables remain historical records.

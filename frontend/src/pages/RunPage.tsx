@@ -428,6 +428,15 @@ function FindingsSection({ run }: { run: Run }) {
     queryFn: () => api.findings(run.id, { q: query, tool, kind, namespace }),
     placeholderData: (previous) => previous,
   });
+  const findingsHeading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    // The client router suppresses native anchor scrolling. Wait until the
+    // asynchronously fetched findings have mounted before honoring this link.
+    if (findings.isSuccess && window.location.hash === "#findings") {
+      findingsHeading.current?.scrollIntoView({ block: "start" });
+      findingsHeading.current?.focus({ preventScroll: true });
+    }
+  }, [findings.isSuccess]);
   const [selected, setSelected] = useState<string | null>(() => window.location.hash.startsWith("#finding-") ? window.location.hash.slice(9) : null);
   useEffect(() => {
     const selectSource = (clearFilters = false) => {
@@ -462,7 +471,7 @@ function FindingsSection({ run }: { run: Run }) {
   const total = findings.data.total;
   return (
     <section className="card" aria-labelledby="findings">
-      <h2 id="findings">
+      <h2 id="findings" ref={findingsHeading} tabIndex={-1}>
         Findings <span className="count">{total}</span>
       </h2>
       <FindingsMeaning notices={findings.data.notices} />
