@@ -138,7 +138,16 @@ def test_scoped_function_views_summary_export_and_limits(tmp_path: Path) -> None
         assert exported.status_code == 200
         assert exported.json()["overview"] == overview
         assert exported.json()["analysis"]["functions"][0] == {
-            key: value for key, value in detail["function"].items() if key != "limitations"
+            key: value
+            for key, value in detail["function"].items()
+            if key
+            not in {
+                "limitations",
+                "body_ranges",
+                "body_ranges_truncated",
+                "references",
+                "references_truncated",
+            }
         }
         assert exported.content == client.get(base + "/export?format=json").content
         rendered = client.get(base + "/export?format=html")

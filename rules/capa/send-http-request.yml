@@ -1,0 +1,14 @@
+rule:
+  meta:
+    name: send HTTP request via Windows API
+    namespace: communication/http
+    authors:
+      - Bytasm contributors
+    scopes:
+      static: function
+      dynamic: unsupported
+    description: Static API-call feature; ordinary applications may use this API. Does not prove runtime behavior or malicious intent.
+  features:
+    - or:
+      - api: winhttp.WinHttpSendRequest
+      - api: wininet.HttpSendRequest

@@ -82,7 +82,8 @@ def registry() -> list[dict[str, object]]:
             "formats": ["PE x86", "PE x64"],
             "rules_sha256": capa_sha,
             "limitations": (
-                "capa 10.0.0, two upstream rules, vivisect, no library signatures."
+                "capa 10.0.0, two upstream and five Bytasm-authored rules, "
+                "vivisect, no library signatures."
                 " Packed files, installers and wrappers can produce incomplete or "
                 "misleading results."
             ),

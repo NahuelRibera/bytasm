@@ -72,6 +72,19 @@ docker run --rm --network none --pull never \
       -o /out/hello_v1-x86_64.exe hello_v1.c
     x86_64-w64-mingw32-gcc -O0 -s -shared -ffile-prefix-map=/src=. -Wl,--no-insert-timestamp \
       -o /out/exports_v1-x86_64.dll exports_v1.c
+    # v0.9: authored capa API-feature positives, benign controls and PE resources.
+    for name in capa_create_process capa_read_file capa_read_configuration capa_load_library \
+        capa_control_unrelated capa_control_reference; do
+      x86_64-w64-mingw32-gcc -O0 -s -ffile-prefix-map=/src=. -Wl,--no-insert-timestamp \
+        -o "/out/$name-x86_64.exe" "$name.c"
+    done
+    x86_64-w64-mingw32-gcc -O0 -s -ffile-prefix-map=/src=. -Wl,--no-insert-timestamp \
+      -o /out/capa_http_request-x86_64.exe capa_http_request.c -lwinhttp
+    for name in pe_version_resource pe_resource_noversion; do
+      x86_64-w64-mingw32-windres -O coff -i "$name.rc" -o "/out/$name.rsrc.coff"
+      x86_64-w64-mingw32-gcc -O0 -s -ffile-prefix-map=/src=. -Wl,--no-insert-timestamp \
+        -o "/out/$name-x86_64.exe" "$name.c" "/out/$name.rsrc.coff"
+    done
     {
       x86_64-linux-gnu-gcc --version | head -n 1
       x86_64-linux-gnu-ld --version | head -n 1

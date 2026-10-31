@@ -22,7 +22,13 @@ class ExportPolicy(Strict):
 
 
 class ExportDocument(Strict):
-    schema_version: Literal["bytasm-review-export-1"]
+    schema_version: Literal["bytasm-review-export-1", "bytasm-review-export-2"]
+    interpretation_version: str | None = None
+    answers: list[dict[str, Any]] = Field(default_factory=list, max_length=4)
+    structure: dict[str, Any] | None = None
+    function_evidence: list[dict[str, Any]] = Field(default_factory=list, max_length=1024)
+    source_run_offset: int = 0
+    source_runs_more: bool = False
     review_id: str
     review_sha256: str
     created_at: str
@@ -133,8 +139,50 @@ def derivative(review: Snapshot, source_digest: str, policy: ExportPolicy) -> di
             }
             if item.get("citation"):
                 item["citation"] = {"text_sha256": item["citation"]["text_sha256"]}
+    function_evidence = []
+    if policy.technical_details:
+        for fn in review.function_evidence:
+            record = {key: value for key, value in fn.items() if key != "name"}
+            record["references"] = [
+                {
+                    key: value
+                    for key, value in ref.items()
+                    if key != "target_name" and (policy.string_values or key != "preview")
+                }
+                for ref in fn["references"]
+            ]
+            function_evidence.append(record)
+    answers = []
+    if policy.overview and policy.observations:
+        for answer in review.answers:
+            copied = dict(answer)
+            copied["observations"] = [
+                {
+                    key: value
+                    for key, value in item.items()
+                    if key != "evidence" or policy.technical_details
+                }
+                for item in answer["observations"]
+            ]
+            answers.append(copied)
     document: dict[str, Any] = {
-        "schema_version": "bytasm-review-export-1",
+        "schema_version": "bytasm-review-export-2"
+        if review.schema_version == "bytasm-review-2"
+        else "bytasm-review-export-1",
+        **(
+            {
+                "interpretation_version": review.interpretation_version,
+                "answers": answers,
+                "structure": review.structure
+                if policy.technical_details and policy.string_values
+                else None,
+                "function_evidence": function_evidence,
+                "source_run_offset": review.source_run_offset,
+                "source_runs_more": review.source_runs_more,
+            }
+            if review.schema_version == "bytasm-review-2"
+            else {}
+        ),
         "review_id": review.id,
         "review_sha256": source_digest,
         "created_at": review.created_at.isoformat(),
@@ -154,6 +202,11 @@ def derivative(review: Snapshot, source_digest: str, policy: ExportPolicy) -> di
         "unknowns": review.unknowns,
         "excluded_content": [
             "Raw tool outputs, pseudocode and machine symbols are excluded.",
+            *(
+                []
+                if policy.technical_details and policy.string_values
+                else ["Structural declaration values (require technical details and string values)"]
+            ),
             "Version/finding annotations and previous function revisions are excluded.",
             *([] if policy.analyst_notes else ["Analyst overlays and notes"]),
             *([] if policy.overview else ["Overview"]),
@@ -218,6 +271,49 @@ def export_bytes(document: dict[str, Any], format: Literal["json", "html"]) -> b
             + escaped(document["overview"]["selection_explanation"])
             + "</p>"
         )
+    if document.get("answers"):
+        sections.append(
+            "<h2>What we could establish</h2><p>Static evidence only; the "
+            "file was not executed.</p>"
+        )
+        for answer in document["answers"]:
+            sections.append("<article><h3>" + escaped(answer["title"]) + "</h3>")
+            for item in answer["observations"]:
+                for label, key in (
+                    ("Evidence level", "level"),
+                    ("Observation", "observation"),
+                    ("Why it matters", "why_it_matters"),
+                    ("Legitimate alternative", "alternative"),
+                    ("Missing evidence", "missing"),
+                    ("Next action", "next_action"),
+                ):
+                    sections.append("<p>" + label + ": " + escaped(item[key]) + "</p>")
+            if not answer["observations"]:
+                sections.append("<p>No supporting observation retained in this scope.</p>")
+            sections.append(
+                "<p>"
+                + escaped(answer["missing"])
+                + "</p><p>"
+                + escaped(answer["next_action"])
+                + "</p></article>"
+            )
+    structure = document.get("structure")
+    if structure:
+        sections.append("<h2>File structure</h2><dl>")
+        for group in ("declarations", "measurements"):
+            for key, value in structure.get(group, {}).items():
+                sections.append(
+                    "<dt>"
+                    + escaped(key.replace("_", " "))
+                    + " ("
+                    + group
+                    + ")</dt><dd>"
+                    + escaped(value)
+                    + ". "
+                    + escaped(structure.get("explanations", {}).get(key, ""))
+                    + "</dd>"
+                )
+        sections.append("</dl>")
     sections.append("<h2>Actual inspection scope</h2><ul>")
     for source in document["sources"]:
         selected, latest = source["selected"], source["latest_attempt"]

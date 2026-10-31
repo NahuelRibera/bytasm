@@ -38,7 +38,21 @@ ELF_FIXTURES = (
     FIXTURES_DIR / "bin" / "inventory_many-x86_64.elf",
 )
 CAPA_PE = FIXTURES_DIR / "bin" / "capa_environment-x86_64.exe"
-PE_FIXTURES = (PE_X86_64_EXE, PE_X86_64_DLL, CAPA_PE)
+V09_PE_FIXTURES = tuple(
+    FIXTURES_DIR / "bin" / f"{name}-x86_64.exe"
+    for name in (
+        "capa_create_process",
+        "capa_http_request",
+        "capa_read_file",
+        "capa_read_configuration",
+        "capa_load_library",
+        "capa_control_unrelated",
+        "capa_control_reference",
+        "pe_version_resource",
+        "pe_resource_noversion",
+    )
+)
+PE_FIXTURES = (PE_X86_64_EXE, PE_X86_64_DLL, CAPA_PE, *V09_PE_FIXTURES)
 ALL_FIXTURES = ELF_FIXTURES + PE_FIXTURES
 
 

@@ -493,12 +493,12 @@ def _create_run(ctx: AppContext, version_id: str, profile_id: str = "default-sta
             if capa_rules is None:
                 capa_rules = RuleSet(
                     tool="capa",
-                    name="capa-rules-bytasm-subset",
+                    name="capa-rules-bytasm-curated",
                     version="10.0.0",
                     sha256=sha,
-                    source="upstream@v10.0.0",
+                    source="upstream@v10.0.0 + bytasm-authored@1.0.0",
                     snapshot_path=ctx.outputs.relative_path(sha),
-                    rule_count=2,
+                    rule_count=len(json.loads(raw)),
                 )
                 session.add(capa_rules)
                 session.flush()

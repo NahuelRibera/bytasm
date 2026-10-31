@@ -108,10 +108,15 @@ try {
   await expect(evidence.getByRole("table", { name: "Instructions returned by Ghidra" })).toBeVisible();
   await evidence.getByRole("button", { name: "Explore one-hop relationships" }).click();
   await expect(evidence.getByRole("region", { name: "One-hop static call relationships" })).toBeVisible();
+  const references = evidence.getByRole("region", { name: "Function body and outgoing references" });
+  await expect(references.getByText(/^Exact body address ranges \(1\)$/)).toBeVisible();
+  await expect(references.getByText(/No outgoing string, data or external-symbol references were retained/)).toBeVisible();
   const citation = await evidence.getByRole("link", { name: "Original function record" }).getAttribute("href");
   const raw = await (await fetch(`${base}${citation.split("#")[0]}`)).json();
-  assert.equal(raw.schema_version, "ghidra-2");
-  assert(raw.functions.some(fn => fn.name === "inventory_39_9" && fn.pseudocode_status === "available"));
+  assert.equal(raw.schema_version, "ghidra-3");
+  const rawFunction = raw.functions.find(fn => fn.name === "inventory_39_9" && fn.pseudocode_status === "available");
+  assert(rawFunction && rawFunction.body_ranges.length === 1 && rawFunction.references.length === 0);
+  assert.equal(rawFunction.body_ranges[0].provenance, "ghidra_function_body");
   const downloadEvent = page.waitForEvent("download");
   await page.getByRole("link", { name: "Export Ghidra report (JSON)" }).click();
   const download = await downloadEvent;
@@ -136,7 +141,7 @@ try {
   assert.deepEqual(axe.violations.map(item => item.id), []);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), 0);
   await page.screenshot({ path: join(artifacts, "workbench-360.png"), fullPage: true });
-  console.log("Real browser/API/offline-worker flow passed: fixture import, inventory beyond 256, selected dossier, instructions, relationships, evidence, report, keyboard, 360px and axe.");
+  console.log("Real browser/API/offline-worker flow passed: fixture import, inventory beyond 256, selected dossier, instructions, relationships, ghidra-3 body range/references, evidence, report, keyboard, 360px and axe.");
 } finally {
   if (browser) await browser.close();
   for (const id of containers.reverse()) docker(["rm", "--force", id]);

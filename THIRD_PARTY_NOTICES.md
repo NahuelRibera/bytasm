@@ -13,8 +13,12 @@ wheel licenses and the lockfile retain complete dependency details.
   in `rules/capa/LICENSE.txt`. Only the two unmodified environment-variable
   rules listed in `rules/capa/ruleset.json` are bundled. Original paths,
   hashes and author metadata are preserved (Michael Hunhoff and @_re_fox).
-- Snapshot SHA-256:
+- Historical two-rule snapshot SHA-256:
   `c78c7ff8ad97ba7e6f2b74060e425bbcc830ea30c5fb5b2594acc9365d78d3a6`.
+- Five additional API-feature rules are authored by Bytasm contributors under
+  Apache-2.0, authored subset version 1.0.0; see `rules/capa/README.md`.
+  Current mixed seven-rule snapshot SHA-256:
+  `9a7dbb7813c3e4c4bec1f991e821439ea60fa0210663aedbe5ae96242919ee62`.
 - No upstream example binaries, signatures, documentation images or samples
   are redistributed. Rule-supplied ATT&CK/MBC strings are attributed metadata,
   not a separately redistributed technique corpus or ATT&CK matrix.

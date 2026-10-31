@@ -83,7 +83,7 @@ def inspect_file(path: Path, manifest: Manifest) -> dict[str, Any]:
     if outcome.result is None:
         raise outcome_error(outcome.status, outcome.reason)
     result = outcome.result
-    metadata = result.metadata.model_dump(mode="json")
+    metadata = result.metadata.model_dump(mode="json", exclude={"structure"})
     if metadata["format"] != file_format:
         raise outcome_error("rejected", "parse_failed")
 

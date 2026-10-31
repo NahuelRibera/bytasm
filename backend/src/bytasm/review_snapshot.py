@@ -32,7 +32,7 @@ MAX_REVIEW_BYTES = 4 * 1024 * 1024
 MAX_SOURCE_BYTES = 32 * 1024 * 1024
 ToolName = Literal["lief", "strings", "yara-x", "capa", "ghidra"]
 TOOLS: tuple[ToolName, ...] = ("lief", "strings", "yara-x", "capa", "ghidra")
-CATALOG_VERSION = "review-2"
+CATALOG_VERSION = "review-3"
 
 
 class Strict(BaseModel):
@@ -42,9 +42,12 @@ class Strict(BaseModel):
 class CreateReview(Strict):
     scope: Literal["combined", "exact_run"] = "combined"
     run_id: Annotated[str, Field(pattern=r"^[0-9a-f]{32}$")] | None = None
+    run_offset: Annotated[int, Field(ge=0, le=100_000)] = 0
 
     @model_validator(mode="after")
     def exact_scope(self) -> "CreateReview":
+        if self.scope == "exact_run" and self.run_offset:
+            raise ValueError("Exact run cannot select a source window")
         if (self.scope == "exact_run") != (self.run_id is not None):
             raise ValueError("Exact run requires a run ID; combined review selects server-side")
         return self
@@ -140,18 +143,25 @@ class ImportObservation(Strict):
 
 
 class Snapshot(Strict):
-    schema_version: Literal["bytasm-review-1"] = "bytasm-review-1"
+    schema_version: Literal["bytasm-review-1", "bytasm-review-2"] = "bytasm-review-2"
+    import_inventory: list[str] | None = Field(default=None, max_length=100_000)
+    interpretation_version: str | None = None
+    answers: list[dict[str, Any]] = Field(default_factory=list, max_length=4)
+    source_run_offset: int = 0
+    source_runs_more: bool = False
+    structure: dict[str, Any] | None = None
+    function_evidence: list[dict[str, Any]] = Field(default_factory=list, max_length=1024)
     id: str
     supersedes_id: str | None
     created_at: datetime
     sample: Identity
     scope: Literal["combined", "exact_run"]
     exact_run_id: str | None
-    source_selection_policy: Literal["latest-completed-step-per-tool-v1"] = (
-        "latest-completed-step-per-tool-v1"
-    )
+    source_selection_policy: Literal[
+        "latest-completed-step-per-tool-v1", "latest-completed-step-in-window-v2"
+    ] = "latest-completed-step-in-window-v2"
     integrity: Literal["verified_at_creation"] = "verified_at_creation"
-    catalog_version: Literal["review-2"] = "review-2"
+    catalog_version: Literal["review-2", "review-3"] = "review-3"
     sources: list[Source] = Field(max_length=5)
     observations: list[Observation] = Field(max_length=48)
     observations_total: int
@@ -338,24 +348,35 @@ def create_snapshot(
         query = query.where(AnalysisRun.id == body.run_id, AnalysisRun.kind == "analysis")
     runs = list(
         session.scalars(
-            query.order_by(AnalysisRun.queued_at.desc(), AnalysisRun.id.desc()).limit(201)
+            query.order_by(AnalysisRun.queued_at.desc(), AnalysisRun.id.desc())
+            .offset(body.run_offset)
+            .limit(201)
         )
     )
-    if len(runs) > 200:
-        raise ValueError("Review source scan exceeds 200 runs; use an exact run")
+    runs_more = len(runs) > 200
+    runs = runs[:200]
     if body.scope == "exact_run" and not runs:
         raise LookupError("Exact run is not part of this version")
     sample_bytes = bounded_read(ctx.blobs, version.sha256, ctx.settings.max_upload_bytes)
     if len(sample_bytes) != version.size_bytes:
         raise IntegrityError("Sample size changed")
+    if body.scope == "combined" and not runs:
+        raise ValueError("No runs in this source window; select an earlier window")
     sources: list[Source] = []
     chosen: dict[ToolName, ToolInvocation] = {}
     verified_data: dict[str, dict[str, Any]] = {}
     unknowns = [
         "No runtime behavior, publisher authenticity or safety verdict was established.",
-        "Bundled coverage: five demonstration YARA rules and two capa rules; "
-        "not comprehensive screening.",
+        "Bundled coverage: five YARA text/format rules and seven capa code rules. "
+        "The five authored capa rules and the environment-query rule are verified "
+        "against self-authored compiled fixtures. This is not comprehensive screening.",
     ]
+    if runs_more or body.run_offset:
+        unknowns.append(
+            f"Source selection is limited to runs {body.run_offset + 1}–"
+            f"{body.run_offset + len(runs)} in newest-first order; "
+            "earlier/later windows are not searched."
+        )
     # Exact-run mode includes no import invocation: metadata is separately identified
     # by the sample identity and is not misrepresented as a check in that run.
     for tool in TOOLS:
@@ -465,10 +486,7 @@ def create_snapshot(
                 if tool == "capa":
                     packaged = json.loads(snapshot_bytes)
                     for finding_capa in parsed_capa.findings:
-                        if (
-                            packaged.get(finding_capa.name.replace(" ", "-") + ".yml")
-                            != finding_capa.source
-                        ):
+                        if finding_capa.source not in packaged.values():
                             raise IntegrityError("Capa rule source differs from snapshot")
             selected = Selected(
                 run_id=run.id,
@@ -661,8 +679,45 @@ def create_snapshot(
             ):
                 raise IntegrityError("Overlay source identity changed")
             function_reviews.append(document)
+    function_evidence = []
+    if "ghidra" in chosen:
+        from bytasm.ghidra_protocol import GhidraResult
+
+        ghidra_doc = GhidraResult.model_validate(verified_data["ghidra"])
+        for index, fn in enumerate(ghidra_doc.functions):
+            if not fn.references and not fn.body_ranges:
+                continue
+            function_evidence.append(
+                {
+                    "entry": fn.entry.model_dump(),
+                    "name": fn.name,
+                    "body_ranges": [r.model_dump() for r in fn.body_ranges],
+                    "body_ranges_truncated": fn.body_ranges_truncated,
+                    "references": [r.model_dump() for r in fn.references],
+                    "references_truncated": fn.references_truncated,
+                    "instructions_truncated": fn.instructions_truncated,
+                    "run_id": chosen["ghidra"].run_id,
+                    "invocation_id": chosen["ghidra"].id,
+                    "output_sha256": chosen["ghidra"].raw_output_sha256,
+                    "pointer": f"/functions/{index}",
+                    "function_index": index,
+                    "protocol_version": ghidra_doc.schema_version,
+                }
+            )
+    from bytasm.investigation_answers import build_answers
+
     result = Snapshot(
+        import_inventory=verified_data.get("lief", {})
+        .get("metadata", {})
+        .get("imports", {})
+        .get("functions"),
+        interpretation_version="investigation-1",
+        answers=build_answers(observations[:48], import_observations, function_evidence, unknowns),
         id=new_id(),
+        source_run_offset=body.run_offset,
+        source_runs_more=runs_more,
+        function_evidence=function_evidence,
+        structure=verified_data.get("lief", {}).get("metadata", {}).get("structure"),
         supersedes_id=supersedes_id,
         created_at=datetime.now(UTC),
         sample=Identity(

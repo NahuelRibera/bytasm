@@ -33,6 +33,32 @@ describe("pinned review", () => {
     await userEvent.click(screen.getByLabelText("Technical details"));
     expect(screen.queryByRole("button", { name: "Download previewed JSON" })).toBeNull();
   });
+  it("navigates stored review pages and renders only the exact derivative as text", async () => {
+    installFetch({
+      [`GET /api/v1/sample-versions/${VERSION_ID}/reviews`]: () => json({ items: [{ id: snapshot.id, created_at: snapshot.created_at }], next_offset: 25 }),
+      [`GET /api/v1/sample-versions/${VERSION_ID}/reviews?offset=25`]: () => json({ items: [{ id: "c".repeat(32), created_at: snapshot.created_at }], next_offset: null }),
+      [`POST /api/v1/sample-versions/${VERSION_ID}/reviews`]: () => json(snapshot),
+      [`GET /api/v1/reviews/${snapshot.id}`]: () => json(snapshot),
+      [`POST /api/v1/reviews/${snapshot.id}/export/preview`]: () => json({ document: { overview: "<script>private()</script>", omitted: null, sources: [{ provenance: "retained-source" }] }, sha256: "b".repeat(64), size_bytes: 100 }),
+    });
+    renderWithClient(<PinnedReview version={version()} />);
+    await userEvent.click(await screen.findByText("Saved reviews"));
+    await userEvent.click(screen.getByRole("button", { name: "Older reviews" }));
+    expect(await screen.findByText(/cccccccc/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Older reviews" }).hasAttribute("disabled")).toBe(true);
+    await userEvent.click(screen.getByRole("button", { name: "Create combined review" }));
+    expect(await screen.findByRole("heading", { name: "What we could establish" })).toBeTruthy();
+    expect(screen.getByRole("table", { name: "Checks and limits at pin time" })).toBeTruthy();
+    await userEvent.click(screen.getByText("Preview and export this pinned review"));
+    await userEvent.click(screen.getByRole("button", { name: "Preview export" }));
+    const preview = await screen.findByRole("region", { name: "Exact export preview" });
+    expect(preview.textContent).toContain("<script>private()</script>");
+    expect(preview.querySelector("script")).toBeNull();
+    const sourceDisclosure = screen.getByText("sources", { selector: "summary" }).closest("details");
+    expect(sourceDisclosure?.open).toBe(false);
+    expect(sourceDisclosure?.textContent).toContain("retained-source");
+    expect(screen.getByText("Technical JSON of this exact export")).toBeTruthy();
+  });
   it("cancels an in-flight download when privacy changes", async () => {
     let complete!: (value: Response) => void;
     let signal: AbortSignal | undefined;

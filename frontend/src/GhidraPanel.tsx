@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { FunctionReview } from "./FunctionReview";
+import { FunctionReferences } from "./FunctionReferences";
 import { FunctionRelationships } from "./FunctionRelationships";
 import { FunctionSelection } from "./FunctionSelection";
 import { Link } from "./router";
@@ -74,7 +75,10 @@ function FunctionInventory({ runId }: { runId: string }) {
   const [cursor, setCursor] = useState<string | undefined>();
   const [previous, setPrevious] = useState<Array<{ offset: number; cursor?: string }>>([]);
   const [checked, setChecked] = useState<number[]>([]);
-  const [selected, setSelected] = useState<number | null>(null);
+  const [selected, setSelected] = useState<number | null>(() => {
+    const value = new URLSearchParams(window.location.search).get("ghidra_function");
+    return value !== null && /^\d{1,4}$/.test(value) && Number(value) < 1024 ? Number(value) : null;
+  });
   const [relationships, setRelationships] = useState(false);
   const openers = useRef<Record<number, HTMLButtonElement | null>>({});
   const inventory = useQuery({ queryKey: ["ghidra-functions", runId, query, offset, filters, cursor], queryFn: () => ghidraApi.functions(runId, query, offset, filters.field, filters.pseudocode, cursor) });
@@ -115,13 +119,14 @@ function FunctionDetail({ detail }: { detail: GhidraDetail }) {
   return <>
     <h4 className="untrusted">{fn.name}{fn.name_truncated && " (name truncated)"}</h4>
     <p><code>{addressLabel(fn.entry)}</code> <CopyButton value={addressLabel(fn.entry)} label="Copy function entry with address space" /> <a href={detail.citation}>Original function record</a></p>
+    <FunctionReferences fn={fn} protocolVersion={detail.protocol_version} instructionLinks />
     {fn.limitations.length > 0 && <ul className="notice">{fn.limitations.map((item, index) => <li key={index}>{item}</li>)}</ul>}
     <FunctionReview key={`${detail.run_id}:${detail.index}`} detail={detail} />
     <h4>Ghidra pseudocode</h4><p className="hint">Decompiler approximation, not original source code. Status: {fn.pseudocode_status.replaceAll("_", " ")}.{fn.pseudocode_truncated && " Output was truncated."}</p>
     {fn.pseudocode === null ? <p>No pseudocode was retained for this function.</p> : <pre className="ghidra-code" tabIndex={0} aria-label="Ghidra pseudocode"><code>{fn.pseudocode}</code></pre>}
     <details><summary>Assembly and instruction bytes ({fn.instructions.length} retained)</summary>
       {fn.instructions_truncated && <p className="notice">Instruction output reached its limit. This is not a complete function listing.</p>}
-      {fn.instructions.length === 0 ? <p>No instructions were retained.</p> : <div className="table-scroll" tabIndex={0} role="region" aria-label="Assembly listing"><table className="table"><caption>Instructions returned by Ghidra</caption><thead><tr><th scope="col">Address</th><th scope="col">Bytes (hex)</th><th scope="col">Instruction</th></tr></thead><tbody>{fn.instructions.map((item, index) => <tr key={index}><td><code>{addressLabel(item.address)}</code></td><td><code>{item.bytes_hex}</code>{item.bytes_truncated && " (bytes truncated)"}</td><td><code>{item.text}</code>{item.text_truncated && " (text truncated)"}</td></tr>)}</tbody></table></div>}
+      {fn.instructions.length === 0 ? <p>No instructions were retained.</p> : <div className="table-scroll" tabIndex={0} role="region" aria-label="Assembly listing"><table className="table"><caption>Instructions returned by Ghidra</caption><thead><tr><th scope="col">Address</th><th scope="col">Bytes (hex)</th><th scope="col">Instruction</th></tr></thead><tbody>{fn.instructions.map((item, index) => <tr key={index} id={`instruction-${encodeURIComponent(addressLabel(item.address))}`} tabIndex={-1}><td><code>{addressLabel(item.address)}</code></td><td><code>{item.bytes_hex}</code>{item.bytes_truncated && " (bytes truncated)"}</td><td><code>{item.text}</code>{item.text_truncated && " (text truncated)"}</td></tr>)}</tbody></table></div>}
     </details>
     <StaticCalls fn={fn} />
   </>;

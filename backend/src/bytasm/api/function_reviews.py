@@ -3,7 +3,7 @@
 import hashlib
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import Field
 from sqlalchemy import select
@@ -67,7 +67,9 @@ def scope(
     return identity, digest, fn.pseudocode
 
 
-def view(session: Session, identity: dict[str, Any], digest: str) -> dict[str, Any]:
+def view(
+    session: Session, identity: dict[str, Any], digest: str, offset: int = 0
+) -> dict[str, Any]:
     rows = list(
         session.scalars(
             select(FunctionReviewRevision)
@@ -75,6 +77,7 @@ def view(session: Session, identity: dict[str, Any], digest: str) -> dict[str, A
                 FunctionReviewRevision.scope_sha256 == digest,
             )
             .order_by(FunctionReviewRevision.revision.desc())
+            .offset(offset)
             .limit(26)
         )
     )
@@ -84,7 +87,12 @@ def view(session: Session, identity: dict[str, Any], digest: str) -> dict[str, A
     return {
         "identity": identity,
         "scope_sha256": digest,
-        "current": documents[0] if documents else None,
+        "current": (
+            view(session, identity, digest)["current"]
+            if offset
+            else (documents[0] if documents else None)
+        ),
+        "next_offset": offset + 25 if len(rows) > 25 else None,
         "revisions": documents[:25],
         "history_capped": len(rows) > 25,
         "notice": (
@@ -95,11 +103,13 @@ def view(session: Session, identity: dict[str, Any], digest: str) -> dict[str, A
 
 
 @router.get("/runs/{run_id}/ghidra/functions/{index}/review")
-def get(request: Request, run_id: str, index: int) -> JSONResponse:
+def get(
+    request: Request, run_id: str, index: int, offset: Annotated[int, Query(ge=0, le=100_000)] = 0
+) -> JSONResponse:
     try:
         with _ctx(request).sessions() as session:
             identity, digest, _ = scope(request, session, run_id, index)
-            return JSONResponse(view(session, identity, digest))
+            return JSONResponse(view(session, identity, digest, offset))
     except LookupError:
         return _not_found(request, "function review source")
     except IntegrityError:

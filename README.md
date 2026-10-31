@@ -69,7 +69,7 @@ overview and pinned review increments described in [the current record](docs/mil
 Package versions remain **0.4.0** and sample reports remain schema **4**; these
 are distinct from feature milestone names. **Tools**
 shows installed versions, availability, adapters, rules hashes and profile limits.
-Quick static review remains the default. Full adds capa 10.0.0 with two upstream
+Quick static review remains the default. Full adds capa 10.0.0 with two upstream and five Bytasm-authored
 Apache-2.0 rules, native PE x86/x64 only and no library signatures. Other formats
 keep Quick results and explicitly show partial analysis. Function addresses from
 capa are not file offsets. No arbitrary commands, plugins or custom rules are exposed.
@@ -344,3 +344,9 @@ The wider A–N milestone remains incomplete: richer structural extraction, new
 Ghidra xrefs/flow/comparisons, package intake, signature verification and complete
 deletion remain outstanding. An optional real disposable metadata operation is
 described in [SECURITY.md](SECURITY.md); external intake stays blocked by I1.
+
+The current local evidence increment adds versioned function references, structural
+metadata, pinned answers, comparison and private previews. See the
+[implementation and verification limits](docs/milestones/v0.9-evidence-increment.md),
+including the real Ghidra 12.2 and compiled-fixture verification and the unchanged
+I1 admission restrictions.

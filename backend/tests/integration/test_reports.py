@@ -101,7 +101,7 @@ def test_report_validates_and_carries_identity_and_provenance(
         entropy = section["entropy"]
         assert entropy["unit"] == "bits_per_byte"
         assert entropy["method"] == "shannon-bits-per-byte"
-        assert entropy["computed_by"] == "bytasm metadata_lief 0.1.0"
+        assert entropy["computed_by"] == f"bytasm metadata_lief {invocation['adapter_version']}"
         assert (entropy["value"] is None) == (entropy["note"] is not None)
     assert any("did not execute" in item for item in report["limitations"])
     assert any("not a verdict" in item for item in report["limitations"])
@@ -162,7 +162,7 @@ def test_entropy_measurement_on_the_high_entropy_fixture(client: TestClient) -> 
         "value": None,
         "unit": "bits_per_byte",
         "method": "shannon-bits-per-byte",
-        "computed_by": "bytasm metadata_lief 0.1.0",
+        "computed_by": "bytasm metadata_lief 0.2.0",
         "measured_over": "section_bytes_in_file",
         "note": "no file data",
     }

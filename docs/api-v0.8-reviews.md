@@ -36,3 +36,28 @@ Relevance version `review-2` prioritizes reviewed capa code features (30), revie
 URL text (20), UPX-style structural context (15), other declaration text (5/1), then
 unreviewed matches (0). Scores only choose reading order. Repeated matches receive
 no additional weight. Import categories are separately labelled as declarations.
+
+## Evidence increment (v2)
+
+New immutable documents use `bytasm-review-2` and export
+`bytasm-review-export-2`; published additive reader schemas are
+`schemas/review-v2.schema.json` and `schemas/review-export-v2.schema.json`.
+The original schema files remain the historical contracts. Ghidra v3 is published
+separately at `schemas/ghidra-analysis-v3.schema.json`.
+
+Combined creation accepts `run_offset` (0..100000), selecting at most 200 runs
+in newest-first order. Snapshot `source_run_offset` and `source_runs_more` disclose
+the window; refresh retains its offset. Empty windows refuse creation. Exact-run
+requests require zero offset. Review histories and function review GET accept
+`?offset=N`; both return `next_offset`. Function `current` remains the latest
+revision even on older pages.
+
+`GET /reviews/{left_id}/compare/{right_id}` reads only immutable verified snapshots.
+It returns compatibility, source/attempt and bounded result changes, missing
+coverage and cautions. It never runs an analyzer. Different sample lineages with
+different hashes or different formats expose incompatibility instead of result
+deltas; historical incomplete inventories suppress import deltas.
+
+V2 pins `interpretation_version`, `answers`, `import_inventory`, `structure` and
+`function_evidence`. Evidence retains source run/invocation/output/pointers. Export
+omission policies apply to new fields before preview/download serialization.

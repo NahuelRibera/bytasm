@@ -140,6 +140,11 @@ def persist_import(
                 "entry_point": metadata.entry_point,
                 "declared_header": dict(metadata.declared_header),
                 "imported_libraries": list(metadata.imports.libraries),
+                **(
+                    {"structure": metadata.structure.model_dump(mode="json")}
+                    if metadata.structure is not None
+                    else {}
+                ),
             },
             warnings=list(metadata.warnings),
         )

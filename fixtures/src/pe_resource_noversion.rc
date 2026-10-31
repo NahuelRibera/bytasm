@@ -1,0 +1,6 @@
+// Self-authored resource script for a never-executed static fixture.
+// Control: a resource payload with no VERSIONINFO declaration.
+2 RCDATA
+BEGIN
+  "bytasm fixture resource payload"
+END

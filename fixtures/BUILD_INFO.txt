@@ -198,3 +198,55 @@ SOURCE_DATE_EPOCH=1761436800; source mounted read-only; --network none --pull ne
 Two separate compilations into backend/.pytest_cache/v06/fixture-a and fixture-b
 produced identical bytes; committed mode is 0644. Earlier fixture bytes/hashes
 were not changed. fixtures/build/build.sh includes the same compile command.
+
+v0.9 compiled capa and PE resource fixtures (2026-10-31)
+-------------------------------------------------------
+
+Nine new self-authored PE32+ x86-64 console programs (fixtures/src/). None
+was executed, by the build, by Bytasm or by any test. Mode 0644.
+
+  bin/capa_create_process-x86_64.exe      14,336  CreateProcessA call site
+  bin/capa_http_request-x86_64.exe        14,336  WinHttpSendRequest call site (-lwinhttp)
+  bin/capa_read_file-x86_64.exe           14,336  ReadFile call site
+  bin/capa_read_configuration-x86_64.exe  14,336  GetPrivateProfileStringA call site
+  bin/capa_load_library-x86_64.exe        14,336  LoadLibraryA call site
+  bin/capa_control_unrelated-x86_64.exe   14,336  benign control: GetTickCount only
+  bin/capa_control_reference-x86_64.exe   14,336  benign control: the API names as text
+                                                  and three imports whose addresses are
+                                                  stored but never called
+  bin/pe_version_resource-x86_64.exe      15,360  VERSIONINFO (StringFileInfo 040904b0)
+                                                  plus RCDATA 2 (pe_version_resource.rc)
+  bin/pe_resource_noversion-x86_64.exe    14,848  control: RCDATA 2, no VERSIONINFO
+
+  Each positive places its API call in one __attribute__((noinline)) helper
+  called from main. Exact hashes: MANIFEST.sha256 (the nine lines appended).
+
+  Toolchain: cached bytasm-fixture-toolchain:trixie-20261020, image ID
+  sha256:47c1639029d85b693515686d2daeae9dcad22124ebd6a575e3724446ddb4173e
+  (the same image documented above; not rebuilt, nothing downloaded).
+  x86_64-w64-mingw32-gcc (GCC) 14-win32; GNU ld and GNU windres (Binutils) 2.44.
+  Exact commands: the "v0.9" block in build/build.sh (windres -O coff to a
+  .rsrc.coff object, then gcc -O0 -s -ffile-prefix-map=/src=.
+  -Wl,--no-insert-timestamp). Docker client 29.8.1; every compile used
+  --network none --pull never, current uid:gid, SOURCE_DATE_EPOCH=1761436800,
+  fixtures/src mounted read-only and a new empty output directory as /out.
+
+  Reproducibility: four independent compilations into separate empty
+  directories (two before and two after the commands were placed in
+  build.sh) produced byte-identical files equal to the committed bytes.
+  All eleven earlier fixture bytes and manifest lines are unchanged.
+
+  Independent checks:
+  - objdump (x86_64-w64-mingw32-objdump 2.44): in capa_read_file the call at
+    0x140001494 loads 0x1400081a0, the KERNEL32!ReadFile IAT slot, inside
+    the function at 0x140001450; the other positives have the same shape.
+  - Real capa 10.0.0 (vivisect, -f pe, empty signatures directory, the
+    packaged seven-rule subset) through Bytasm's full-static worker path:
+    each positive matches exactly its authored rule at function
+    0x140001450; both controls, hello_v1-x86_64.exe and the environment
+    fixture produce no match from the five authored rules.
+  - Real LIEF 1.0.0: pe_version_resource declares resource paths
+    10/2/1033 and 16/1/1033 and the five StringFileInfo values exactly as
+    written in the .rc; the control declares only 10/2/1033 and no version.
+  A positive capability fixture is ordinary program code; it is not
+  malicious, and a version declaration is untrusted text, not identity.

@@ -9,7 +9,7 @@ interface Citation { text_sha256: string; start_line: number; end_line: number }
 interface Revision { citation?: Citation | null; revision: number; alias: string; bookmarked: boolean; collections: string[];
   state: ReviewState; note: string; created_at: string }
 interface Workspace { identity: { run_id: string; invocation_id: string; output_sha256: string };
-  current: Revision | null; revisions: Revision[]; history_capped: boolean; notice: string }
+  current: Revision | null; revisions: Revision[]; history_capped: boolean; next_offset?: number | null; notice: string }
 async function request(path: string, body?: unknown): Promise<Workspace> {
   const response = await fetch(path, body === undefined ? undefined : { method: "POST",
     headers: { "X-Bytasm-Request": "1", "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -18,14 +18,15 @@ async function request(path: string, body?: unknown): Promise<Workspace> {
 }
 export function FunctionReview({ detail }: { detail: GhidraDetail }) {
   const url = `/api/v1/runs/${detail.run_id}/ghidra/functions/${detail.index}/review`;
-  const result = useQuery({ queryKey: ["function-review", detail.run_id, detail.index], queryFn: () => request(url) });
+  const [offset, setOffset] = useState(0);
+  const result = useQuery({ queryKey: ["function-review", detail.run_id, detail.index, offset], queryFn: () => request(`${url}${offset ? `?offset=${offset}` : ""}`) });
   return <details className="function-review"><summary>Analyst review, bookmark and notes</summary>
     {result.isError && <ErrorPanel error={result.error} title="Function review unavailable; the source may have changed" />}
     {result.data && result.data.identity.run_id === detail.run_id && result.data.identity.invocation_id === detail.invocation_id && <>
       <p>{result.data.notice}</p>
       <FunctionReviewEditor key={result.data.current?.revision ?? 0} workspace={result.data} detail={detail} url={url} onSaved={() => { void result.refetch(); }} />
       <button className="button" onClick={() => { void result.refetch(); }}>Reload current revision</button>
-      <details><summary>Retained revision history</summary>{result.data.revisions.map(item => <article key={item.revision}><h5>Revision {item.revision} · {item.state.replaceAll("_", " ")}</h5><p>Local alias: {item.alias || "None"}</p><p className="untrusted">{item.note || "No note"}</p></article>)}{result.data.history_capped && <p>Latest 25 revisions shown; earlier revisions remain stored.</p>}</details>
+      <details><summary>Retained revision history</summary>{result.data.revisions.map(item => <article key={item.revision}><h5>Revision {item.revision} · {item.state.replaceAll("_", " ")}</h5><p>Local alias: {item.alias || "None"}</p><p className="untrusted">{item.note || "No note"}</p></article>)}<nav aria-label="Function revision pages"><button className="button" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - 25))}>Newer revisions</button><span role="status"> Revisions {offset + 1}–{offset + result.data.revisions.length} </span><button className="button" disabled={result.data.next_offset == null} onClick={() => setOffset(result.data!.next_offset!)}>Older revisions</button></nav></details>
     </>}
   </details>;
 }

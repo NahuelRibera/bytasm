@@ -9,6 +9,10 @@ export interface GhidraFunction {
   name_truncated?: boolean;
   namespace_truncated?: boolean;
   body_size: number | null;
+  body_ranges?: Array<{ start: GhidraAddress; end: GhidraAddress; provenance: string }>;
+  body_ranges_truncated?: boolean;
+  references?: Array<{ source: GhidraAddress; target: GhidraAddress; kind: string; reference_type: string; provenance: string; target_name?: string | null; preview?: string | null; target_name_truncated?: boolean; preview_truncated?: boolean; resolved_external_target?: GhidraAddress | null; resolved_external_provenance?: "ghidra_function_thunk" | null }>;
+  references_truncated?: boolean;
   pseudocode: string | null;
   pseudocode_status: string;
   pseudocode_truncated: boolean;
@@ -57,6 +61,7 @@ export interface GhidraFunctions {
   items: Array<Pick<GhidraFunction, "entry" | "external" | "name" | "name_truncated" | "namespace" | "namespace_truncated" | "body_size" | "pseudocode_status" | "pseudocode_truncated" | "instructions_truncated" | "calls_truncated"> & { index: number }>;
 }
 export interface GhidraDetail {
+  protocol_version?: string;
   run_id: string; invocation_id: string; index: number; citation: string; function: GhidraFunction;
 }
 async function get<T>(url: string, body?: unknown): Promise<T> {
