@@ -1,0 +1,34 @@
+import { expect, test } from "@playwright/test";
+import { FIXTURES_URL } from "../playwright.config";
+import { createProject, expectNoAxeViolations, FIXTURE, importFile } from "./helpers";
+
+test("guided overview uses real fixture evidence, exact run links and keyboard disclosure", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await createProject(page, FIXTURES_URL, "Guided inspection");
+  await importFile(page, FIXTURE("hello_v1-x86_64.exe"), { sample: "overview" });
+  const overview = page.getByRole("region", { name: "What do we know about this file?" });
+  await expect(overview.getByRole("heading", { name: "Header metadata only" })).toBeVisible();
+  await overview.getByRole("link", { name: "Choose a static inspection" }).click();
+  await expect(page.getByRole("heading", { name: "Static analysis runs" })).toBeInViewport();
+  await page.getByRole("button", { name: "Run pattern matching…" }).click();
+  await page.getByRole("button", { name: "Start run", exact: true }).click();
+  await expect(page.getByTestId("status").first()).toHaveText("Succeeded");
+  const runId = new URL(page.url()).pathname.split("/").pop()!;
+  await page.getByRole("link", { name: /Search the strings on the sample version page/ }).click();
+  await expect(overview.getByText(/Selected run from this page link/)).toBeVisible();
+  await expect(overview.getByRole("heading", { name: "Checks completed within their limits" })).toBeVisible();
+  const summaries = overview.locator("summary");
+  await summaries.first().focus();
+  await page.keyboard.press("Enter");
+  await expect(overview.getByRole("link", { name: /Download validated strings JSON/ })).toBeVisible();
+  expect(new URL(await overview.getByRole("link", { name: "Inspect rule observations" }).getAttribute("href") as string, page.url()).pathname).toBe(`/runs/${runId}`);
+  await expectNoAxeViolations(page);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+  await page.screenshot({ path: "test-results/inspection-overview-360.png", fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await expectNoAxeViolations(page);
+  await overview.screenshot({ path: "test-results/inspection-overview-desktop.png" });
+  await overview.getByRole("link", { name: "Inspect rule observations" }).click();
+  await expect(page.getByRole("heading", { name: /^Findings/ })).toBeInViewport();
+  await expect(page.getByRole("heading", { name: /^Findings/ })).toBeFocused();
+});

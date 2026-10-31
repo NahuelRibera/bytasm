@@ -64,7 +64,10 @@ Both build the UI and serve it at http://127.0.0.1:8000/. With Docker, use
 8. Add an analyst note or cited conclusion; compare two versions of the same
    sample. Comparison reports warn that changed strings and analyst text may be shared.
 
-This working tree targets **v0.4.0** (schema 4), pending owner review. **Tools**
+This checkout includes the **v0.6 function workbench** and the guided inspection
+overview increment described in [the current record](docs/milestones/v0.7-guided-overview.md).
+Package versions remain **0.4.0** and sample reports remain schema **4**; these
+are distinct from feature milestone names. **Tools**
 shows installed versions, availability, adapters, rules hashes and profile limits.
 Quick static review remains the default. Full adds capa 10.0.0 with two upstream
 Apache-2.0 rules, native PE x86/x64 only and no library signatures. Other formats
@@ -218,12 +221,16 @@ test-generated inputs.
 
 ## Remaining work
 
-ADR-0003 still proposes SQLite for the worker queue and needs owner review.
-The UI version still reads `0.0.1`; its strings counter needs to distinguish
-unanalysed input from zero results. The UPX-style rule needs a positive test.
-The v0.3 comparison and annotation workflows are described in the
-[milestone record](docs/milestones/v0.3-compare-annotate.md). See the
-[blueprint](docs/PROJECT_BLUEPRINT.md) for the wider scope.
+External-file intake remains blocked by **I1**. The API import path and parser
+workers still share access to trusted application state; resource limits do not
+close this boundary. See the [threat-path review and runtime acceptance checklist](docs/security/i1-acceptance.md).
+Function notes/bookmarks, cross-version Ghidra matching, archive inspection,
+credential classification and privacy-selectable exports remain future work.
+The strings counter already distinguishes unavailable data; the UI version is
+0.4.0, and the UPX-style fixture regression is present. Older milestone records
+are historical verification, not a fresh test result. ADR-0003 retains its
+proposed decision status even though the SQLite worker is implemented.
+See the [blueprint](docs/PROJECT_BLUEPRINT.md) for wider scope.
 
 ## Licence
 
@@ -267,7 +274,7 @@ capped at 1024. Explicit selected sets can request additional bounded dossiers.
 Nothing is installed or bundled automatically. Native macOS/Windows analysis
 and arbitrary-file admission remain unavailable. Follow the
 [setup and status guide](docs/ghidra-setup.md), optional Compose example and
-[current milestone](docs/milestones/v0.6-function-workbench.md) for precise
+[function-workbench milestone](docs/milestones/v0.6-function-workbench.md) for precise
 limits, verified platforms, deferred scope and residual parser risks.
 
 
@@ -285,6 +292,27 @@ run provenance. No behavior verdict or whole-program coverage is inferred.
 Existing fixture/self_built admission, baseline comparisons, annotations and
 historical report schemas remain intact. Function bookmarks/notes, Ghidra version
 matching, complete xrefs and arbitrary-file intake remain deferred. See the
-[current milestone](docs/milestones/v0.6-function-workbench.md) for exact scope,
+[function-workbench milestone](docs/milestones/v0.6-function-workbench.md) for exact scope,
 verification, known risks and follow-up, and the [API](docs/api-v0.5-ghidra.md) for
 selection/cursor semantics.
+
+## Start here: understanding an inspection
+
+After importing an admitted fixture, the version page first explains the file's
+apparent type and declared architecture, then shows the actual recorded analysis
+scope. Before any run it says **Header metadata only**. After a run it names the
+profile, run ID, check states, tool versions, retained observations and unknowns.
+Completion labels describe checks within limits; they are never threat verdicts.
+
+Without a run link, this overview shows the newest recorded analysis run,
+including a failed or cancelled one. A link with `run_id` shows only that exact
+run and checks version/hash/size identity. It never substitutes a successful
+older run. Browse text through the overview's exact-run link, or open a finding
+for offsets, addresses, rule provenance and raw JSON. Ghidra evidence links to
+its existing bounded function workbench; viewing evidence starts no analysis.
+
+Reports keep their historical independent selection rules and can contain a
+different run. Check the preview and source identities before sharing. Files,
+strings, pseudocode and analyst notes remain local and potentially sensitive;
+hiding a path in the interface does not remove it from storage or raw output.
+The import screen explains storage, network limits and a fixture-first path.

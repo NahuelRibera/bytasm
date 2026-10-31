@@ -89,3 +89,14 @@ The overview adds retained pseudocode/failed-detail/instruction/call counts,
 inventory state, selected entries and source provenance. Its sole selected tool
 is Ghidra; it does not imply strings/YARA-X/capa ran in that run. A missing output
 has unknown function count, never zero. No behavioral hypothesis is added.
+
+
+## Guided overview consumer (2026-10-31)
+
+The version overview uses existing `GET /sample-versions/{version}/runs` (latest
+recorded analysis run) or `GET /runs/{run}` for an explicit page `run_id`. It
+requires matching sample version, SHA-256 and byte size before showing run
+observations. Missing/mismatched evidence is unavailable; it is never replaced
+by another run. Check provenance links use the existing invocation raw endpoint.
+Ghidra-only jobs link to their exact function workbench rather than showing zero
+rule matches. No endpoint, schema or analysis-trigger behavior changes.

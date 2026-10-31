@@ -233,3 +233,27 @@ recovery removes only old regular files matching the reserved staging pattern.
 Disk or permission failure does not expose a partial final content-addressed file.
 This handles filesystem transfer reliability, not arbitrary-input isolation or
 proven power-loss durability.
+
+
+## Guided inspection overview and I1 acceptance
+
+The [I1 review](docs/security/i1-acceptance.md) records the full sample path,
+remaining trust-boundary failures and unchecked runtime acceptance requirements.
+No external input mode is introduced. A future isolated deployment must remove
+file-format parsing from the privileged API, isolate trusted state and prove
+network/filesystem/descendant/resource controls on each enabled platform.
+
+The version overview reads existing stored-evidence APIs. It selects the latest
+recorded analysis run or an explicitly linked run, checks version/hash/size
+identity, and shows unavailable evidence rather than substituting older success.
+Completion labels describe check status, not file safety or evidence completeness.
+Reviewed interpretation templates remain hypotheses. Ghidra inventory limits
+remain on its exact run's workbench. Reports retain independent snapshot scope.
+No new schema, migration, remote lookup, AI integration or tool distribution is
+introduced. Source-level identity checks in the browser are presentation guards;
+server-side export/input integrity checks remain authoritative.
+
+Stopping the app preserves local files and database. There is no complete
+per-sample deletion workflow. Raw JSON, report previews, existing comparison
+exports and retained analyst notes may disclose private data. This increment
+adds disclosure, not storage encryption, secret detection or export redaction.
