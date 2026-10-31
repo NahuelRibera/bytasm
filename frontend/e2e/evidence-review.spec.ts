@@ -14,8 +14,12 @@ test("fixture → understandable observations → exact evidence → scoped stri
   await expect(page.getByTestId("status").first()).toHaveText("Succeeded");
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
   const guide = page.getByRole("region", { name: "Evidence-led explanations" });
-  const url = guide.locator("article").filter({ has: page.getByRole("heading", { name: "url_reference", exact: true }) });
+  const url = guide.locator("article").filter({ has: page.getByRole("heading", { name: "Web address text is present", exact: true }) });
   await expect(url.getByText(/does not prove a network request/)).toBeVisible();
+  await url.getByText("Technical rule identifier", { exact: true }).click();
+  await expect(url.getByText("url_reference", { exact: true })).toBeVisible();
+  const target = await url.getByRole("link", { name: "Inspect exact finding and evidence" }).boundingBox();
+  expect(target?.height).toBeGreaterThanOrEqual(24);
   await url.getByRole("link", { name: "Inspect exact finding and evidence" }).click();
   await expect(page.getByRole("region", { name: "Evidence: url_reference", exact: true })).toBeVisible();
   await page.getByRole("link", { name: /Search the strings/ }).click();

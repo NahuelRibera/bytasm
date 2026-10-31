@@ -853,6 +853,13 @@ details.card > summary {
 .review-panel, .review-observation, .section-map { min-width: 0; overflow-wrap: anywhere; }
 .review-panel details > summary { cursor: pointer; min-height: 28px; padding-block: 8px; }
 .review-observation { border-top: 1px solid var(--border); margin-top: 16px; padding-top: 12px; }
+.review-panel .review-observation > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  max-width: 100%;
+  padding-block: var(--space-1);
+}
 .section-map { margin: 0 0 24px; }
 .section-map ul { list-style: none; padding: 0; }
 .section-map li { margin: 16px 0; }
