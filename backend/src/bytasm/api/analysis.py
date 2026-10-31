@@ -60,6 +60,7 @@ from bytasm.db.models import (
     StringOccurrence,
     ToolInvocation,
 )
+from bytasm.interpretation_catalog import rank_live_review
 from bytasm.jobs import messages, runs, summary
 from bytasm.jobs.scan import (
     expected_identifiers,
@@ -321,6 +322,7 @@ def run_out(session: Session, run: AnalysisRun) -> RunOut:
     review = build_review(observations, run.id, version.id)
     review.total = finding_count or 0
     review.capped = review.total > len(review.observations)
+    rank_live_review(review)
     return RunOut(
         id=run.id,
         status=run.status,  # type: ignore[arg-type]  # constrained by the lifecycle

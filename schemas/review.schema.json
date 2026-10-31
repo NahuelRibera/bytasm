@@ -1,0 +1,665 @@
+{
+  "$defs": {
+    "Attempt": {
+      "additionalProperties": false,
+      "properties": {
+        "invocation_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Invocation Id"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "run_status": {
+          "title": "Run Status",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "invocation_id",
+        "run_status",
+        "status"
+      ],
+      "title": "Attempt",
+      "type": "object"
+    },
+    "Identity": {
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "title": "Format",
+          "type": "string"
+        },
+        "sample_id": {
+          "title": "Sample Id",
+          "type": "string"
+        },
+        "sha256": {
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size_bytes": {
+          "title": "Size Bytes",
+          "type": "integer"
+        },
+        "version_id": {
+          "title": "Version Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "version_id",
+        "sample_id",
+        "sha256",
+        "size_bytes",
+        "format"
+      ],
+      "title": "Identity",
+      "type": "object"
+    },
+    "ImportObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "alternative": {
+          "title": "Alternative",
+          "type": "string"
+        },
+        "catalog_sha256": {
+          "title": "Catalog Sha256",
+          "type": "string"
+        },
+        "catalog_version": {
+          "title": "Catalog Version",
+          "type": "string"
+        },
+        "category": {
+          "title": "Category",
+          "type": "string"
+        },
+        "invocation_id": {
+          "title": "Invocation Id",
+          "type": "string"
+        },
+        "limitation": {
+          "title": "Limitation",
+          "type": "string"
+        },
+        "locations_capped": {
+          "title": "Locations Capped",
+          "type": "boolean"
+        },
+        "matches_retained": {
+          "title": "Matches Retained",
+          "type": "integer"
+        },
+        "next_step": {
+          "title": "Next Step",
+          "type": "string"
+        },
+        "observation": {
+          "title": "Observation",
+          "type": "string"
+        },
+        "output_sha256": {
+          "title": "Output Sha256",
+          "type": "string"
+        },
+        "pointers": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 8,
+          "title": "Pointers",
+          "type": "array"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "supporting_names": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 8,
+          "title": "Supporting Names",
+          "type": "array"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "category",
+        "title",
+        "observation",
+        "alternative",
+        "next_step",
+        "pointers",
+        "supporting_names",
+        "matches_retained",
+        "locations_capped",
+        "catalog_version",
+        "catalog_sha256",
+        "source",
+        "limitation",
+        "run_id",
+        "invocation_id",
+        "output_sha256"
+      ],
+      "title": "ImportObservation",
+      "type": "object"
+    },
+    "Observation": {
+      "additionalProperties": false,
+      "properties": {
+        "alternatives": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Alternatives",
+          "type": "array"
+        },
+        "conditions": {
+          "title": "Conditions",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "evidence_capped": {
+          "title": "Evidence Capped",
+          "type": "boolean"
+        },
+        "finding_id": {
+          "title": "Finding Id",
+          "type": "string"
+        },
+        "hypothesis": {
+          "title": "Hypothesis",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "invocation_id": {
+          "title": "Invocation Id",
+          "type": "string"
+        },
+        "limitations": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Limitations",
+          "type": "array"
+        },
+        "next_step": {
+          "title": "Next Step",
+          "type": "string"
+        },
+        "output_sha256": {
+          "title": "Output Sha256",
+          "type": "string"
+        },
+        "question": {
+          "title": "Question",
+          "type": "string"
+        },
+        "relevance": {
+          "title": "Relevance",
+          "type": "integer"
+        },
+        "reviewed": {
+          "title": "Reviewed",
+          "type": "boolean"
+        },
+        "rule_id": {
+          "title": "Rule Id",
+          "type": "string"
+        },
+        "rule_sha256": {
+          "title": "Rule Sha256",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "selection_reason": {
+          "title": "Selection Reason",
+          "type": "string"
+        },
+        "statement": {
+          "title": "Statement",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "tool": {
+          "title": "Tool",
+          "type": "string"
+        },
+        "why_it_matters": {
+          "title": "Why It Matters",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "question",
+        "statement",
+        "why_it_matters",
+        "alternatives",
+        "hypothesis",
+        "conditions",
+        "limitations",
+        "next_step",
+        "reviewed",
+        "relevance",
+        "selection_reason",
+        "run_id",
+        "invocation_id",
+        "output_sha256",
+        "tool",
+        "rule_id",
+        "rule_sha256",
+        "finding_id",
+        "evidence",
+        "evidence_capped"
+      ],
+      "title": "Observation",
+      "type": "object"
+    },
+    "Selected": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter": {
+          "title": "Adapter",
+          "type": "string"
+        },
+        "adapter_version": {
+          "title": "Adapter Version",
+          "type": "string"
+        },
+        "completeness": {
+          "const": "bounded_retained_output",
+          "default": "bounded_retained_output",
+          "title": "Completeness",
+          "type": "string"
+        },
+        "invocation_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Invocation Id"
+        },
+        "limits": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Limits"
+        },
+        "output_sha256": {
+          "title": "Output Sha256",
+          "type": "string"
+        },
+        "parameters": {
+          "additionalProperties": true,
+          "title": "Parameters",
+          "type": "object"
+        },
+        "profile": {
+          "additionalProperties": true,
+          "title": "Profile",
+          "type": "object"
+        },
+        "retention": {
+          "additionalProperties": true,
+          "title": "Retention",
+          "type": "object"
+        },
+        "rule_sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Rule Sha256"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "run_status": {
+          "title": "Run Status",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "tool_version": {
+          "title": "Tool Version",
+          "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "run_id",
+        "invocation_id",
+        "run_status",
+        "status",
+        "output_sha256",
+        "tool_version",
+        "adapter",
+        "adapter_version",
+        "rule_sha256",
+        "profile",
+        "parameters",
+        "limits",
+        "retention",
+        "warnings"
+      ],
+      "title": "Selected",
+      "type": "object"
+    },
+    "Source": {
+      "additionalProperties": false,
+      "properties": {
+        "latest_attempt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Attempt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "selected": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Selected"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tool": {
+          "enum": [
+            "lief",
+            "strings",
+            "yara-x",
+            "capa",
+            "ghidra"
+          ],
+          "title": "Tool",
+          "type": "string"
+        },
+        "unavailable_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Unavailable Reason"
+        }
+      },
+      "required": [
+        "tool",
+        "selected",
+        "latest_attempt",
+        "unavailable_reason"
+      ],
+      "title": "Source",
+      "type": "object"
+    },
+    "TextRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "encoding": {
+          "title": "Encoding",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "invocation_id": {
+          "title": "Invocation Id",
+          "type": "string"
+        },
+        "offset": {
+          "title": "Offset",
+          "type": "integer"
+        },
+        "value": {
+          "title": "Value",
+          "type": "string"
+        },
+        "value_truncated": {
+          "title": "Value Truncated",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "invocation_id",
+        "offset",
+        "encoding",
+        "value",
+        "value_truncated"
+      ],
+      "title": "TextRecord",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "catalog_version": {
+      "const": "review-2",
+      "default": "review-2",
+      "title": "Catalog Version",
+      "type": "string"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "declared_filename": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Declared Filename"
+    },
+    "exact_run_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Exact Run Id"
+    },
+    "function_reviews": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "maxItems": 128,
+      "title": "Function Reviews",
+      "type": "array"
+    },
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "import_observations": {
+      "items": {
+        "$ref": "#/$defs/ImportObservation"
+      },
+      "maxItems": 16,
+      "title": "Import Observations",
+      "type": "array"
+    },
+    "integrity": {
+      "const": "verified_at_creation",
+      "default": "verified_at_creation",
+      "title": "Integrity",
+      "type": "string"
+    },
+    "observations": {
+      "items": {
+        "$ref": "#/$defs/Observation"
+      },
+      "maxItems": 48,
+      "title": "Observations",
+      "type": "array"
+    },
+    "observations_capped": {
+      "title": "Observations Capped",
+      "type": "boolean"
+    },
+    "observations_total": {
+      "title": "Observations Total",
+      "type": "integer"
+    },
+    "sample": {
+      "$ref": "#/$defs/Identity"
+    },
+    "schema_version": {
+      "const": "bytasm-review-1",
+      "default": "bytasm-review-1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "scope": {
+      "enum": [
+        "combined",
+        "exact_run"
+      ],
+      "title": "Scope",
+      "type": "string"
+    },
+    "selection_explanation": {
+      "title": "Selection Explanation",
+      "type": "string"
+    },
+    "source_selection_policy": {
+      "const": "latest-completed-step-per-tool-v1",
+      "default": "latest-completed-step-per-tool-v1",
+      "title": "Source Selection Policy",
+      "type": "string"
+    },
+    "sources": {
+      "items": {
+        "$ref": "#/$defs/Source"
+      },
+      "maxItems": 5,
+      "title": "Sources",
+      "type": "array"
+    },
+    "strings": {
+      "items": {
+        "$ref": "#/$defs/TextRecord"
+      },
+      "maxItems": 5000,
+      "title": "Strings",
+      "type": "array"
+    },
+    "supersedes_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Supersedes Id"
+    },
+    "unknowns": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Unknowns",
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "supersedes_id",
+    "created_at",
+    "sample",
+    "scope",
+    "exact_run_id",
+    "sources",
+    "observations",
+    "observations_total",
+    "observations_capped",
+    "strings",
+    "unknowns",
+    "selection_explanation",
+    "declared_filename"
+  ],
+  "title": "Snapshot",
+  "type": "object"
+}

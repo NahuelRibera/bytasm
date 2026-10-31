@@ -1,0 +1,36 @@
+import { expect, test } from "@playwright/test";
+import { readFile } from "node:fs/promises";
+import { FIXTURES_URL } from "../playwright.config";
+import { createProject, expectNoAxeViolations, FIXTURE, importFile } from "./helpers";
+
+test("real fixture pins sources, previews byte-minimized export and navigates bytes at 360 px", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await createProject(page, FIXTURES_URL, "Pinned investigation");
+  await importFile(page, FIXTURE("hello_v1-x86_64.elf"), { sample: "pinned" });
+  await page.getByRole("button", { name: "Create combined review" }).click();
+  const panel = page.getByRole("region", { name: "Pinned investigation review" });
+  await expect(panel.getByText("Combined review", { exact: true })).toBeVisible();
+  const reviewId = new URL(page.url()).searchParams.get("review_id");
+  expect(reviewId).toMatch(/^[a-f0-9]{32}$/);
+  await panel.getByText("Preview and export this pinned review").click();
+  await expect(panel.getByLabel("Readable text values (may be private)")).not.toBeChecked();
+  await panel.getByRole("button", { name: "Preview export", exact: true }).click();
+  await expect(panel.getByRole("button", { name: "Download previewed JSON" })).toBeVisible();
+  const [download] = await Promise.all([page.waitForEvent("download"), panel.getByRole("button", { name: "Download previewed JSON" }).click()]);
+  const downloaded = JSON.parse(await readFile((await download.path())!, "utf8"));
+  expect(downloaded.review_id).toBe(reviewId);
+  expect(downloaded.strings).toEqual([]);
+  expect(downloaded).not.toHaveProperty("declared_filename");
+  const pinned = JSON.stringify(downloaded);
+  await page.getByText("Inspect exact file bytes", { exact: true }).click();
+  const byteTable = page.getByRole("table", { name: "256-byte window from file offset 0" });
+  await expect(byteTable).toContainText("7f 45 4c 46");
+  await page.getByRole("button", { name: "Next byte window" }).click();
+  await expect(page.getByRole("table", { name: "256-byte window from file offset 256" })).toBeVisible();
+  await expectNoAxeViolations(page);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+  await page.screenshot({ path: "test-results/pinned-review-360.png", fullPage: true });
+  await page.reload();
+  await expect(panel.getByText("Combined review", { exact: true })).toBeVisible();
+  expect(pinned).toContain(reviewId!);
+});

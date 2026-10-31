@@ -1,0 +1,293 @@
+{
+  "$defs": {
+    "ExportPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "analyst_notes": {
+          "default": false,
+          "title": "Analyst Notes",
+          "type": "boolean"
+        },
+        "mask_sensitive_values": {
+          "default": true,
+          "title": "Mask Sensitive Values",
+          "type": "boolean"
+        },
+        "observations": {
+          "default": true,
+          "title": "Observations",
+          "type": "boolean"
+        },
+        "original_names": {
+          "default": false,
+          "title": "Original Names",
+          "type": "boolean"
+        },
+        "overview": {
+          "default": true,
+          "title": "Overview",
+          "type": "boolean"
+        },
+        "string_values": {
+          "default": false,
+          "title": "String Values",
+          "type": "boolean"
+        },
+        "technical_details": {
+          "default": true,
+          "title": "Technical Details",
+          "type": "boolean"
+        }
+      },
+      "title": "ExportPolicy",
+      "type": "object"
+    },
+    "Identity": {
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "title": "Format",
+          "type": "string"
+        },
+        "sample_id": {
+          "title": "Sample Id",
+          "type": "string"
+        },
+        "sha256": {
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size_bytes": {
+          "title": "Size Bytes",
+          "type": "integer"
+        },
+        "version_id": {
+          "title": "Version Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "version_id",
+        "sample_id",
+        "sha256",
+        "size_bytes",
+        "format"
+      ],
+      "title": "Identity",
+      "type": "object"
+    },
+    "TextRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "encoding": {
+          "title": "Encoding",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "invocation_id": {
+          "title": "Invocation Id",
+          "type": "string"
+        },
+        "offset": {
+          "title": "Offset",
+          "type": "integer"
+        },
+        "value": {
+          "title": "Value",
+          "type": "string"
+        },
+        "value_truncated": {
+          "title": "Value Truncated",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "invocation_id",
+        "offset",
+        "encoding",
+        "value",
+        "value_truncated"
+      ],
+      "title": "TextRecord",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "catalog_version": {
+      "title": "Catalog Version",
+      "type": "string"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "declared_filename": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Declared Filename"
+    },
+    "exact_run_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Exact Run Id"
+    },
+    "excluded_content": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Excluded Content",
+      "type": "array"
+    },
+    "function_reviews": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "maxItems": 128,
+      "title": "Function Reviews",
+      "type": "array"
+    },
+    "import_observations": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "maxItems": 16,
+      "title": "Import Observations",
+      "type": "array"
+    },
+    "observations": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "maxItems": 48,
+      "title": "Observations",
+      "type": "array"
+    },
+    "observations_capped": {
+      "title": "Observations Capped",
+      "type": "boolean"
+    },
+    "observations_total": {
+      "title": "Observations Total",
+      "type": "integer"
+    },
+    "overview": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Overview"
+    },
+    "privacy_notice": {
+      "title": "Privacy Notice",
+      "type": "string"
+    },
+    "privacy_policy": {
+      "$ref": "#/$defs/ExportPolicy"
+    },
+    "review_id": {
+      "title": "Review Id",
+      "type": "string"
+    },
+    "review_sha256": {
+      "title": "Review Sha256",
+      "type": "string"
+    },
+    "sample": {
+      "$ref": "#/$defs/Identity"
+    },
+    "schema_version": {
+      "const": "bytasm-review-export-1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "scope": {
+      "enum": [
+        "combined",
+        "exact_run"
+      ],
+      "title": "Scope",
+      "type": "string"
+    },
+    "source_selection_policy": {
+      "title": "Source Selection Policy",
+      "type": "string"
+    },
+    "sources": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "maxItems": 5,
+      "title": "Sources",
+      "type": "array"
+    },
+    "strings": {
+      "items": {
+        "$ref": "#/$defs/TextRecord"
+      },
+      "maxItems": 5000,
+      "title": "Strings",
+      "type": "array"
+    },
+    "unknowns": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Unknowns",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "review_id",
+    "review_sha256",
+    "created_at",
+    "sample",
+    "scope",
+    "exact_run_id",
+    "catalog_version",
+    "source_selection_policy",
+    "sources",
+    "privacy_policy",
+    "observations",
+    "import_observations",
+    "function_reviews",
+    "observations_total",
+    "observations_capped",
+    "strings",
+    "unknowns",
+    "excluded_content",
+    "privacy_notice"
+  ],
+  "title": "ExportDocument",
+  "type": "object"
+}

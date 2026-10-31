@@ -89,10 +89,11 @@ function OverviewEvidence({ version, run, explicitlySelected }: { version: Sampl
           : ruleChecks.length ? <p>{run.counts.findings} rule observations recorded across {ruleChecks.length} completed rule checks. {run.counts.findings === 0 ? "No matches in these checks cannot establish that the file is harmless. " : "A pattern match does not show that a behavior happened. "}<Link to={`/runs/${run.id}#findings`}>Inspect rule observations</Link>.</p>
           : <p>Rule checks did not complete.</p>}
         {observations.length > 0 && <>
-          <p className="hint">First {observations.length} of {review?.total} recorded observations in source order; this is not a severity ranking. Reviewed templates {review?.template_version}.</p>
+          <p className="hint">{review?.selection_explanation ?? `First ${observations.length} of ${review?.total} recorded observations in source order; this is not a severity ranking.`} Showing {observations.length} retained examples; inspect the run for all observations. Reviewed templates {review?.template_version}.</p>
           {observations.map(item => <article className="review-observation" key={item.key}>
-            <h4>{item.rule_id}</h4><p><strong>Observed:</strong> {item.statement}</p>
+            <h4>{item.title ?? item.rule_id}</h4><p><strong>Observed:</strong> {item.statement}</p>
             <p><strong>Possible interpretation:</strong> {item.hypothesis}</p>
+            {item.title && <details><summary>Technical rule identifier</summary><code>{item.rule_id}</code></details>}
             <p>{item.tool} {item.tool_version} · <a href={item.source_href}>Inspect exact finding and evidence</a>.</p>
             {item.evidence_capped && <p className="hint">Source evidence is capped; inspect its full retained scope.</p>}
           </article>)}

@@ -529,12 +529,14 @@ export interface ActivityPage {
 
 
 export interface Review {
+  selection_policy?: "source-order-v1" | "relevance-v1";
+  selection_explanation?: string | null;
   template_version: string;
   run_id: string | null;
   version_id: string;
   total: number;
   capped: boolean;
-  observations: Array<{ key: string; tool: string; tool_version: string; adapter_version: string;
+  observations: Array<{ title?: string | null; key: string; tool: string; tool_version: string; adapter_version: string;
     rule_id: string; rule_version: string; rule_sha256: string; statement: string; hypothesis: string;
     source_href: string; locations: string[]; pointers: string[]; evidence_capped: boolean }>;
   glossary: Record<string, string>;

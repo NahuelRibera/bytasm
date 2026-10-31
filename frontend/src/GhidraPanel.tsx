@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRef, useState } from "react";
+import { FunctionReview } from "./FunctionReview";
 import { FunctionRelationships } from "./FunctionRelationships";
 import { FunctionSelection } from "./FunctionSelection";
 import { Link } from "./router";
@@ -115,6 +116,7 @@ function FunctionDetail({ detail }: { detail: GhidraDetail }) {
     <h4 className="untrusted">{fn.name}{fn.name_truncated && " (name truncated)"}</h4>
     <p><code>{addressLabel(fn.entry)}</code> <CopyButton value={addressLabel(fn.entry)} label="Copy function entry with address space" /> <a href={detail.citation}>Original function record</a></p>
     {fn.limitations.length > 0 && <ul className="notice">{fn.limitations.map((item, index) => <li key={index}>{item}</li>)}</ul>}
+    <FunctionReview key={`${detail.run_id}:${detail.index}`} detail={detail} />
     <h4>Ghidra pseudocode</h4><p className="hint">Decompiler approximation, not original source code. Status: {fn.pseudocode_status.replaceAll("_", " ")}.{fn.pseudocode_truncated && " Output was truncated."}</p>
     {fn.pseudocode === null ? <p>No pseudocode was retained for this function.</p> : <pre className="ghidra-code" tabIndex={0} aria-label="Ghidra pseudocode"><code>{fn.pseudocode}</code></pre>}
     <details><summary>Assembly and instruction bytes ({fn.instructions.length} retained)</summary>

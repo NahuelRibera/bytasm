@@ -57,6 +57,7 @@ class SuccessfulParse:
     started_at: datetime
     finished_at: datetime
     limits: dict[str, Any]
+    isolation: dict[str, Any] | None = None
 
 
 def persist_import(
@@ -121,7 +122,10 @@ def persist_import(
             tool_version=parsed.result.tool_version,
             adapter_name=parsed.result.adapter,
             adapter_version=parsed.result.adapter_version,
-            args={"limits": parsed.limits},
+            args={
+                "limits": parsed.limits,
+                **({"isolation": parsed.isolation} if parsed.isolation else {}),
+            },
             status="succeeded",
             exit_code=parsed.exit_code,
             duration_ms=parsed.duration_ms,
