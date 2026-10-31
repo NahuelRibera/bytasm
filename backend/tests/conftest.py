@@ -35,6 +35,7 @@ ELF_FIXTURES = (
     ELF_X86_64,
     ELF_X86_64_STRIPPED,
     ELF_X86_64_V2,
+    FIXTURES_DIR / "bin" / "inventory_many-x86_64.elf",
 )
 CAPA_PE = FIXTURES_DIR / "bin" / "capa_environment-x86_64.exe"
 PE_FIXTURES = (PE_X86_64_EXE, PE_X86_64_DLL, CAPA_PE)

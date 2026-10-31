@@ -159,3 +159,27 @@ Migration0007 adds no columns and rewrites no evidence, annotations, citations
 or report rows. Downgrade rejects any retained Ghidra run/invocation to prevent
 older code silently hiding its evidence. Existing capa downgrade protection
 remains active and transactional.
+
+
+## v0.6 selected-function reports
+
+New ghidra-2 analyses export `bytasm-ghidra-report-2`; legacy ghidra-1 output
+continues to export report-1 with the enriched live overview. The separate
+analysis schema accepts both versions, enforcing the historical 256-entry cap
+on ghidra-1 and 1024 entries on ghidra-2. Selected reports include exact requested
+entries, source run/output digest and the new selected run's own profile/script
+identities. Retained detail counts have the retained inventory as denominator;
+they are not whole-program analysis percentages. Export output is bounded at
+16 MiB, from at most 2 MiB of validated analysis. HTML remains inert and escaped.
+The report deliberately excludes version annotations and unsupported non-call
+references. Existing schemas 2/3/4 and stored historical downloads are unchanged;
+no database migration or report-history rewriting is introduced.
+
+Report-2 HTML includes a readable provenance section, selected pseudocode,
+assembly/byte tables, direct-call pointers and an expandable retained inventory,
+followed by the escaped canonical JSON appendix. Every function keeps its original
+record index; report links are local fragment links, never sample-derived URLs.
+Unselected functions remain inventory entries. Missing instructions/pseudocode and
+caps are explicit. Expanded HTML that exceeds 16 MiB returns 413/report_too_large,
+not an integrity failure or truncated success; canonical JSON remains available
+when it fits its own bound. Historical schemas 2/3/4 use their existing renderer.

@@ -81,13 +81,39 @@ The run page shows queued/running/failure/cancellation states. Completed results
 show an evidence-led count summary, exact run/version identity and limits.
 Search/page the function inventory, open a function, inspect available pseudocode,
 instructions and direct static call relationships. Details are limited to the
-first 16 functions, not chosen interactively in this milestone. Inventory-only
-functions say so. The static-call view has a source/target address table.
+first 16 functions on the initial run. Inventory is bounded at 1024 entries.
+Inventory-only functions say so. Select up to eight entries and request a new
+selected-function run for bounded pseudocode, instructions and direct calls.
+That explicit action repeats the bounded import/analysis; it may take three
+minutes. Search and opening stored evidence never start a parser. Exact matching
+requests reuse an active/completed job. Cancel through the selected run page. The static-call view has a source/target address table.
 
 Export the separate JSON or self-contained HTML report from that run. Exports
 include sample-derived pseudocode and names: review them before sharing.
 Exports are generated from the hash-verified canonical Ghidra document and do
 not enter the existing report library/history. Existing schema 2/3/4 reports and
 baseline comparisons continue to use their original profiles. Ghidra comparison,
-selected-function reruns, advanced reference/data extraction and report-library
-integration are bounded future work.
+advanced reference/data extraction and report-library integration remain future
+work. One-hop call exploration uses retained direct-call windows only; it does
+not promise complete incoming references. See the v0.6 milestone for new results.
+
+## Opt-in verification lanes
+
+With verified external Linux tools and a local locked-dependency dev image:
+
+```sh
+BYTASM_GHIDRA_TEST_IMAGE=your-local-dev-image ./scripts/check-ghidra-real.sh
+make web-build
+BYTASM_GHIDRA_TEST_IMAGE=your-local-dev-image node scripts/check-ghidra-browser.mjs
+```
+
+Both also require the exported absolute BYTASM_GHIDRA_HOME and
+BYTASM_GHIDRA_JAVA_HOME roots. The browser lane requires the existing frontend
+Playwright Chromium installation. It creates disposable API/offline-worker
+containers and a uniquely named data volume, binds only a random localhost port,
+uses manifest-admitted fixtures and removes its own containers/volume in finally.
+It imports nothing from the user's projects and never executes a sample.
+Screenshots and the selected report stay in backend/.pytest_cache/v06/browser-real
+for local review. This is a development verification helper, not deployment or
+third-party intake. Worker scratch uses a separate noexec tmpfs, so the lane also
+checks publication of verified output onto a different persistent filesystem.

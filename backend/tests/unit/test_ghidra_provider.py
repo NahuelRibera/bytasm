@@ -19,7 +19,7 @@ from bytasm.ghidra_protocol import GhidraResult
 
 def document() -> dict[str, Any]:
     return {
-        "schema_version": "ghidra-1",
+        "schema_version": "ghidra-2",
         "input_sha256": "a" * 64,
         "ghidra_version": "12.2",
         "language_id": "x86:LE:64:default",

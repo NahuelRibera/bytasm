@@ -53,7 +53,7 @@ def startup_sweep(ctx: AppContext) -> SweepResult:
         }
     removed = {}
     for name, store in (("blobs", ctx.blobs), ("outputs", ctx.outputs), ("reports", ctx.reports)):
-        count = 0
+        count = store.remove_stale_staging(max_age)
         for sha256, age in list(store.stored_hashes()):
             if sha256 not in referenced[name] and age > max_age:
                 store.remove(sha256)

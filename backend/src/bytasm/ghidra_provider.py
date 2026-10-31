@@ -19,7 +19,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from bytasm.ghidra import GhidraConfiguration, diagnose
-from bytasm.ghidra_protocol import GhidraResult
+from bytasm.ghidra_protocol import Address, GhidraResult
 from bytasm.runner import workspace
 from bytasm.runner.child import read_verified_file
 from bytasm.runner.limits import MAX_INPUT_BYTES, MIB, ParserLimits
@@ -35,14 +35,14 @@ LIMITS = ParserLimits(
 )
 OPTIONS: dict[str, Any] = {
     "id": "ghidra-static",
-    "version": 1,
+    "version": 2,
     "name": "Bounded Ghidra static review",
     "ghidra_version": "12.2",
     "analyzers": "Ghidra 12.2 loader defaults, single CPU, fresh project",
     "analysis_timeout_seconds": 60,
     "wall_timeout_seconds": 180,
     "heap_mib": 768,
-    "max_functions": 256,
+    "max_functions": 1024,
     "max_function_details": 16,
     "max_instructions_per_function": 64,
     "max_calls_per_function": 64,
@@ -56,26 +56,37 @@ def script_digest() -> str:
     return hashlib.sha256((SCRIPTS / "BytasmExtract.java").read_bytes()).hexdigest()
 
 
-def profile_digest() -> str:
+def profile_digest(selected: list[Address] | None = None) -> str:
     return hashlib.sha256(
-        json.dumps(OPTIONS, sort_keys=True, separators=(",", ":")).encode()
+        json.dumps(profile_options(selected), sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
 
 
-def profile_snapshot() -> dict[str, Any]:
+def profile_options(selected: list[Address] | None = None) -> dict[str, Any]:
+    if selected is None:
+        return dict(OPTIONS)
+    if not 1 <= len(selected) <= 8 or len({(a.space, a.address) for a in selected}) != len(
+        selected
+    ):
+        raise ValueError("Invalid selected function set")
+    entries = sorted((a.model_dump() for a in selected), key=lambda a: (a["space"], a["address"]))
+    return {**OPTIONS, "selected_entries": entries}
+
+
+def profile_snapshot(selected: list[Address] | None = None) -> dict[str, Any]:
     return {
         "id": OPTIONS["id"],
-        "version": 1,
-        "name": OPTIONS["name"],
+        "version": 2,
+        "name": OPTIONS["name"] if selected is None else "Selected Ghidra function review",
         "steps": [
             {
                 "tool": "ghidra",
                 "adapter": "ghidra_headless",
                 "adapter_version": "1",
                 "tool_version": "12.2",
-                "profile_sha256": profile_digest(),
+                "profile_sha256": profile_digest(selected),
                 "script_sha256": script_digest(),
-                "options": dict(OPTIONS),
+                "options": profile_options(selected),
             }
         ],
     }
@@ -158,15 +169,18 @@ def _temporary_filesystem_bounded(workdir: Path) -> bool:
     return False
 
 
-def _parse(raw: bytes, expected_sha256: str) -> GhidraResult | None:
+def _parse(
+    raw: bytes, expected_sha256: str, selected: list[Address] | None = None
+) -> GhidraResult | None:
     try:
         result = GhidraResult.model_validate_json(raw)
     except ValidationError:
         return None
     if (
-        result.input_sha256 != expected_sha256
+        result.schema_version != "ghidra-2"
+        or result.input_sha256 != expected_sha256
         or result.script_sha256 != script_digest()
-        or result.profile_sha256 != profile_digest()
+        or result.profile_sha256 != profile_digest(selected)
         or result.analysis_timed_out
         or result.language_id
         not in {
@@ -176,6 +190,20 @@ def _parse(raw: bytes, expected_sha256: str) -> GhidraResult | None:
         }
     ):
         return None
+    if (
+        selected is None
+        and sum(f.pseudocode_status != "not_selected" for f in result.functions) > 16
+    ):
+        return None
+    if selected is not None:
+        expected = {(a.space, a.address) for a in selected}
+        actual = {
+            (f.entry.space, f.entry.address)
+            for f in result.functions
+            if f.pseudocode_status != "not_selected"
+        }
+        if expected != actual:
+            return None
     return result
 
 
@@ -202,6 +230,7 @@ async def analyze(
     workdir: Path,
     expected_sha256: str,
     should_cancel: Callable[[], bool],
+    selected: list[Address] | None = None,
 ) -> AdapterOutcome[GhidraResult]:
     preflight = diagnose(config)
     if preflight.status != "execution_unavailable":
@@ -216,11 +245,16 @@ async def analyze(
             status="cancelled", reason="cancel_requested", exit_code=None, duration_ms=0
         )
     try:
+        if selected is not None:
+            options = profile_options(selected)
+            (workdir / "selection.json").write_text(
+                json.dumps(options["selected_entries"]), encoding="utf-8"
+            )
         return await run_child(
             _command(config, "analyze", expected_sha256),
             workdir,
             LIMITS,
-            parse_result=lambda raw: _parse(raw, expected_sha256),
+            parse_result=lambda raw: _parse(raw, expected_sha256, selected),
             should_cancel=should_cancel,
         )
     except OSError:
@@ -332,6 +366,15 @@ def _bridge() -> None:
 
         identify_format(data)
         del data
+        selected = None
+        selection_path = work / "selection.json"
+        if selection_path.exists():
+            if selection_path.is_symlink() or selection_path.stat().st_size > 8192:
+                raise SystemExit(3)
+            selected = [Address.model_validate(a) for a in json.loads(selection_path.read_text())]
+            profile_options(selected)
+        else:
+            selection_path.write_text("[]", encoding="utf-8")
         argv += [
             "-import",
             str(work / "upload.bin"),
@@ -343,8 +386,9 @@ def _bridge() -> None:
             "BytasmExtract.java",
             str(work / "result.json"),
             expected,
-            profile_digest(),
+            profile_digest(selected),
             script_digest(),
+            str(selection_path),
         ]
     env = {
         "PATH": f"{java}/bin:/usr/bin:/bin",

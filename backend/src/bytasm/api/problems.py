@@ -36,6 +36,17 @@ _PROBLEMS: Final[dict[str, tuple[int, str, str]]] = {
         "Something went wrong inside Bytasm. Try again; if it happens again, find this "
         "request ID in the server log.",
     ),
+    "report_too_large": (
+        413,
+        "Report output limit reached",
+        "The export exceeds the bounded report size. Try the canonical JSON format.",
+    ),
+    "ghidra_incompatible": (
+        409,
+        "Ghidra provenance is incompatible",
+        "Start a new Ghidra function review with the current profile "
+        "before requesting selected details.",
+    ),
     # Import
     "invalid_import_metadata": (
         422,
