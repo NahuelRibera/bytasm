@@ -1,3 +1,5 @@
+import { ByteViewer } from "../ByteViewer";
+import { PinnedReview } from "../PinnedReview";
 import { InspectionOverview } from "../InspectionOverview";
 import { SectionMap } from "../SectionMap";
 import { ReportLibrary } from "../ReportLibrary";
@@ -70,6 +72,8 @@ export function VersionPage({
       </header>
 
       <InspectionOverview key={`${versionId}:${sourceRun ?? "latest"}`} version={v} runId={sourceRun} />
+      <PinnedReview key={versionId} version={v} runId={sourceRun} />
+      <ByteViewer key={`bytes:${versionId}`} versionId={versionId} />
       <div className="grid-2">
         <IdentityPanel v={v} />
         <MetadataPanel v={v} />

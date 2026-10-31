@@ -909,3 +909,26 @@ details.card > summary {
   .inspection-guidance { grid-template-columns: 1fr; gap: 0; }
   .inspection-overview .inspection-intro { font-size: 1rem; }
 }
+
+/* Investigation controls share the established surfaces, type and focus rules. */
+.pinned-review summary,
+.byte-viewer summary,
+.function-review summary {
+  min-height: 24px;
+  padding-block: var(--space-2);
+  cursor: pointer;
+}
+.pinned-review fieldset { min-width: 0; }
+.pinned-review label,
+.function-review label,
+.byte-viewer label { display: block; margin-block: var(--space-2); }
+.review-export-preview {
+  max-height: 28rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.function-review textarea { width: 100%; min-height: 7rem; }
+.pinned-review .button,
+.byte-viewer .button,
+.function-review .button { white-space: normal; }

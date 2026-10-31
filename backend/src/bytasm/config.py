@@ -72,6 +72,7 @@ class Settings:
     # `scripts/check_compose.py` asserts. Host, Origin and request-header
     # guards still apply. self_built is refused in this mode, because the
     # listener is not loopback (blueprint 5.7, 8.2). See ADR-0002.
+    metadata_isolation_image: str | None = None
     container: bool = False
     ghidra: GhidraConfiguration = field(
         default_factory=GhidraConfiguration, repr=False, kw_only=True
@@ -99,6 +100,7 @@ class Settings:
             raise ConfigError(f"BYTASM_PORT must be a TCP port number, not {port_text!r}.")
         settings = cls(
             ghidra=GhidraConfiguration.from_env(env),
+            metadata_isolation_image=env.get("BYTASM_METADATA_ISOLATION_IMAGE") or None,
             data_dir=Path(env.get("BYTASM_DATA_DIR", str(REPO_ROOT / "data"))).resolve(),
             host=CONTAINER_BIND if container else env.get("BYTASM_HOST", "127.0.0.1"),
             port=int(port_text),
@@ -117,6 +119,13 @@ class Settings:
 
     def validate(self) -> None:
         """Refuse configurations the v0.1 design does not allow."""
+        if self.metadata_isolation_image is not None:
+            from bytasm.runner.isolated_metadata import IsolationConfig
+
+            try:
+                IsolationConfig(self.metadata_isolation_image)
+            except ValueError as exc:
+                raise ConfigError(str(exc)) from exc
         if self.container:
             if self.host != CONTAINER_BIND:
                 raise ConfigError(f"Container mode listens on {CONTAINER_BIND} only.")

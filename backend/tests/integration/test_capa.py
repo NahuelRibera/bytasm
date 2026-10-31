@@ -303,5 +303,5 @@ def test_downgrade_refuses_to_discard_capa_citations(tmp_path: Path) -> None:
             assert connection.exec_driver_sql("PRAGMA foreign_key_check").all() == []
             assert (
                 connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-                == "0007"
+                == "0009"
             )

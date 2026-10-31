@@ -91,3 +91,27 @@ a control-plane canary or write trusted storage and that all descendants disappe
 on teardown. No user-facing external intake until this and the full checklist
 pass independent review. Existing Compose scripts are diagnostics for the current
 fixture deployment; they cannot mark this checklist complete.
+
+## 2026-10-31 disposable metadata implementation evidence
+
+An opt-in fixed-profile broker/worker path now exists; see
+[ADR-0008](../adr/0008-pinned-reviews-and-disposable-metadata.md).
+The broker admits and hashes bounded bytes, sends an exact stream over stdin to
+a fresh non-root read-only Docker container with no host mounts/network/socket,
+validates bounded typed output, recomputes section byte-range measurements, removes
+the container and publishes through the existing transactional import path.
+A configured unavailable image does not fall back to the native parser.
+
+The self-authored harness is separate trusted code, never an imported sample.
+The initial real Linux/aarch64 campaign passed 12 tests: actual fixture import,
+nonexistent-image refusal, forbidden image/filesystem canary accesses, no outbound
+network route, scratch exhaustion, PID exhaustion, detached child teardown,
+memory exhaustion, crash, malformed output, bounded output and parent timeout.
+Each harness is followed by a fresh real fixture parse to check contamination.
+`scripts/check-isolated-metadata.py` rebuilds from an existing trusted local image
+and repeats the campaign; no samples or hashes are sent to a service.
+
+These are scoped operation tests, not I1 acceptance. No checklist box above is
+changed. Same-kernel/daemon/image trust, host format checks and all other parser
+paths remain; cancellation races, publication failure, broker restart/daemon loss,
+all-parser coverage and independent containment review still need evidence.

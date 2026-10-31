@@ -17,9 +17,11 @@ from bytasm.api import (
     analysis,
     annotations,
     compare,
+    function_reviews,
     ghidra,
     imports,
     reports,
+    reviews,
     routes,
     tools,
 )
@@ -116,6 +118,8 @@ def create_app(
     app.include_router(reports.router, prefix="/api/v1")
     app.include_router(analysis.router, prefix="/api/v1")
     app.include_router(ghidra.router, prefix="/api/v1")
+    app.include_router(reviews.router, prefix="/api/v1")
+    app.include_router(function_reviews.router, prefix="/api/v1")
     add_web_routes(app, settings.web_dist)
 
     @app.exception_handler(RequestValidationError)

@@ -271,6 +271,15 @@ def test_no_endpoint_can_change_the_input_policy(client: TestClient) -> None:
     spec = client.get("/api/openapi.json").json()
     routes = {(path, method) for path, item in spec["paths"].items() for method in item}
     assert routes == {
+        # Pinned reviews and exact-function analyst overlays cannot alter admission.
+        ("/api/v1/sample-versions/{version_id}/reviews", "get"),
+        ("/api/v1/sample-versions/{version_id}/reviews", "post"),
+        ("/api/v1/reviews/{review_id}", "get"),
+        ("/api/v1/reviews/{review_id}/refresh", "post"),
+        ("/api/v1/reviews/{review_id}/export/{format}", "post"),
+        ("/api/v1/sample-versions/{version_id}/bytes", "get"),
+        ("/api/v1/runs/{run_id}/ghidra/functions/{index}/review", "get"),
+        ("/api/v1/runs/{run_id}/ghidra/functions/{index}/review", "post"),
         ("/api/v1/health", "get"),
         ("/api/v1/tools", "get"),
         ("/api/v1/reports/{report_id}/review", "get"),

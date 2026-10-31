@@ -257,3 +257,22 @@ Stopping the app preserves local files and database. There is no complete
 per-sample deletion workflow. Raw JSON, report previews, existing comparison
 exports and retained analyst notes may disclose private data. This increment
 adds disclosure, not storage encryption, secret detection or export redaction.
+
+## Optional disposable metadata worker
+
+A trusted local operator can configure `BYTASM_METADATA_ISOLATION_IMAGE` to an
+immutable local Docker image ID. LIEF metadata extraction then runs in a fresh
+read-only non-root container, receiving only bounded admitted bytes over stdin,
+with no host mounts or network. An unavailable worker refuses the import; there
+is no native fallback in this mode. The default native parser and other analysis
+paths retain the limitations described above. This is not I1 completion or
+approval to admit external files. See [ADR-0008](docs/adr/0008-pinned-reviews-and-disposable-metadata.md)
+and the [I1 record](docs/security/i1-acceptance.md).
+
+Use `uv --directory backend run --no-sync python ../scripts/check-isolated-metadata.py`
+for the real self-authored harness campaign. It requires the existing trusted
+local `bytasm-local:v0.4` image and does not download a base. Obtain the resulting
+image ID with `docker image inspect bytasm-metadata-boundary:local --format '{{.Id}}'`;
+set that exact ID in local server configuration. The runtime/image/daemon are
+trusted code and configuration. Never build them from analyzed content or mount
+application storage into the disposable worker.

@@ -188,7 +188,16 @@ async def create_import(project_id: str, request: Request) -> JSONResponse:
         workspace.seal_input(upload_path)
 
         parse_started = datetime.now(UTC).replace(microsecond=0)
-        outcome = await run_adapter(ctx.adapter_command, workdir, sha256, ctx.settings.limits)
+        if ctx.settings.metadata_isolation_image:
+            from bytasm.runner.isolated_metadata import IsolationConfig, parse_isolated
+
+            outcome = await parse_isolated(
+                upload_path.read_bytes(),
+                ctx.policy,
+                IsolationConfig(ctx.settings.metadata_isolation_image),
+            )
+        else:
+            outcome = await run_adapter(ctx.adapter_command, workdir, sha256, ctx.settings.limits)
         parse_finished = datetime.now(UTC).replace(microsecond=0)
         if outcome.result is None or outcome.result_bytes is None:
             failure = outcome_error(outcome.status, outcome.reason)
@@ -217,6 +226,15 @@ async def create_import(project_id: str, request: Request) -> JSONResponse:
             started_at=parse_started,
             finished_at=parse_finished,
             limits=outcome.result.resource_limits.model_dump(),
+            isolation={
+                "profile": "disposable-docker-metadata-1",
+                "image_id": ctx.settings.metadata_isolation_image,
+                "transport": "stdin-exact-bytes",
+                "host_mounts": False,
+                "external_admission_enabled": False,
+            }
+            if ctx.settings.metadata_isolation_image
+            else None,
         )
         version_id = await run_in_threadpool(
             persist_import, ctx.sessions, ctx.blobs, ctx.outputs, workdir, project_id, meta, parsed

@@ -65,7 +65,7 @@ Both build the UI and serve it at http://127.0.0.1:8000/. With Docker, use
    sample. Comparison reports warn that changed strings and analyst text may be shared.
 
 This checkout includes the **v0.6 function workbench** and the guided inspection
-overview increment described in [the current record](docs/milestones/v0.7-guided-overview.md).
+overview and pinned review increments described in [the current record](docs/milestones/v0.8-investigation-workbench.md).
 Package versions remain **0.4.0** and sample reports remain schema **4**; these
 are distinct from feature milestone names. **Tools**
 shows installed versions, availability, adapters, rules hashes and profile limits.
@@ -224,7 +224,7 @@ test-generated inputs.
 External-file intake remains blocked by **I1**. The API import path and parser
 workers still share access to trusted application state; resource limits do not
 close this boundary. See the [threat-path review and runtime acceptance checklist](docs/security/i1-acceptance.md).
-Function notes/bookmarks, cross-version Ghidra matching, archive inspection,
+Cross-version Ghidra matching, archive inspection,
 credential classification and privacy-selectable exports remain future work.
 The strings counter already distinguishes unavailable data; the UI version is
 0.4.0, and the UPX-style fixture regression is present. Older milestone records
@@ -290,8 +290,8 @@ reconstruction, inventory caps and unknown output. Selected reports retain sourc
 run provenance. No behavior verdict or whole-program coverage is inferred.
 
 Existing fixture/self_built admission, baseline comparisons, annotations and
-historical report schemas remain intact. Function bookmarks/notes, Ghidra version
-matching, complete xrefs and arbitrary-file intake remain deferred. See the
+historical report schemas remain intact. Function bookmarks/notes were deferred in v0.6 and are now available in the pinned
+investigation workspace below. Ghidra version matching, complete xrefs and arbitrary-file intake remain deferred. See the
 [function-workbench milestone](docs/milestones/v0.6-function-workbench.md) for exact scope,
 verification, known risks and follow-up, and the [API](docs/api-v0.5-ghidra.md) for
 selection/cursor semantics.
@@ -316,3 +316,31 @@ different run. Check the preview and source identities before sharing. Files,
 strings, pseudocode and analyst notes remain local and potentially sensitive;
 hiding a path in the interface does not remove it from storage or raw output.
 The import screen explains storage, network limits and a fixture-first path.
+
+## Pinned investigation reviews
+
+The version page can now **Create combined review** from stored evidence for
+that exact version. It records selected sources, the latest attempts at pin time,
+reviewed explanations, import-presence questions and important unknowns. An exact
+run link can also **Pin exact run**. **Refresh into a new review** keeps the old
+snapshot; it never silently changes when another analysis finishes.
+
+Preview inclusion controls before downloading canonical JSON or standalone HTML.
+String values, original filenames and analyst function notes are omitted by
+default; plausible secrets/private home paths are heuristically masked. These
+controls change exported bytes. Originals remain in local storage. Raw outputs,
+reconstructed code, symbols and ordinary version/finding annotations are outside
+this new export contract. Historical report formats remain unchanged.
+
+Function details now support analyst bookmarks, collections, display aliases,
+workflow state, notes and exact-text citations with immutable revision history.
+These overlays bind to one exact run/output/function and do not carry across
+reanalysis. Reviewed is not a safety classification. The byte viewer displays
+bounded exact file offsets without running or interpreting file content.
+
+See the [current acceptance matrix](docs/milestones/v0.8-investigation-workbench.md),
+[API](docs/api-v0.8-reviews.md) and [decision](docs/adr/0008-pinned-reviews-and-disposable-metadata.md).
+The wider A–N milestone remains incomplete: richer structural extraction, new
+Ghidra xrefs/flow/comparisons, package intake, signature verification and complete
+deletion remain outstanding. An optional real disposable metadata operation is
+described in [SECURITY.md](SECURITY.md); external intake stays blocked by I1.

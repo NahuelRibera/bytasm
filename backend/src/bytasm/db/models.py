@@ -412,3 +412,30 @@ class AnnotationCitation(Base):
     target_id: Mapped[str] = mapped_column(String(32))
     finding_id: Mapped[str | None] = mapped_column(ForeignKey("finding.id"))
     evidence_id: Mapped[int | None] = mapped_column(ForeignKey("evidence.id"))
+
+
+class ReviewSnapshot(Base):
+    """Immutable canonical review; never an alias for a live run selection."""
+
+    __tablename__ = "review_snapshot"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    version_id: Mapped[str] = mapped_column(ForeignKey("sample_version.id"), index=True)
+    supersedes_id: Mapped[str | None] = mapped_column(ForeignKey("review_snapshot.id"))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime)
+    sha256: Mapped[str] = mapped_column(String(64))
+    canonical: Mapped[str] = mapped_column(Text)
+
+
+class FunctionReviewRevision(Base):
+    """Immutable analyst overlay, identified by an exact function/output scope."""
+
+    __tablename__ = "function_review_revision"
+    __table_args__ = (UniqueConstraint("scope_sha256", "revision"),)
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    version_id: Mapped[str] = mapped_column(ForeignKey("sample_version.id"), index=True)
+    invocation_id: Mapped[str] = mapped_column(ForeignKey("tool_invocation.id"), index=True)
+    scope_sha256: Mapped[str] = mapped_column(String(64), index=True)
+    revision: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
+    document: Mapped[dict[str, Any]] = mapped_column(JSON)
+    document_sha256: Mapped[str] = mapped_column(String(64))

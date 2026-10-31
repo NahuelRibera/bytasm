@@ -94,6 +94,7 @@ Text = Annotated[str, Field(max_length=256)]
 
 
 class ReviewObservation(BaseModel):
+    title: Text | None = None
     key: Text
     tool: Text
     tool_version: Text
@@ -110,6 +111,8 @@ class ReviewObservation(BaseModel):
 
 
 class ReviewOut(BaseModel):
+    selection_policy: Literal["source-order-v1", "relevance-v1"] = "source-order-v1"
+    selection_explanation: Annotated[str, Field(max_length=512)] | None = None
     template_version: Literal["1"] = "1"
     run_id: str | None
     version_id: Text
