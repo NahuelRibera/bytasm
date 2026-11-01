@@ -12,6 +12,7 @@ import {
   FindingsMeaning,
   KeyValues,
   Loading,
+  SectionLabel,
   StatusPill,
   asciiPreview,
   formatBytes,
@@ -51,8 +52,11 @@ export function RunPage({ runId }: { runId: string }) {
           ← {r.sample.sample_name} {label}
         </Link>
       </nav>
-      <header className="page-header page-header-actions">
+      <header className="page-header page-header-actions run-header frame-bracket">
         <div>
+          <p className="eyebrow">
+            <b>∷</b> Analysis run · <span className="mono">{r.id.slice(0, 8)}</span>
+          </p>
           <h1>
             Analysis run <span className="muted">{r.profile_id === "ghidra-static" ? r.profile_name : `strings + ${r.rule_set.label}`}</span>
           </h1>
@@ -67,17 +71,28 @@ export function RunPage({ runId }: { runId: string }) {
       {ACTIVE.has(r.status) && <WorkerWarning />}
       <RunBanner run={r} />
 
+      <section className="run-summary" aria-label="Run summary">
+        <p className="sr-only">{r.steps.filter(step => step.status === "succeeded").length} of {r.steps.length} selected steps succeeded · {r.counts.findings} findings · {r.counts.strings.toLocaleString("en")} recorded strings</p>
+        <dl className="metric-strip" aria-hidden="true">
+          <div className="metric"><dt>Steps succeeded</dt><dd>{r.steps.filter(step => step.status === "succeeded").length}<span className="metric-of">/{r.steps.length}</span></dd></div>
+          <div className="metric"><dt>Findings</dt><dd>{r.counts.findings}</dd></div>
+          <div className="metric"><dt>Recorded strings</dt><dd>{r.counts.strings.toLocaleString("en")}</dd></div>
+        </dl>
+        <p className="hint">Scope: this run. Failed, unsupported and unavailable steps do not establish absence of patterns.</p>
+      </section>
       {r.profile_id === "ghidra-static" && <GhidraPanel run={r} />}
       {r.profile_id !== "ghidra-static" && r.summary && <section className="card analysis-summary" aria-labelledby="plain-run"><h2 id="plain-run">Analysis in plain language</h2>{r.summary.map((text, i) => <p key={i}>{text}</p>)}</section>}
       {r.review && <ReviewPanel review={r.review} />}
-      <section className="card" aria-label="Run summary"><p>{r.steps.filter(step => step.status === "succeeded").length} of {r.steps.length} selected steps succeeded · {r.counts.findings} findings · {r.counts.strings.toLocaleString("en")} recorded strings</p><p className="hint">Scope: this run. Failed, unsupported and unavailable steps do not establish absence of patterns.</p></section>
+      <SectionLabel index="01">Sample and provenance</SectionLabel>
       <div className="grid-2 run-grid">
         <SamplePanel run={r} />
         <ProvenancePanel run={r} />
       </div>
+      <SectionLabel index="02">Steps</SectionLabel>
       <StepsTable run={r} />
       <TechnicalLog run={r} />
       <StringsSummaryPanel run={r} />
+      {r.profile_id !== "ghidra-static" && <SectionLabel index="03">Findings</SectionLabel>}
       {r.steps.some(step => ["yara-x", "capa"].includes(step.tool) && step.status === "succeeded") ? (
         <FindingsSection run={r} />
       ) : (
@@ -303,19 +318,23 @@ function StepsTable({ run }: { run: Run }) {
           <tbody>
             {run.steps.map((step) => (
               <tr key={step.index} className={step.status === "skipped" ? "row-muted" : undefined}>
-                <td className="num">{step.index + 1}</td>
+                <td className="num step-index">
+                  <span aria-hidden="true">[{String(step.index + 1).padStart(2, "0")}]</span>
+                  <span className="sr-only">{step.index + 1}</span>
+                </td>
                 <td>
                   {step.tool === "yara-x"
                     ? `YARA-X with ${run.rule_set.label}`
                     : TOOL_NAMES[step.tool] ?? step.tool}
+                  {step.tool_version && <span className="tool-badge step-version">{step.tool_version}</span>}
                   <div className="hint">{STEP_DESCRIPTIONS[step.tool] ?? step.adapter}</div>
                   {step.message && <div className="step-message">{step.message}</div>}
                 </td>
                 <td>
                   <StatusPill status={step.status} />
                 </td>
-                <td className="num">{step.duration_ms === null ? "—" : `${step.duration_ms} ms`}</td>
-                <td className="num">{step.timeout_seconds} s</td>
+                <td className="num mono">{step.duration_ms === null ? "—" : `${step.duration_ms} ms`}</td>
+                <td className="num mono">{step.timeout_seconds} s</td>
                 <td>
                   {step.invocation_id && step.raw_output_sha256 ? (
                     <a
@@ -470,7 +489,7 @@ function FindingsSection({ run }: { run: Run }) {
 
   const total = findings.data.total;
   return (
-    <section className="card" aria-labelledby="findings">
+    <section className={`card findings${current ? " has-inspector" : ""}`} aria-labelledby="findings">
       <h2 id="findings" ref={findingsHeading} tabIndex={-1}>
         Findings <span className="count">{total}</span>
       </h2>
@@ -520,7 +539,7 @@ function FindingsSection({ run }: { run: Run }) {
           </p>
         </Empty>
       ) : (
-        <div className="table-scroll" tabIndex={0} role="region" aria-label="Findings table">
+        <div className="table-scroll findings-table" tabIndex={0} role="region" aria-label="Findings table">
           <table className="table">
             <caption className="sr-only">Rules that matched, with their match counts</caption>
             <thead>
