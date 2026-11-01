@@ -116,6 +116,45 @@ class Function(Record):
         return self
 
 
+class FileRange(Record):
+    """Ghidra-reported mapping of an inclusive address range onto input file bytes."""
+
+    start: Address
+    end: Address
+    file_offset: Annotated[int, Field(ge=0, le=(1 << 63) - 1)]
+    provenance: Literal["ghidra_memory_block_file_bytes"] = "ghidra_memory_block_file_bytes"
+
+    @model_validator(mode="after")
+    def same_space(self) -> "FileRange":
+        if self.start.space != self.end.space:
+            raise ValueError("File range crosses address spaces")
+        return self
+
+
+class MemoryBlock(Record):
+    name: Text
+    name_truncated: bool = False
+    start: Address
+    end: Address
+    read: bool
+    write: bool
+    execute: bool
+    initialized: bool
+    file_ranges: Annotated[list[FileRange], Field(max_length=16)]
+    file_ranges_truncated: bool
+
+    @model_validator(mode="after")
+    def same_space(self) -> "MemoryBlock":
+        spaces = {self.start.space, self.end.space}
+        spaces.update(r.start.space for r in self.file_ranges)
+        if len(spaces) != 1:
+            raise ValueError("Memory block crosses address spaces")
+        return self
+
+
+V4_KEYS = ("image_base", "memory_blocks", "memory_blocks_truncated")
+
+
 class GhidraResult(Record):
     model_config = ConfigDict(
         extra="forbid",
@@ -129,7 +168,7 @@ class GhidraResult(Record):
             ],
         },
     )
-    schema_version: Literal["ghidra-1", "ghidra-2", "ghidra-3"]
+    schema_version: Literal["ghidra-1", "ghidra-2", "ghidra-3", "ghidra-4"]
     input_sha256: Digest
     ghidra_version: Literal["12.2"]
     language_id: Text
@@ -142,11 +181,18 @@ class GhidraResult(Record):
     functions_truncated: bool
     analysis_timed_out: bool
     limitations: Annotated[list[Text], Field(max_length=32)]
+    # ghidra-4 only: Ghidra's program image base and memory map.
+    image_base: Address | None = None
+    memory_blocks: Annotated[list[MemoryBlock], Field(max_length=64)] = Field(default_factory=list)
+    memory_blocks_truncated: bool = False
 
     @model_serializer(mode="wrap")
     def preserve_historical_shape(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
         result: dict[str, Any] = handler(self)
-        if self.schema_version != "ghidra-3":
+        if self.schema_version != "ghidra-4":
+            for key in V4_KEYS:
+                result.pop(key, None)
+        if self.schema_version not in ("ghidra-3", "ghidra-4"):
             for function in result.get("functions", []):
                 for key in (
                     "body_ranges",
@@ -165,7 +211,13 @@ class GhidraResult(Record):
             raise ValueError("Invalid function count")
         if self.functions_truncated != (self.function_count > len(self.functions)):
             raise ValueError("Inventory truncation mismatch")
-        if self.schema_version != "ghidra-3" and any(
+        if self.schema_version == "ghidra-4" and self.image_base is None:
+            raise ValueError("Protocol version 4 requires an image base")
+        if self.schema_version != "ghidra-4" and (
+            self.image_base is not None or self.memory_blocks or self.memory_blocks_truncated
+        ):
+            raise ValueError("Legacy protocol contains version 4 memory map")
+        if self.schema_version not in ("ghidra-3", "ghidra-4") and any(
             f.body_ranges or f.body_ranges_truncated or f.references or f.references_truncated
             for f in self.functions
         ):

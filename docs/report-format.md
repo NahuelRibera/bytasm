@@ -163,7 +163,9 @@ remains active and transactional.
 
 ## v0.6 selected-function reports
 
-New ghidra-2 and ghidra-3 analyses export `bytasm-ghidra-report-2` (the nested
+New ghidra-2, ghidra-3 and ghidra-4 (v0.10: adds `image_base` and Ghidra's
+memory map; schema `schemas/ghidra-analysis-v4.schema.json`) analyses export
+`bytasm-ghidra-report-2` (the nested
 `analysis.schema_version` identifies the protocol); legacy ghidra-1 output
 continues to export report-1 with the enriched live overview. The separate
 analysis schema accepts both versions, enforcing the historical 256-entry cap

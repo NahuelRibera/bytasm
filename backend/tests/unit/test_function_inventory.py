@@ -1,7 +1,7 @@
 """Stored inventory discovery never invokes a parser."""
 
 import pytest
-from test_ghidra_provider import document
+from test_ghidra_provider import document, legacy
 
 from bytasm.function_inventory import InventoryQuery, page_inventory
 from bytasm.ghidra_protocol import GhidraResult
@@ -130,7 +130,7 @@ def test_protocol_preserves_legacy_cap_and_new_inventory_bound() -> None:
         for i in range(1024)
     ]
     value["function_count"] = 1024
-    value["schema_version"] = "ghidra-1"
+    legacy(value, "ghidra-1")
     with pytest.raises(ValidationError, match="Legacy inventory"):
         GhidraResult.model_validate(value)
     value["schema_version"] = "ghidra-2"

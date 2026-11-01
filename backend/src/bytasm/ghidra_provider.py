@@ -179,7 +179,7 @@ def _parse(
     except ValidationError:
         return None
     if (
-        result.schema_version != "ghidra-3"
+        result.schema_version != "ghidra-4"
         or result.input_sha256 != expected_sha256
         or result.script_sha256 != script_digest()
         or result.profile_sha256 != profile_digest(selected)
