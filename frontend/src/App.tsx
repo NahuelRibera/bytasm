@@ -12,45 +12,23 @@ import { RunPage } from "./pages/RunPage";
 import { VersionPage } from "./pages/VersionPage";
 import { AnalysisPanel } from "./AnalysisPanel";
 import { ExportReportButton } from "./ExportReportButton";
-import { Link, useRoute } from "./router";
+import { useRoute } from "./router";
+import { NotFound } from "./pages/NotFound";
+import { NavRail, StatusBar } from "./shell";
 
 export function App() {
   const route = useRoute();
   const health = useQuery({ queryKey: ["health"], queryFn: api.health, staleTime: 60_000 });
-  const mode = health.data?.input_policy.mode;
 
   return (
     <div className="app">
       <a className="skip-link" href="#main">
         Skip to content
       </a>
-      <header className="topbar">
-        <Link to="/" className="brand" aria-label="Bytasm home">
-          <span className="brand-mark" aria-hidden="true">
-            ▚
-          </span>
-          Bytasm
-        </Link>
-        <nav className="topbar-nav" aria-label="Main">
-          <Link to="/" aria-current={route.name === "projects" ? "page" : undefined}>
-            Projects
-          </Link>
-          <Link to="/rules" aria-current={route.name === "rules" ? "page" : undefined}>
-            Rules
-          </Link>
-          <Link to="/tools" aria-current={route.name === "tools" ? "page" : undefined}>Tools</Link>
-        </nav>
-        <span className="topbar-meta">
-          local · static analysis only
-          {health.data && <> · v{health.data.bytasm_version}</>}
-        </span>
-        <span className={`pill ${mode === "self_built" ? "pill-warn" : "pill-ok"}`}>
-          <span className="pill-dot" aria-hidden="true" />
-          Input policy: {mode === "self_built" ? "fixtures + self-built" : "fixtures only"}
-        </span>
-      </header>
-      <SelfBuiltBanner health={health.data} />
-      <main id="main" className="main" tabIndex={-1}>
+      <NavRail route={route} />
+      <div className="workspace">
+        <SelfBuiltBanner health={health.data} />
+        <main id="main" className="main" tabIndex={-1}>
         {route.name === "projects" && <ProjectsPage />}
         {route.name === "tools" && <ToolsPage />}
         {route.name === "report" && <ReportPage key={route.reportId} reportId={route.reportId} />}
@@ -66,20 +44,10 @@ export function App() {
         )}
         {route.name === "rules" && <RulesPage key={route.ruleSetId ?? "current"} ruleSetId={route.ruleSetId} />}
         {route.name === "run" && <RunPage key={route.runId} runId={route.runId} />}
-        {route.name === "not_found" && (
-          <div className="empty">
-            <h1>Not found</h1>
-            <p>
-              Nothing lives at this address. <Link to="/">Back to projects</Link>
-            </p>
-          </div>
-        )}
-      </main>
-      <footer className="footer">
-        Bytasm never runs the files it imports. It is for self-authored binaries only and is not
-        safe for downloaded, received, third-party, or suspicious files. Resource limits are not a
-        sandbox. Rule matches are observations, not verdicts.
-      </footer>
+        {route.name === "not_found" && <NotFound />}
+        </main>
+        <StatusBar health={health.data} healthError={health.isError} />
+      </div>
     </div>
   );
 }

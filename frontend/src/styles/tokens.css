@@ -1,0 +1,99 @@
+/* Bytasm design tokens: the Signal palette (decision D3, docs/design/DESIGN_SYSTEM.md §2).
+   Dark only (decision D2). Contrast ratios are documented per role in DESIGN_SYSTEM §2 and
+   re-checked by src/styles/tokens.test.ts. Old token names are aliased at the end so
+   untouched stylesheet sections keep working while screens migrate. */
+
+:root {
+  color-scheme: dark;
+
+  /* Neutral foundation */
+  --void: #050507;
+  --bg: #0a0a0d;
+  --surface: #121216;
+  --raised: #1a1a20;
+  --line: #25252d;
+  --line-strong: #34343f;
+  --control: #74737f;
+  --text: #efebe4;
+  --text-muted: #a3a1ab;
+  --text-faint: #6c6b76; /* decoration only: 3.77:1 on --bg */
+
+  /* Dark purple surfaces */
+  --plum-950: #0e0917;
+  --plum-900: #170e26;
+  --plum-800: #221338;
+  --plum-700: #3a1f63;
+
+  /* Signal purple: one hue, split by job */
+  --signal-600: #7e22e0; /* primary pressed */
+  --signal-500: #902efd; /* primary fill, white label 5.26:1 */
+  --signal-500h: #9a3cfe; /* primary hover */
+  --signal-400: #a454fc; /* graphics only: bars, underlines, selected edges, chart series 1 */
+  --signal-300: #bc85ff; /* readable purple: links, purple text, focus ring */
+  --signal-200: #d9bdff; /* text on plum surfaces */
+  --signal-glow: rgb(164 84 252 / 0.18);
+
+  /* Secondary accents: orchid beside purple only; magenta at most once per screen */
+  --orchid-400: #d46bf2;
+  --magenta-400: #ff4fb8;
+  --magenta-900: #2a0b1f;
+
+  /* Semantic: process state only */
+  --ok: #4fd18b;
+  --ok-bg: #0f2a1c;
+  --warn: #f2b84b;
+  --warn-bg: #2e2410;
+  --danger: #ff6b57;
+  --danger-bg: #2e1411;
+  --info: #79b8ff;
+  --info-bg: #0f1d30;
+
+  /* Character art tints (ASCII_INTEGRATION §5) */
+  --art-ink: #e6e2da;
+  --art-ash: #6c6b76;
+  --art-signal: #a454fc;
+  --art-orchid: #d46bf2;
+  --art-ghost: #2a2833;
+
+  /* Type */
+  --font-sans: "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Space, radius, motion */
+  --radius: 4px;
+  --radius-small: 2px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --dur-1: 90ms;
+  --dur-2: 160ms;
+  --dur-3: 240ms;
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  /* Aliases for pre-M1 names (DESIGN_SYSTEM §14) */
+  --surface-2: var(--raised);
+  --border: var(--line-strong);
+  --accent: var(--signal-300);
+  --accent-fill: var(--signal-500);
+  --accent-text: #ffffff;
+  --focus: var(--signal-300);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-1: 0ms;
+    --dur-2: 0ms;
+    --dur-3: 0ms;
+  }
+}
+
+:root[data-atmosphere="off"] {
+  --dur-1: 0ms;
+  --dur-2: 0ms;
+  --dur-3: 0ms;
+}

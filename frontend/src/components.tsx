@@ -119,6 +119,39 @@ export function Empty({ children }: { children: ReactNode }) {
   return <div className="empty">{children}</div>;
 }
 
+/** An empty state with one character figure (ASCII_INTEGRATION §9): copy and action stay on clean black. */
+export function EmptyArt({ art, children }: { art: ReactNode; children: ReactNode }) {
+  return (
+    <div className="empty-art frame-bracket">
+      {art}
+      <div className="empty-art-copy">{children}</div>
+    </div>
+  );
+}
+
+/** Counts the API returned, as a Nordlys-style strip. Never a derived score. */
+export function MetricStrip({ items, label }: { items: Array<[string, ReactNode]>; label: string }) {
+  return (
+    <dl className="metric-strip" aria-label={label}>
+      {items.map(([name, value]) => (
+        <div className="metric" key={name}>
+          <dt>{name}</dt>
+          <dd>{value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/** A numbered section label with a centre-node rule; numbers only where order matters. */
+export function SectionLabel({ index, children }: { index: string; children: ReactNode }) {
+  return (
+    <p className="section-label" aria-hidden="true">
+      <b>{index}</b> {children}
+    </p>
+  );
+}
+
 export function SelfBuiltBanner({ health }: { health: Health | undefined }) {
   if (!health?.input_policy.self_built_enabled) return null;
   return (
