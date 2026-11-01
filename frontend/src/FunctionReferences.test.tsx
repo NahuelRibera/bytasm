@@ -12,6 +12,8 @@ describe("function references", () => {
     view.rerender(<FunctionReferences fn={fn} protocolVersion="ghidra-3" />);
     expect(screen.getByText(/No outgoing string/)).toBeTruthy();
     expect(screen.queryByText(/were not captured by this source/)).toBeNull();
+    view.rerender(<FunctionReferences fn={fn} protocolVersion="ghidra-4" />);
+    expect(screen.getByText(/No outgoing string/)).toBeTruthy();
   });
   it("keeps exact address spaces and inert text with a complete retained table", () => {
     const address = (address: string) => ({ space: "ram", address });

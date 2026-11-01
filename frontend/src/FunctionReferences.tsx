@@ -1,7 +1,7 @@
 import { addressLabel, type GhidraFunction } from "./ghidra-api";
 
 export function FunctionReferences({ fn, protocolVersion, instructionLinks = false }: { instructionLinks?: boolean; protocolVersion?: string; fn: Pick<GhidraFunction, "body_ranges" | "body_ranges_truncated" | "references" | "references_truncated"> }) {
-  if (protocolVersion !== "ghidra-3") return <p>Function-body ranges and data references were not captured by this source.</p>;
+  if (protocolVersion !== "ghidra-3" && protocolVersion !== "ghidra-4") return <p>Function-body ranges and data references were not captured by this source.</p>;
   const references = fn.references ?? [];
   return <section aria-label="Function body and outgoing references">
     <h4>Function body and outgoing references</h4>

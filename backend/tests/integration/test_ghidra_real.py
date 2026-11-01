@@ -54,7 +54,7 @@ def test_real_no_sample_health_and_authorized_static_fixture(
         result = outcome.result
         assert result is not None and result.input_sha256 == digest
         assert result.ghidra_version == "12.2"
-        assert result.schema_version == "ghidra-3"
+        assert result.schema_version == "ghidra-4"
         assert any(f.body_ranges for f in result.functions if not f.external)
         assert any(f.references for f in result.functions)
         for function in result.functions:
@@ -89,6 +89,20 @@ def test_real_no_sample_health_and_authorized_static_fixture(
         assert strings and all(r.target.space == "ram" for r in strings)
         assert {int(r.target.address, 16) for r in strings} == {expected}
         assert all("bytasm fixture v1" in (r.preview or "") for r in strings)
+        # ghidra-4: Ghidra's own memory map translates the string target back to
+        # the literal's file offset, independently of LIEF's declared mapping.
+        from bytasm.address_map import GhidraMemoryMap
+
+        assert result.image_base is not None and result.image_base.space == "ram"
+        if isinstance(binary, lief.PE.Binary):
+            assert int(result.image_base.address, 16) == binary.optional_header.imagebase
+        assert result.memory_blocks and not result.memory_blocks_truncated
+        for block in result.memory_blocks:
+            for item in block.file_ranges:
+                length = int(item.end.address, 16) - int(item.start.address, 16) + 1
+                assert item.file_offset >= 0 and item.file_offset + length <= len(data)
+        ghidra_map = GhidraMemoryMap.from_result(result, len(data))
+        assert {ghidra_map.to_file_offset(r.target).file_offset for r in strings} == {offset}
         thunks = [r for r in references if r.resolved_external_target is not None]
         assert thunks, "Fixture must exercise exact thunk resolution"
         for reference in thunks:
@@ -336,3 +350,101 @@ def test_real_inventory_beyond_256_and_selected_dossier(tmp_path: Path) -> None:
     finally:
         workspace.remove_workdir(work)
     assert not list(tmp_path.iterdir())
+
+
+def test_real_evidence_graph_joins_live_capa_and_live_ghidra(tmp_path: Path) -> None:
+    """v0.10 acceptance: real capa + real Ghidra through the real worker, then /evidence.
+
+    The expected file offset comes from LIEF directly; Bytasm's translation is
+    not used to compute expectations. No fixture is executed.
+    """
+    import json
+    import subprocess
+    import sys
+    import time
+
+    import lief
+    from api_support import api_client, create_project, do_import, make_settings
+
+    config = GhidraConfiguration.from_env()
+    settings = make_settings(tmp_path, ghidra=config)
+    assert isolation_status() is None
+    data = (REPO_ROOT / "fixtures/bin/capa_read_file-x86_64.exe").read_bytes()
+    manifest = (REPO_ROOT / "fixtures/MANIFEST.sha256").read_text()
+    assert f"{hashlib.sha256(data).hexdigest()}  bin/capa_read_file-x86_64.exe" in manifest
+    binary = lief.parse(data)
+    assert isinstance(binary, lief.PE.Binary)
+    expected_offset = binary.rva_to_offset(0x140001450 - binary.optional_header.imagebase)
+    with api_client(settings) as client:
+        imported = do_import(client, create_project(client), data)
+        assert imported.status_code == 201
+        version = imported.json()["sample_version"]["id"]
+        env = {
+            **os.environ,
+            "BYTASM_DATA_DIR": str(settings.data_dir),
+            "BYTASM_INPUT_POLICY": "fixtures",
+        }
+        worker = subprocess.Popen(  # noqa: S603 - fixed application, never sample
+            [sys.executable, "-I", "-m", "bytasm", "worker"],
+            env=env,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            close_fds=True,
+        )
+        try:
+            deadline = time.monotonic() + 100
+            while not (settings.data_dir / "worker.heartbeat").exists():
+                assert worker.poll() is None and time.monotonic() < deadline
+                time.sleep(0.1)
+            health = json.loads((settings.data_dir / "ghidra-health.json").read_text())
+            assert health["available"] and health["analysis_enabled"]
+            # One active run per version: run the two profiles sequentially.
+            run_ids = []
+            deadline = time.monotonic() + 300
+            for profile in ("full-static", "ghidra-static"):
+                queued = client.post(
+                    f"/api/v1/sample-versions/{version}/runs", json={"profile_id": profile}
+                )
+                assert queued.status_code == 202, queued.text
+                run_id = queued.json()["id"]
+                run_ids.append(run_id)
+                while True:
+                    run = client.get(f"/api/v1/runs/{run_id}").json()
+                    if run["status"] not in ("queued", "running"):
+                        break
+                    assert worker.poll() is None and time.monotonic() < deadline
+                    time.sleep(0.2)
+                assert run["status"] == "succeeded", (profile, run["status"])
+            base = f"/api/v1/sample-versions/{version}/evidence"
+            summary = client.get(base).json()
+            sources = {s["source"]: s["run_id"] for s in summary["scope"]["sources"]}
+            assert sources["pattern"] == run_ids[0] and sources["ghidra"] == run_ids[1]
+            assert summary["coverage"]["ghidra_protocol"] == "ghidra-4"
+            assert summary["coverage"]["ghidra_memory_map"] == "available"
+            edges = client.get(
+                base + "/edges", params={"type": "capa_match_at_function_entry"}
+            ).json()["items"]
+            findings = client.get(f"/api/v1/runs/{run_ids[0]}/findings?tool=capa").json()
+            diagnostic = json.dumps(
+                [
+                    summary["coverage"]["joins"],
+                    [(f["tool"], f["rule_id"]) for f in findings["findings"]],
+                ]
+            )
+            assert len(edges) == 1, diagnostic
+            assert edges[0]["attributes"]["file_offset"] == expected_offset
+            target = client.get(base + "/nodes/" + edges[0]["target"]).json()["node"]
+            assert target["address"] == {"space": "ram", "address": "140001450"}
+            entry = client.get(base + "/edges", params={"type": "entry_point_is_function"})
+            assert len(entry.json()["items"]) == 1
+            claims = [c for c in summary["claims"] if c["kind"] == "capa_rule_at_function"]
+            assert [c["title"] for c in claims] == ["Code refers to reading a file"]
+            assert claims[0]["evidence"] == [edges[0]["id"]]
+        finally:
+            worker.terminate()
+            try:
+                worker.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                worker.kill()
+                worker.wait(timeout=5)

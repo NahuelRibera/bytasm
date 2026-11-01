@@ -113,7 +113,8 @@ try {
   await expect(references.getByText(/No outgoing string, data or external-symbol references were retained/)).toBeVisible();
   const citation = await evidence.getByRole("link", { name: "Original function record" }).getAttribute("href");
   const raw = await (await fetch(`${base}${citation.split("#")[0]}`)).json();
-  assert.equal(raw.schema_version, "ghidra-3");
+  assert.equal(raw.schema_version, "ghidra-4");
+  assert(raw.image_base && raw.memory_blocks.some(block => block.file_ranges.length > 0));
   const rawFunction = raw.functions.find(fn => fn.name === "inventory_39_9" && fn.pseudocode_status === "available");
   assert(rawFunction && rawFunction.body_ranges.length === 1 && rawFunction.references.length === 0);
   assert.equal(rawFunction.body_ranges[0].provenance, "ghidra_function_body");
@@ -141,7 +142,7 @@ try {
   assert.deepEqual(axe.violations.map(item => item.id), []);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), 0);
   await page.screenshot({ path: join(artifacts, "workbench-360.png"), fullPage: true });
-  console.log("Real browser/API/offline-worker flow passed: fixture import, inventory beyond 256, selected dossier, instructions, relationships, ghidra-3 body range/references, evidence, report, keyboard, 360px and axe.");
+  console.log("Real browser/API/offline-worker flow passed: fixture import, inventory beyond 256, selected dossier, instructions, relationships, ghidra-4 body range/references, evidence, report, keyboard, 360px and axe.");
 } finally {
   if (browser) await browser.close();
   for (const id of containers.reverse()) docker(["rm", "--force", id]);

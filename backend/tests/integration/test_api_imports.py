@@ -311,6 +311,10 @@ def test_no_endpoint_can_change_the_input_policy(client: TestClient) -> None:
         ("/api/v1/sample-versions/{version_id}/sections", "get"),
         ("/api/v1/sample-versions/{version_id}/imports", "get"),
         ("/api/v1/sample-versions/{version_id}/exports", "get"),
+        ("/api/v1/sample-versions/{version_id}/evidence", "get"),
+        ("/api/v1/sample-versions/{version_id}/evidence/nodes", "get"),
+        ("/api/v1/sample-versions/{version_id}/evidence/nodes/{node_id}", "get"),
+        ("/api/v1/sample-versions/{version_id}/evidence/edges", "get"),
         ("/api/v1/sample-versions/{version_id}/reports", "post"),
         ("/api/v1/reports/{report_id}/download", "get"),
         # v0.2: the bundled rule set is read-only; runs and findings.

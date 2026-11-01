@@ -146,6 +146,46 @@ public class BytasmExtract extends HeadlessScript {
         out.name("references_truncated").value(selected && (refsCapped || instructions.hasNext()));
         out.endObject();
     }
+    // Ghidra's own address-to-file-bytes mapping. Python never derives a file
+    // offset for a Ghidra address without one of these tool-reported ranges.
+    private void memoryMap() throws Exception {
+        out.name("image_base"); address(currentProgram.getImageBase());
+        out.name("memory_blocks").beginArray();
+        int blocks = 0;
+        boolean blocksCapped = false;
+        for (ghidra.program.model.mem.MemoryBlock block : currentProgram.getMemory().getBlocks()) {
+            monitor.checkCancelled();
+            if (blocks >= 64) { blocksCapped = true; break; }
+            out.beginObject();
+            out.name("name").value(bound(block.getName(), 256));
+            out.name("name_truncated").value(block.getName().length() > 256);
+            out.name("start"); address(block.getStart());
+            out.name("end"); address(block.getEnd());
+            out.name("read").value(block.isRead());
+            out.name("write").value(block.isWrite());
+            out.name("execute").value(block.isExecute());
+            out.name("initialized").value(block.isInitialized());
+            out.name("file_ranges").beginArray();
+            int ranges = 0;
+            boolean rangesCapped = false;
+            for (ghidra.program.model.mem.MemoryBlockSourceInfo info : block.getSourceInfos()) {
+                Optional<ghidra.program.database.mem.FileBytes> bytes = info.getFileBytes();
+                if (bytes.isEmpty() || info.getFileBytesOffset() < 0) continue;
+                if (ranges >= 16) { rangesCapped = true; break; }
+                out.beginObject();
+                out.name("start"); address(info.getMinAddress());
+                out.name("end"); address(info.getMaxAddress());
+                out.name("file_offset").value(bytes.get().getFileOffset() + info.getFileBytesOffset());
+                out.name("provenance").value("ghidra_memory_block_file_bytes");
+                out.endObject(); ranges++;
+            }
+            out.endArray();
+            out.name("file_ranges_truncated").value(rangesCapped);
+            out.endObject(); blocks++;
+        }
+        out.endArray();
+        out.name("memory_blocks_truncated").value(blocksCapped);
+    }
     @Override
     public void run() throws Exception {
         String[] args = getScriptArgs();
@@ -166,13 +206,14 @@ public class BytasmExtract extends HeadlessScript {
         try (Writer file = Files.newBufferedWriter(Path.of(args[0]), StandardCharsets.UTF_8)) {
             out = new JsonWriter(file); out.setSerializeNulls(true);
             out.beginObject();
-            out.name("schema_version").value("ghidra-3");
+            out.name("schema_version").value("ghidra-4");
             out.name("input_sha256").value(args[1]);
             out.name("ghidra_version").value(Application.getApplicationVersion());
             out.name("provider_host").value(bound(System.getProperty("os.name") + " " + System.getProperty("os.arch"), 256));
             out.name("profile_sha256").value(args[2]); out.name("script_sha256").value(args[3]);
             out.name("language_id").value(bound(currentProgram.getLanguageID().getIdAsString(), 256));
             out.name("compiler").value(bound(currentProgram.getCompilerSpec().getCompilerSpecID().getIdAsString(), 256));
+            memoryMap();
             FunctionManager manager = currentProgram.getFunctionManager();
             int total = manager.getFunctionCount();
             FunctionIterator functions = manager.getFunctions(true);
@@ -197,6 +238,7 @@ public class BytasmExtract extends HeadlessScript {
             out.value("Details cover the first 16 internal functions or up to 8 explicitly selected entries; calls cover at most 64 instructions each.");
             out.value("Names and namespaces are limited to 256 characters; instruction bytes to 32 bytes.");
             out.value("References cover at most 64 listing instructions and 64 exact targets per selected function; body ranges retain at most 64 inclusive ranges. References to undefined memory, code or the interior of a data item are omitted, not reported as unresolved.");
+            out.value("Memory blocks retain at most 64 blocks and 16 file-backed ranges per block; uninitialized or synthetic blocks have no file range.");
             out.endArray(); out.endObject(); out.flush();
         } finally { decompiler.dispose(); }
     }

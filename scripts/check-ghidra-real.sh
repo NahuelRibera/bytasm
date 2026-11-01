@@ -15,6 +15,7 @@ docker run --rm --network none --read-only --user 10001:10001 --cap-drop ALL \
   -v "$ROOT/backend/src/bytasm:/app/backend/src/bytasm:ro" \
   -v "$ROOT/backend/tests:/app/backend/tests:ro" \
   -v "$ROOT/fixtures:/app/fixtures:ro" \
+  -v "$ROOT/rules:/app/rules:ro" \
   -v "$BYTASM_GHIDRA_HOME:/tools/ghidra:ro" \
   -v "$BYTASM_GHIDRA_JAVA_HOME:/tools/jdk:ro" \
   -e BYTASM_GHIDRA_HOME=/tools/ghidra \

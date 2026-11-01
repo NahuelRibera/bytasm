@@ -19,7 +19,7 @@ from bytasm.ghidra_protocol import GhidraResult
 
 def document() -> dict[str, Any]:
     return {
-        "schema_version": "ghidra-3",
+        "schema_version": "ghidra-4",
         "input_sha256": "a" * 64,
         "ghidra_version": "12.2",
         "language_id": "x86:LE:64:default",
@@ -30,6 +30,27 @@ def document() -> dict[str, Any]:
         "functions_truncated": False,
         "analysis_timed_out": False,
         "limitations": [],
+        "image_base": {"space": "ram", "address": "00100000"},
+        "memory_blocks": [
+            {
+                "name": ".text",
+                "start": {"space": "ram", "address": "00100000"},
+                "end": {"space": "ram", "address": "00100fff"},
+                "read": True,
+                "write": False,
+                "execute": True,
+                "initialized": True,
+                "file_ranges": [
+                    {
+                        "start": {"space": "ram", "address": "00100000"},
+                        "end": {"space": "ram", "address": "00100fff"},
+                        "file_offset": 0,
+                    }
+                ],
+                "file_ranges_truncated": False,
+            }
+        ],
+        "memory_blocks_truncated": False,
         "functions": [
             {
                 "entry": {"space": "ram", "address": "00100000"},
@@ -54,12 +75,22 @@ def document() -> dict[str, Any]:
     }
 
 
+def legacy(value: dict[str, Any], version: str) -> dict[str, Any]:
+    """The same records under a historical protocol, without version 4 fields."""
+    value["schema_version"] = version
+    for key in ("image_base", "memory_blocks", "memory_blocks_truncated"):
+        value.pop(key, None)
+    return value
+
+
 def test_strict_protocol_keeps_exact_address_space_and_hostile_text() -> None:
     result = GhidraResult.model_validate(document())
     assert result.functions[0].entry.address == "00100000"
     assert result.functions[0].entry.space == "ram"
     assert result.functions[0].name.startswith("<script>")
-    assert "file_offset" not in result.model_dump_json()
+    # Function records never carry file offsets; only ghidra-4's memory map
+    # reports Ghidra's own file-byte ranges.
+    assert "file_offset" not in json.dumps(json.loads(result.model_dump_json())["functions"])
     assert provider._parse(result.model_dump_json().encode(), "a" * 64) == result
 
 
@@ -417,9 +448,45 @@ def test_v3_reference_and_range_bounds(damage: str) -> None:
 
 @pytest.mark.parametrize("version", ["ghidra-1", "ghidra-2"])
 def test_historical_protocol_reader_still_accepts_original_records(version: str) -> None:
-    value = document()
-    value["schema_version"] = version
+    value = legacy(document(), version)
     result = GhidraResult.model_validate(value)
     assert result.functions[0].references == [] and result.functions[0].body_ranges == []
     assert "references" not in result.model_dump()["functions"][0]
     assert "body_ranges" not in result.model_dump()["functions"][0]
+
+
+def test_v4_memory_map_is_retained_and_hidden_from_historical_shapes() -> None:
+    result = GhidraResult.model_validate(document())
+    assert result.image_base is not None and result.image_base.address == "00100000"
+    block = result.memory_blocks[0]
+    assert block.file_ranges[0].provenance == "ghidra_memory_block_file_bytes"
+    dumped = json.loads(result.model_dump_json())
+    assert dumped["memory_blocks"][0]["file_ranges"][0]["file_offset"] == 0
+    for version in ("ghidra-1", "ghidra-2", "ghidra-3"):
+        legacy = document()
+        legacy["schema_version"] = version
+        for key in ("image_base", "memory_blocks", "memory_blocks_truncated"):
+            legacy.pop(key)
+        shape = json.loads(GhidraResult.model_validate(legacy).model_dump_json())
+        assert "image_base" not in shape and "memory_blocks" not in shape
+
+
+@pytest.mark.parametrize(
+    "damage",
+    ["missing_base", "legacy_map", "cross_space", "negative_offset", "too_many_ranges"],
+)
+def test_v4_memory_map_rejects_inconsistent_records(damage: str) -> None:
+    value = document()
+    block = value["memory_blocks"][0]
+    if damage == "missing_base":
+        value.pop("image_base")
+    elif damage == "legacy_map":
+        value["schema_version"] = "ghidra-3"
+    elif damage == "cross_space":
+        block["file_ranges"][0]["end"] = {"space": "OTHER", "address": "0"}
+    elif damage == "negative_offset":
+        block["file_ranges"][0]["file_offset"] = -1
+    else:
+        block["file_ranges"] = block["file_ranges"] * 17
+    with pytest.raises(ValidationError):
+        GhidraResult.model_validate(value)
