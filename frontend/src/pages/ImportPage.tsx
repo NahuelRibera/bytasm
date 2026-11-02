@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { MastScene } from "../art/MastArt";
+import { Breadcrumbs } from "../shell";
 import { useState, type FormEvent } from "react";
 import { ApiError, api, type Health, type ImportMetadata } from "../api";
-import { ErrorPanel, Loading, formatBytes } from "../components";
+import { ErrorPanel, Loading, formatBytes, PageMast } from "../components";
 import { Link, navigate } from "../router";
 
 export const INPUT_POLICY_DISCLOSURE =
@@ -85,13 +87,24 @@ export function ImportPage({ projectId, health }: { projectId: string; health?: 
 
   return (
     <>
-      <nav className="breadcrumb" aria-label="Breadcrumb">
-        <Link to={`/projects/${projectId}`}>← {project.data.name}</Link>
-      </nav>
-      <header className="page-header">
-        <h1>Import a binary</h1>
-        <p className="lede">Up to 64 MiB. PE and ELF files only. The file is read, never run.</p>
-      </header>
+      <Breadcrumbs
+        items={[
+          { to: "/", label: "Projects" },
+          { to: `/projects/${projectId}`, label: project.data.name, untrusted: true },
+        ]}
+        current="Import"
+      />
+      <PageMast
+        level="workspace"
+        eyebrow={
+          <>
+            <b>∷</b> Guarded intake
+          </>
+        }
+        title="Import a binary"
+        lede="Up to 64 MiB. PE and ELF files only. The file is read, never run."
+        art={<MastScene kind="figure" character="scavenger" />}
+      />
 
       <section className="notice" aria-labelledby="policy-heading">
         <h2 id="policy-heading">Supported inputs</h2>

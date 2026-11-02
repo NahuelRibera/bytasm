@@ -7,9 +7,14 @@ origin; no font is fetched from a third-party host.
 |---|---|---|---|
 | Inter (variable, Latin subset) | 4.x via Fontsource 5.3.0 | `@fontsource-variable/inter` | SIL Open Font License 1.1 |
 | JetBrains Mono (variable, Latin subset) | 2.x via Fontsource 5.3.0 | `@fontsource-variable/jetbrains-mono` | SIL Open Font License 1.1 |
+| Cormorant Garamond (variable, Latin subset, roman only; display titles) | via Fontsource 5.3.0 | `@fontsource-variable/cormorant-garamond` | SIL Open Font License 1.1 |
 
 The full license texts ship with the packages
 (`node_modules/@fontsource-variable/*/LICENSE`).
 
 The character art masks in `public/art/chars/` are derived by `scripts/build_ascii_art.py`
 from Bytasm's own ASCII character artwork; see `docs/design/ASCII_INTEGRATION.md`.
+
+The Bytasm isotipo in `public/branding/` is the project's own approved mark, used as
+delivered. `public/branding/derived/` holds plain downscales of `bytasm-icon.png` (180 and
+32 px, made with `sips -z`) for the touch icon and the raster favicon fallback.

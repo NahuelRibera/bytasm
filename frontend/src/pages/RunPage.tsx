@@ -12,7 +12,7 @@ import {
   FindingsMeaning,
   KeyValues,
   Loading,
-  SectionLabel,
+  PageMast,
   StatusPill,
   asciiPreview,
   formatBytes,
@@ -22,6 +22,10 @@ import {
 } from "../components";
 import { Link } from "../router";
 import { RuleSource } from "./RulesPage";
+import { FileMap, type MapMark } from "../FileMap";
+import { Astrolabe, MastScene } from "../art/MastArt";
+import { STEP_MEANING } from "../InspectionOverview";
+import { Breadcrumbs, SectionIndex, type IndexEntry } from "../shell";
 
 const ACTIVE = new Set(["queued", "running"]);
 const TOOL_NAMES: Record<string, string> = { strings: "Strings extractor", "yara-x": "YARA-X", "capa": "capa", "ghidra": "Ghidra Headless" };
@@ -44,69 +48,145 @@ export function RunPage({ runId }: { runId: string }) {
   if (run.isError) return <ErrorPanel error={run.error} title="The run could not be loaded" />;
   const r = run.data;
   const label = r.sample.version_label ?? "(unlabelled version)";
+  const ghidra = r.profile_id === "ghidra-static";
+  const succeeded = r.steps.filter((step) => step.status === "succeeded").length;
+  const ruleStepDone = r.steps.some((step) => ["yara-x", "capa"].includes(step.tool) && step.status === "succeeded");
+  const showStrings = Boolean(stepOf(r, "strings")) && !ACTIVE.has(r.status);
+  const showFindings = !ghidra && (ruleStepDone || !ACTIVE.has(r.status));
+  const elapsed = r.steps.reduce((total, step) => total + (step.duration_ms ?? 0), 0);
+  const entries: IndexEntry[] = [
+    ...(!ghidra && r.summary ? [{ id: "plain-run", label: "In plain language", group: "Understand" }] : []),
+    { id: "coverage", label: "Coverage", group: "Understand" },
+    ...(showStrings ? [{ id: "strings-summary", label: "Strings", group: "Understand" }] : []),
+    ...(r.review ? [{ id: "why", label: "Why these appear", group: "Understand" }] : []),
+    ...(ghidra ? [{ id: "ghidra-heading", label: "Ghidra workspace", group: "Investigate" }] : []),
+    ...(showFindings ? [{ id: "findings", label: "Findings and evidence", group: "Investigate" }] : []),
+    { id: "steps", label: "Steps and raw output", group: "Investigate" },
+    { id: "technical-log", label: "Run log", group: "Investigate" },
+    { id: "run-provenance", label: "Sample and provenance", group: "Investigate" },
+  ];
 
   return (
-    <>
-      <nav className="breadcrumb" aria-label="Breadcrumb">
-        <Link to={`/versions/${r.sample.version_id}`}>
-          ← {r.sample.sample_name} {label}
-        </Link>
-      </nav>
-      <header className="page-header page-header-actions run-header frame-bracket">
-        <div>
-          <p className="eyebrow">
+    <div className="run-page">
+      <Breadcrumbs
+        items={[
+          { to: "/", label: "Projects" },
+          { to: `/projects/${r.sample.project_id}`, label: r.sample.project_name, untrusted: true },
+          { to: `/versions/${r.sample.version_id}`, label: `${r.sample.sample_name} ${label}`, untrusted: true },
+        ]}
+        current={`Run ${r.id.slice(0, 8)}`}
+      />
+      <PageMast
+        eyebrow={
+          <>
             <b>∷</b> Analysis run · <span className="mono">{r.id.slice(0, 8)}</span>
-          </p>
-          <h1>
-            Analysis run <span className="muted">{r.profile_id === "ghidra-static" ? r.profile_name : `strings + ${r.rule_set.label}`}</span>
-          </h1>
+          </>
+        }
+        title={
+          <>
+            Analysis run <span className="muted">{ghidra ? r.profile_name : `strings + ${r.rule_set.label}`}</span>
+          </>
+        }
+        meta={
           <p className="status-line" aria-live="polite">
             <StatusPill status={r.status} />
             <span>{statusSentence(r)}</span>
           </p>
-        </div>
-        <CancelButton run={r} />
-      </header>
+        }
+        actions={<CancelButton run={r} />}
+        art={<MastScene kind="instrument" ornament={<Astrolabe />} field={false} />}
+      />
 
       {ACTIVE.has(r.status) && <WorkerWarning />}
       <RunBanner run={r} />
 
       <section className="run-summary" aria-label="Run summary">
-        <p className="sr-only">{r.steps.filter(step => step.status === "succeeded").length} of {r.steps.length} selected steps succeeded · {r.counts.findings} findings · {r.counts.strings.toLocaleString("en")} recorded strings</p>
+        <p className="sr-only">{succeeded} of {r.steps.length} selected steps succeeded · {r.counts.findings} findings · {r.counts.strings.toLocaleString("en")} recorded strings</p>
         <dl className="metric-strip" aria-hidden="true">
-          <div className="metric"><dt>Steps succeeded</dt><dd>{r.steps.filter(step => step.status === "succeeded").length}<span className="metric-of">/{r.steps.length}</span></dd></div>
+          <div className="metric"><dt>Steps succeeded</dt><dd>{succeeded}<span className="metric-of">/{r.steps.length}</span></dd></div>
           <div className="metric"><dt>Findings</dt><dd>{r.counts.findings}</dd></div>
           <div className="metric"><dt>Recorded strings</dt><dd>{r.counts.strings.toLocaleString("en")}</dd></div>
+          <div className="metric"><dt>Step time</dt><dd>{elapsed ? `${(elapsed / 1000).toFixed(2)}` : "—"}<span className="metric-of">{elapsed ? " s" : ""}</span></dd></div>
         </dl>
         <p className="hint">Scope: this run. Failed, unsupported and unavailable steps do not establish absence of patterns.</p>
       </section>
-      {r.profile_id === "ghidra-static" && <GhidraPanel run={r} />}
-      {r.profile_id !== "ghidra-static" && r.summary && <section className="card analysis-summary" aria-labelledby="plain-run"><h2 id="plain-run">Analysis in plain language</h2>{r.summary.map((text, i) => <p key={i}>{text}</p>)}</section>}
-      {r.review && <ReviewPanel review={r.review} />}
-      <SectionLabel index="01">Sample and provenance</SectionLabel>
-      <div className="grid-2 run-grid">
-        <SamplePanel run={r} />
-        <ProvenancePanel run={r} />
+
+      <div className="with-index">
+        <SectionIndex entries={entries} label="Run sections" />
+        <div className="index-body">
+          <h2 className="band-label" id="understand">
+            Understand <span>what this run inspected, what it observed, what stays unknown</span>
+          </h2>
+          <div className="understand-grid">
+            {!ghidra && r.summary && (
+              <section className="card analysis-summary" aria-labelledby="plain-run">
+                <h2 id="plain-run">Analysis in plain language</h2>
+                {r.summary.map((text, i) => <p key={i}>{text}</p>)}
+              </section>
+            )}
+            <RunCoverage run={r} />
+          </div>
+          <StringsSummaryPanel run={r} />
+          {r.review && (
+            <div id="why" tabIndex={-1}>
+              <ReviewPanel review={r.review} />
+            </div>
+          )}
+
+          <h2 className="band-label" id="investigate">
+            Investigate <span>exact findings, byte ranges, tool output and provenance</span>
+          </h2>
+          {ghidra && <GhidraPanel run={r} />}
+          {ruleStepDone ? (
+            <FindingsSection run={r} />
+          ) : (
+            showFindings && (
+              <section className="card" aria-labelledby="findings">
+                <h2 id="findings">Findings</h2>
+                <p>
+                  <strong>Not analysed.</strong> YARA-X did not complete in this run, so there are no
+                  findings. Absence of a match here does not mean a pattern is absent from the file.
+                </p>
+              </section>
+            )
+          )}
+          <StepsTable run={r} />
+          <TechnicalLog run={r} />
+          <div className="grid-2 run-grid">
+            <SamplePanel run={r} />
+            <ProvenancePanel run={r} />
+          </div>
+        </div>
       </div>
-      <SectionLabel index="02">Steps</SectionLabel>
-      <StepsTable run={r} />
-      <TechnicalLog run={r} />
-      <StringsSummaryPanel run={r} />
-      {r.profile_id !== "ghidra-static" && <SectionLabel index="03">Findings</SectionLabel>}
-      {r.steps.some(step => ["yara-x", "capa"].includes(step.tool) && step.status === "succeeded") ? (
-        <FindingsSection run={r} />
-      ) : (
-        r.profile_id !== "ghidra-static" && !ACTIVE.has(r.status) && (
-          <section className="card" aria-labelledby="findings">
-            <h2 id="findings">Findings</h2>
-            <p>
-              <strong>Not analysed.</strong> YARA-X did not complete in this run, so there are no
-              findings. Absence of a match here does not mean a pattern is absent from the file.
-            </p>
-          </section>
-        )
-      )}
-    </>
+    </div>
+  );
+}
+
+/** The step chain as an instrument: what each selected step did, in order, and what its state means. */
+function RunCoverage({ run }: { run: Run }) {
+  return (
+    <section className="card coverage" aria-labelledby="coverage">
+      <h2 id="coverage">Coverage</h2>
+      <p className="hint">What this run inspected. Only completed steps can report observations.</p>
+      <ol className="coverage-chain">
+        {run.steps.map((step) => (
+          <li key={step.index} className={`coverage-step state-${step.status}`}>
+            <span className="coverage-node" aria-hidden="true">{String(step.index + 1).padStart(2, "0")}</span>
+            <div className="coverage-text">
+              <p className="coverage-tool">
+                {TOOL_NAMES[step.tool] ?? step.tool}
+                {step.tool_version && <code>{step.tool_version}</code>}
+              </p>
+              <p className="coverage-state">
+                <span className={`coverage-status state-text-${step.status}`}>{step.status.replace("_", " ")}</span>
+                <span className="hint">{step.duration_ms === null ? "" : `${step.duration_ms} ms`}</span>
+              </p>
+              <p className="hint">{STEP_MEANING[step.status]}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 
@@ -383,7 +463,7 @@ function TechnicalLog({ run }: { run: Run }) {
     enabled: open,
   });
   return (
-    <details className="card" onToggle={(event) => setOpen((event.target as HTMLDetailsElement).open)}>
+    <details className="card technical-log" id="technical-log" onToggle={(event) => setOpen((event.target as HTMLDetailsElement).open)}>
       <summary>Technical log</summary>
       {log.isPending && open && <Loading label="Loading the log…" />}
       {log.isError && <ErrorPanel error={log.error} title="The log could not be loaded" />}
@@ -475,6 +555,10 @@ function FindingsSection({ run }: { run: Run }) {
     return () => window.removeEventListener("hashchange", navigateSource);
   }, [findings.data]);
   const openers = useRef<Record<string, HTMLButtonElement | null>>({});
+  const sections = useQuery({
+    queryKey: ["sections", run.sample.version_id],
+    queryFn: () => api.sections(run.sample.version_id),
+  });
 
   if (findings.isPending) return <Loading label="Loading findings…" />;
   if (findings.isError) return <ErrorPanel error={findings.error} title="The findings could not be loaded" />;
@@ -488,6 +572,21 @@ function FindingsSection({ run }: { run: Run }) {
   };
 
   const total = findings.data.total;
+  const marks: MapMark[] = items.flatMap((finding) =>
+    finding.evidence
+      .filter((item) => item.file_offset !== null)
+      .map((item) => ({
+        key: `${finding.id}-${item.id}`,
+        offset: item.file_offset!,
+        length: item.length ?? 0,
+        group: finding.id,
+        label: `${finding.rule_id} · ${item.pattern_id}`,
+      })),
+  );
+  const select = (id: string) => {
+    setSelected(id);
+    document.getElementById(`finding-${id}`)?.scrollIntoView({ block: "nearest" });
+  };
   return (
     <section className={`card findings${current ? " has-inspector" : ""}`} aria-labelledby="findings">
       <h2 id="findings" ref={findingsHeading} tabIndex={-1}>
@@ -523,6 +622,16 @@ function FindingsSection({ run }: { run: Run }) {
             {findings.isFetching ? "Updating filtered findings…" : query || tool || kind || namespace ? `${items.length} of ${total} shown` : `${total} shown`} · tool: {tool || "all completed tools"}
           </span>
         </form>
+      )}
+      {marks.length > 0 && sections.data && (
+        <FileMap
+          title="Where the matched bytes sit in the file"
+          size={run.sample.size_bytes}
+          sections={sections.data.sections}
+          marks={marks}
+          selectedGroup={selected}
+          onSelect={select}
+        />
       )}
       {total > 0 && items.length === 0 ? (
         <Empty>

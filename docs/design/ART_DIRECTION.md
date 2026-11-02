@@ -126,6 +126,11 @@ are close (ΔE 13).
   and **JetBrains Mono** (unambiguous `0 O`, `1 l I`, which matters for hex). Both
   OFL and self-hosted, because the CSP has no external `font-src` (see DESIGN_SYSTEM §3).
 
+> **M2 update (2026-11-02):** a display serif is now part of the product. Cormorant Garamond
+> (self-hosted, roman only) sets display and editorial titles; Inter and JetBrains Mono keep
+> their roles. Blackletter stays out of the UI (it lives only inside the isotipo). See
+> `docs/milestones/m2-journey-frontend.md`.
+
 ## 7. Underground hacker influence: how it shows up for real
 
 | Motif | Bytasm form | Where |
@@ -179,6 +184,10 @@ binary quadrant glyph, which is a promising seed.
 Recommendation: **B1 symbol + B4 wordmark** for the product (favicon, app icon,
 rail, status bar). Keep **B3** for the landing hero only, if at all. Avoid skulls and
 hoods in the mark. The boards' crow/skull app icons are art, not identity.
+
+> **M2 update (2026-11-02):** branding is decided. The approved isotipo (gothic arch, four-point
+> star, blackletter B) in `frontend/public/branding/` is the mark, used as delivered; the
+> wordmark is "Bytasm" in Cormorant Garamond. The proposals above are historical.
 
 ## 10. Do's and don'ts
 

@@ -42,7 +42,7 @@ test("imports a fixture and shows its identity and metadata", async ({ page }) =
   await expect(page.getByText("KERNEL32.dll")).toBeVisible();
 
   // Browse back to the project: the sample and its version are listed.
-  await page.getByRole("link", { name: "← UI flow" }).click();
+  await page.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link", { name: "UI flow" }).click();
   await expect(page.getByRole("article", { name: "Sample hello_v1-x86_64" })).toBeVisible();
   await expect(page.getByRole("link", { name: "v1" })).toBeVisible();
   await expect(page.getByText("Fixture manifest")).toBeVisible();

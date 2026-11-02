@@ -63,7 +63,7 @@ test("rules → validate → run → findings with byte evidence", async ({ page
   }
 
   // The run is listed on the version page, and the history link works.
-  await page.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link").click();
+  await page.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link").last().click();
   await expect(page.getByRole("region", { name: "Runs of this version" })).toContainText("Succeeded");
 });
 
