@@ -58,6 +58,18 @@
   /* Type */
   --font-sans: "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono Variable", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-display: "Cormorant Garamond Variable", "Iowan Old Style", Georgia, serif;
+
+  /* Type scale (M2): display serif for titles, sans for reading, mono for evidence */
+  --type-mast: clamp(40px, 5.4vw, 68px);
+  --type-page: clamp(30px, 3.4vw, 42px);
+  --type-section: 24px;
+
+  /* Journey atmosphere (M2): how strongly a page carries the identity, set per surface */
+  --moon: #b98cff;
+  --haze: rgb(144 46 253 / 0.1);
+  --hatch: rgb(239 235 228 / 0.035);
+  --rim: rgb(188 133 255 / 0.55);
 
   /* Space, radius, motion */
   --radius: 4px;

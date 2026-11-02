@@ -14,12 +14,17 @@ import {
   ErrorPanel,
   KeyValues,
   Loading,
+  PageMast,
   formatBytes,
   formatDate,
   hex,
 } from "../components";
 import { Link } from "../router";
 import { AnnotationsSection } from "./AnnotationsSection";
+import { FileMap } from "../FileMap";
+import { BinaryArt } from "../art/BinaryArt";
+import { Arcade, MastScene } from "../art/MastArt";
+import { Breadcrumbs, SectionIndex, type IndexEntry } from "../shell";
 
 const TABS = ["Sections", "Imports", "Exports", "Strings"] as const;
 type Tab = (typeof TABS)[number];
@@ -51,38 +56,49 @@ export function VersionPage({
   const v = version.data;
   const label = v.version_label ?? "(unlabelled version)";
 
+  const entries: IndexEntry[] = [
+    { id: "inspection-overview", label: "What we know", group: "Understand" },
+    { id: "pinned-review-title", label: "Pinned review", group: "Understand" },
+    { id: "pattern-matching", label: "Analysis runs", group: "Investigate" },
+    { id: "identity", label: "Identity and header", group: "Investigate" },
+    { id: "structure", label: "File structure", group: "Investigate" },
+    { id: "bytes", label: "Bytes", group: "Investigate" },
+    { id: "provenance", label: "Provenance", group: "Investigate" },
+    { id: "reports", label: "Reports and comparison", group: "Record" },
+    { id: "annotations", label: "Annotations", group: "Record" },
+  ];
+
   return (
     <>
-      <nav className="breadcrumb" aria-label="Breadcrumb">
-        <Link to={`/projects/${v.project_id}`}>← {v.project_name}</Link>
-      </nav>
-      <header className="page-header page-header-actions">
-        <div>
-          <h1>
-            {v.sample_name} <span className="muted">{label}</span>
-          </h1>
+      <Breadcrumbs
+        items={[
+          { to: "/", label: "Projects" },
+          { to: `/projects/${v.project_id}`, label: v.project_name, untrusted: true },
+        ]}
+        current={`${v.sample_name} ${label}`}
+      />
+      <PageMast
+        eyebrow={
+          <>
+            <b>∷</b> Sample version · <span className="mono">{v.sha256.slice(0, 12)}</span>
+          </>
+        }
+        title={
+          <>
+            <span className="untrusted">{v.sample_name}</span> <span className="muted">{label}</span>
+          </>
+        }
+        meta={
           <p className="status-line">
             <AdmittedPill value={v.admitted_under} />
             <span>
               {v.detected_format} · {v.header.architecture} · imported {formatDate(v.imported_at)}
             </span>
           </p>
-        </div>
-        {actions}
-      </header>
-
-      <InspectionOverview key={`${versionId}:${sourceRun ?? "latest"}`} version={v} runId={sourceRun} />
-      <PinnedReview key={versionId} version={v} runId={sourceRun} />
-      <ByteViewer key={`bytes:${versionId}`} versionId={versionId} />
-      <div className="grid-2">
-        <IdentityPanel v={v} />
-        <MetadataPanel v={v} />
-      </div>
-      <ProvenancePanel v={v} />
-      {analysis?.(v)}
-      <ReportLibrary key={versionId} versionId={versionId} />
-      <p><Link to={`/projects/${v.project_id}/compare/${v.sample_id}`}>Compare versions</Link></p>
-      <AnnotationsSection key={versionId} versionId={versionId} />
+        }
+        actions={actions}
+        art={<MastScene kind="architecture" ornament={<Arcade />} />}
+      />
 
       {v.warnings.length > 0 && (
         <section className="notice notice-warn" aria-labelledby="warnings">
@@ -95,21 +111,68 @@ export function VersionPage({
         </section>
       )}
 
-      <section className="card" aria-label="File structure">
-        <Tabs
-          current={tab}
-          onChange={setTab}
-          counts={{ ...v.counts, strings: strings.data?.summary?.stored }}
-        />
-        <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} tabIndex={0}>
-          {tab === "Sections" && <SectionsTable versionId={versionId} />}
-          {tab === "Imports" && <ImportsList versionId={versionId} />}
-          {tab === "Exports" && <ExportsList versionId={versionId} />}
-          {tab === "Strings" && <StringsTab versionId={versionId} runId={sourceRun} onSection={() => setTab("Sections")} />}
+      <div className="with-index">
+        <SectionIndex entries={entries} label="Sample version sections" />
+        <div className="index-body">
+          <h2 className="band-label">
+            Understand <span>what the stored evidence says about this file</span>
+          </h2>
+          <InspectionOverview key={`${versionId}:${sourceRun ?? "latest"}`} version={v} runId={sourceRun} />
+          <PinnedReview key={versionId} version={v} runId={sourceRun} />
+
+          <h2 className="band-label">
+            Investigate <span>exact structure, bytes and provenance</span>
+          </h2>
+          {analysis?.(v)}
+          <div className="grid-2">
+            <IdentityPanel v={v} />
+            <MetadataPanel v={v} />
+          </div>
+          <section className="card" aria-label="File structure" id="structure" tabIndex={-1}>
+            <VersionFileMap versionId={versionId} size={v.size_bytes} />
+            <Tabs
+              current={tab}
+              onChange={setTab}
+              counts={{ ...v.counts, strings: strings.data?.summary?.stored }}
+            />
+            <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} tabIndex={0}>
+              {tab === "Sections" && <SectionsTable versionId={versionId} />}
+              {tab === "Imports" && <ImportsList versionId={versionId} />}
+              {tab === "Exports" && <ExportsList versionId={versionId} />}
+              {tab === "Strings" && <StringsTab versionId={versionId} runId={sourceRun} onSection={() => setTab("Sections")} />}
+            </div>
+          </section>
+          <div id="bytes" tabIndex={-1}>
+            <ByteViewer key={`bytes:${versionId}`} versionId={versionId} />
+          </div>
+          <ProvenancePanel v={v} />
+
+          <div className="band-scene">
+            <BinaryArt character="mystic" tint="bone" className="band-art art-dense" />
+            <h2 className="band-label">
+              Record <span>reports, comparisons and analyst notes</span>
+            </h2>
+          </div>
+          <div id="reports" tabIndex={-1}>
+            <ReportLibrary key={versionId} versionId={versionId} />
+            <p className="compare-link">
+              <Link to={`/projects/${v.project_id}/compare/${v.sample_id}`}>Compare versions</Link>
+            </p>
+          </div>
+          <div id="annotations" tabIndex={-1}>
+            <AnnotationsSection key={versionId} versionId={versionId} />
+          </div>
         </div>
-      </section>
+      </div>
     </>
   );
+}
+
+/** The sections as declared, laid along the stored file (no rule marks on this page). */
+function VersionFileMap({ versionId, size }: { versionId: string; size: number }) {
+  const sections = useQuery({ queryKey: ["sections", versionId], queryFn: () => api.sections(versionId) });
+  if (!sections.data || sections.data.sections.length === 0) return null;
+  return <FileMap title="Sections along the file" size={size} sections={sections.data.sections} />;
 }
 
 function IdentityPanel({ v }: { v: SampleVersion }) {

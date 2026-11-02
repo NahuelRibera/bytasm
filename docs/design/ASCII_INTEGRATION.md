@@ -277,6 +277,14 @@ placements follow the screens each milestone restyles.
 | Landing closing / footer | `muerte` | cutout, ghost, 0.5 | M6 | Small, right, with ASCII rule |
 | App shell rail bottom | none by default | — | — | Asset-7 puts figures in the sidebar. Rejected: always visible means always noise |
 
+> **M2.1 update (2026-11-02):** current placements, superseding the rows above where they differ:
+> muerte (Projects hero, drawn inside the scene SVG), crow (Projects empty, no moon), scavenger
+> (Project empty, Import mast), automaton (Tools mast), wizard (Rules mast, bundled set),
+> executioner (stored rule-set mast: archive keeper, never near rejections or failures), mystic
+> (Version "Record" band), nohead (404). Opacity is set per placement; small figures use a
+> double impression of the mask (`.art-dense`) and the `bone` tint. Still no figure on a project
+> that has samples, nor on report previews. See `docs/milestones/m2.1-visual-refinement.md`.
+
 **Never:** inside RunPage findings, evidence drawer, VersionPage metadata,
 Compare diff, Ghidra workspace, ByteViewer, pinned-review preview, exported reports.
 

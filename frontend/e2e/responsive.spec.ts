@@ -38,7 +38,7 @@ test("every screen fits a 360 px window", async ({ page }) => {
   }
 
   // The project page again, now with a sample and its versions table.
-  await page.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link").click();
+  await page.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link").last().click();
   await expect(page.getByRole("region", { name: "Versions of narrow" })).toBeVisible();
   await expectNoHorizontalPageScroll(page);
   await expectNoAxeViolations(page);

@@ -85,7 +85,8 @@ describe("Version comparison", () => {
     expect(screen.queryByRole("option", { name: /Foreign version/ })).toBeNull();
     expect(screen.getByRole("link", { name: "View version A" }).getAttribute("href")).toBe(`/versions/${older}`);
     expect(screen.getByRole("link", { name: "View version B" }).getAttribute("href")).toBe(`/versions/${VERSION_ID}`);
-    expect(screen.getByRole("link", { name: "← Project" }).getAttribute("href")).toBe(`/projects/${PROJECT_ID}`);
+    const trail = screen.getByRole("navigation", { name: "Breadcrumb" });
+    expect(within(trail).getByRole("link", { name: "Project" }).getAttribute("href")).toBe(`/projects/${PROJECT_ID}`);
     await user.selectOptions(a, oldest);
     expect(screen.getByRole("link", { name: "View version A" }).getAttribute("href")).toBe(`/versions/${oldest}`);
     expect(await screen.findByText("No differences in this category.")).toBeTruthy();

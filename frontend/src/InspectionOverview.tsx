@@ -3,7 +3,7 @@ import { api, rawOutputUrl, type Run, type SampleVersion, type StepStatus } from
 import { ErrorPanel, Loading, StatusPill, formatBytes, formatDate } from "./components";
 import { Link } from "./router";
 
-const STEP_MEANING: Record<StepStatus, string> = {
+export const STEP_MEANING: Record<StepStatus, string> = {
   queued: "Waiting; no result yet.",
   running: "Still reading the file; no final result yet.",
   succeeded: "Completed within the tool's recorded limits.",

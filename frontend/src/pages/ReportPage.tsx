@@ -1,7 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
+import { Breadcrumbs } from "../shell";
 import { ReviewPanel } from "../ReviewPanel";
 import { api } from "../api";
-import { ErrorPanel, Loading } from "../components";
+import { ErrorPanel, Loading, PageMast } from "../components";
+import { Arcade, MastScene } from "../art/MastArt";
 
 function Value({ value }: { value: unknown }) {
   if (value === null) return <>Not available</>;
@@ -16,7 +18,13 @@ export function ReportPage({ reportId }: { reportId: string }) {
   if (query.isPending) return <Loading label="Loading report snapshot…" />;
   if (query.isError) return <ErrorPanel error={query.error} />;
   const report = query.data;
-  return <><h1>Report preview</h1><p>Stored JSON snapshot · schema {String(report.schema_version)}. Downloads use this snapshot, not later database changes.</p>
+  return <><Breadcrumbs items={[{ to: "/", label: "Projects" }]} current="Report preview" />
+    <PageMast
+      eyebrow={<><b>∷</b> Stored snapshot · schema {String(report.schema_version)}</>}
+      title="Report preview"
+      art={<MastScene kind="architecture" ornament={<Arcade />} />}
+      lede={`Stored JSON snapshot · schema ${String(report.schema_version)}. Downloads use this snapshot, not later database changes.`}
+    />
     <section className="card analysis-summary" aria-labelledby="plain-report"><h2 id="plain-report">Analysis in plain language</h2>{Array.isArray(report.summary) && report.summary.map((text, i) => <p key={i}>{String(text)}</p>)}</section>
     {guide.isFetching && <Loading label="Loading snapshot explanations…" />}{guide.isError && <ErrorPanel error={guide.error} />}{guide.data && <ReviewPanel review={guide.data} snapshot />}
     <p className="notice">Comparison reports may include changed strings and analyst text. Review before sharing.</p>

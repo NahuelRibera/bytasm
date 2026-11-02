@@ -285,9 +285,11 @@ section,
   margin-bottom: 0;
 }
 
+/* M2.1: warnings no longer fill the box with amber. A neutral surface, an amber edge and a faint
+   warm wash; the title marker carries the colour (see .notice-block for the badge form). */
 .notice-warn {
   border-left-color: var(--warn);
-  background: var(--warn-bg);
+  background: linear-gradient(90deg, rgb(242 184 75 / 0.07), rgb(242 184 75 / 0) 40%), var(--raised);
 }
 
 .banner {

@@ -6,6 +6,7 @@ import "./styles/fonts.css";
 import "./styles/tokens.css";
 import "./styles.css";
 import "./styles/shell.css";
+import "./styles/journey.css";
 import "./art/characters.css";
 
 const queryClient = new QueryClient({

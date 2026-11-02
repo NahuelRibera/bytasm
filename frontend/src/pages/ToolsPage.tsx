@@ -1,18 +1,24 @@
 import { useQuery } from "@tanstack/react-query";
+import { Astrolabe, MastScene } from "../art/MastArt";
 import { api } from "../api";
-import { ErrorPanel, Loading } from "../components";
+import { ErrorPanel, Loading, PageMast } from "../components";
 
 export function ToolsPage() {
   const tools = useQuery({ queryKey: ["tools"], queryFn: api.tools });
   if (tools.isPending) return <Loading label="Loading tool versions…" />;
   if (tools.isError) return <ErrorPanel error={tools.error} />;
-  return <><h1>Tools and profiles</h1><p>Installed static analysis tools. No sample is opened to populate this page.</p>
-    <div className="grid-2">{tools.data.tools.map((tool) => <section className="card" key={tool.tool}>
+  return <><PageMast
+      eyebrow={<><b>∷</b> Instruments</>}
+      title="Tools and profiles"
+      lede="Installed static analysis tools. No sample is opened to populate this page."
+      art={<MastScene kind="figure" character="automaton" ornament={<Astrolabe />} />}
+    />
+    <div className="grid-2 tool-grid">{tools.data.tools.map((tool) => <section className={`card plate frame-bracket tool-card ${tool.available ? "is-available" : "is-unavailable"}`} key={tool.tool}>
       <h2>{tool.tool} <span className="count">{tool.version ?? "Unavailable"}</span></h2>
-      <p>{tool.available ? "Available" : "Unavailable for the configured version"}</p><p>{tool.adapter} {tool.adapter_version} · {tool.formats.join(", ")}</p>
-      <p>{tool.limitations}</p>{tool.rules_sha256 && <p className="untrusted">Rules SHA-256: <code>{tool.rules_sha256}</code></p>}
+      <p className="tool-state"><span className="api-led" aria-hidden="true" />{tool.available ? "Available" : "Unavailable for the configured version"}</p><p className="tool-adapter">{tool.adapter} {tool.adapter_version} · {tool.formats.join(", ")}</p>
+      <p>{tool.limitations}</p>{tool.rules_sha256 && <p className="untrusted plate-foot">Rules SHA-256: <code>{tool.rules_sha256}</code></p>}
     </section>)}</div>
-    {tools.data.optional_providers?.map(provider => <section className="card optional-provider" aria-label="Ghidra diagnostics" key={provider.provider}>
+    {tools.data.optional_providers?.map(provider => <section className="card plate optional-provider" aria-label="Ghidra diagnostics" key={provider.provider}>
       <h2>Optional Ghidra provider</h2>
       <p><strong>{provider.analysis_enabled ? "Analysis available." : "Analysis unavailable."}</strong> {provider.message}</p>
       <dl className="diff-values">
@@ -23,7 +29,7 @@ export function ToolsPage() {
       <p>{provider.verification === "metadata_only" ? "Metadata only, not proof of a usable installation." : "A bounded Headless self-check was attempted without a sample."} Health check: {provider.health_check.replaceAll("_", " ")}. {provider.health_check === "not_run" && "No executable or sample was opened by this diagnostic."}</p>
       <p>Local setup uses BYTASM_GHIDRA_HOME and BYTASM_GHIDRA_JAVA_HOME. Nothing is downloaded automatically. A verified offline runner is required before analysis can be enabled.</p>
     </section>)}
-    <h2>Built-in profiles</h2>{tools.data.profiles.map((profile) => <section className="card" key={profile.id}>
-      <h3>{profile.name}</h3><p>{profile.steps.join(" → ")}</p><p>{profile.limitations}</p>
+    <h2 className="section-label">Built-in profiles</h2>{tools.data.profiles.map((profile) => <section className="card profile-card" key={profile.id}>
+      <h3>{profile.name}</h3><ol className="profile-steps">{profile.steps.map((step) => <li key={step}>{step}</li>)}</ol><p className="sr-only">{profile.steps.join(" → ")}</p><p>{profile.limitations}</p>
     </section>)}<p>Header metadata is always read at import. Custom commands, plugins and editable rules are unavailable.</p></>;
 }
