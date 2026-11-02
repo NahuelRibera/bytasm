@@ -4,7 +4,7 @@
 import type { CharacterName } from "./characters";
 
 export type ArtVariant = "cutout" | "field";
-export type ArtTint = "ink" | "signal" | "ash" | "ghost";
+export type ArtTint = "ink" | "signal" | "ash" | "ghost" | "moonlit" | "bone";
 
 export function BinaryArt({
   character,

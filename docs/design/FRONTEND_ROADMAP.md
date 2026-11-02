@@ -312,3 +312,21 @@ A passing build alone is not acceptance.
 
 Implemented on branch `feat/m1-frontend-foundation` (not committed). Results and the
 remaining owner review are recorded in `docs/milestones/m1-frontend-foundation.md`.
+
+## 14. M2 Journey status (2026-11-02)
+
+Implemented, uncommitted, on `feat/m1-frontend-foundation`: definitive isotipo and favicon,
+display serif, top bar + breadcrumbs + section index (rail removed), Journey masthead
+(gothic city, dithered moon, astrolabe halo, binary field, muerte rider), specimen spine and
+field log on Project, Understand / Investigate workstation with coverage chain and file map on
+Run, the same grammar on Version, and masts for Import, Rules, Tools, Compare and Report.
+Record: `docs/milestones/m2-journey-frontend.md`.
+
+## 15. M2.1 visual refinement status (2026-11-02)
+
+Implemented, uncommitted: Journey hero recomposed (rider drawn in the scene on its ridge, smaller
+distant settlement, restrained silver-violet moon, no star on the rider), a secondary masthead
+family (figure / architecture / instrument scenes with original engraved ornaments), all eight
+characters placed and framed, the `Notice` badge pattern replacing amber warning blocks, the
+`.plate` and rules-codex primitives, and a redesigned Compare (bench, counted category strip,
+change ledger). Record: `docs/milestones/m2.1-visual-refinement.md`.

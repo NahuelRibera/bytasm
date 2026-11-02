@@ -14,7 +14,7 @@ import { AnalysisPanel } from "./AnalysisPanel";
 import { ExportReportButton } from "./ExportReportButton";
 import { useRoute } from "./router";
 import { NotFound } from "./pages/NotFound";
-import { NavRail, StatusBar } from "./shell";
+import { StatusBar, TopBar } from "./shell";
 
 export function App() {
   const route = useRoute();
@@ -25,8 +25,8 @@ export function App() {
       <a className="skip-link" href="#main">
         Skip to content
       </a>
-      <NavRail route={route} />
-      <div className="workspace">
+      <TopBar route={route} health={health.data} healthError={health.isError} />
+      <div className="workspace" data-route={route.name}>
         <SelfBuiltBanner health={health.data} />
         <main id="main" className="main" tabIndex={-1}>
         {route.name === "projects" && <ProjectsPage />}
@@ -46,7 +46,7 @@ export function App() {
         {route.name === "run" && <RunPage key={route.runId} runId={route.runId} />}
         {route.name === "not_found" && <NotFound />}
         </main>
-        <StatusBar health={health.data} healthError={health.isError} />
+        <StatusBar health={health.data} />
       </div>
     </div>
   );

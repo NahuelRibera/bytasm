@@ -3,6 +3,7 @@
 // React text child, so React escapes it.
 import { useState, type ReactNode } from "react";
 import { ApiError, type Health } from "./api";
+import { InfoIcon, WarnIcon } from "./icons";
 
 export function hex(value: number | null | undefined): string {
   if (value === null || value === undefined) return "—";
@@ -120,9 +121,9 @@ export function Empty({ children }: { children: ReactNode }) {
 }
 
 /** An empty state with one character figure (ASCII_INTEGRATION §9): copy and action stay on clean black. */
-export function EmptyArt({ art, children }: { art: ReactNode; children: ReactNode }) {
+export function EmptyArt({ art, children, className }: { art: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <div className="empty-art frame-bracket">
+    <div className={["empty-art frame-bracket", className].filter(Boolean).join(" ")}>
       {art}
       <div className="empty-art-copy">{children}</div>
     </div>
@@ -130,6 +131,32 @@ export function EmptyArt({ art, children }: { art: ReactNode; children: ReactNod
 }
 
 /** Counts the API returned, as a Nordlys-style strip. Never a derived score. */
+/**
+ * A notice with a small labelled badge on a neutral surface (M2.1). Only the badge, its icon and
+ * the left edge carry the tone; the message stays in normal readable text. Never hides the text.
+ */
+export function Notice({
+  tone = "info",
+  label,
+  children,
+  className,
+}: {
+  tone?: "info" | "warn";
+  label: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={["notice-block", `notice-block-${tone}`, className].filter(Boolean).join(" ")} role="note">
+      <span className="notice-badge">
+        {tone === "warn" ? <WarnIcon /> : <InfoIcon />}
+        {label}
+      </span>
+      <div className="notice-text">{children}</div>
+    </div>
+  );
+}
+
 export function MetricStrip({ items, label }: { items: Array<[string, ReactNode]>; label: string }) {
   return (
     <dl className="metric-strip" aria-label={label}>
@@ -149,6 +176,98 @@ export function SectionLabel({ index, children }: { index: string; children: Rea
     <p className="section-label" aria-hidden="true">
       <b>{index}</b> {children}
     </p>
+  );
+}
+
+/**
+ * A page header in the Journey family. `level` sets how much atmosphere the page carries:
+ * "workspace" (project level: a horizon and engraving), "instrument" (version, run and other
+ * working pages: a reduced astrolabe edge). The Projects entrance has its own masthead.
+ */
+export function PageMast({
+  level = "instrument",
+  eyebrow,
+  title,
+  lede,
+  meta,
+  actions,
+  art,
+  titleClassName,
+}: {
+  level?: "workspace" | "instrument";
+  eyebrow?: ReactNode;
+  title: ReactNode;
+  lede?: ReactNode;
+  meta?: ReactNode;
+  actions?: ReactNode;
+  art?: ReactNode;
+  titleClassName?: string;
+}) {
+  return (
+    <div className={`mast mast-${level}`}>
+      <div className="mast-atmo atmo" aria-hidden="true">
+        <svg className="mast-horizon" viewBox="0 0 1200 120" preserveAspectRatio="none" focusable="false">
+          {level === "workspace" && (
+            <path d="M0 120V96L60 90L120 94L190 80L240 86L300 72L350 80L420 76L470 64L520 70L600 58L650 66L720 60L790 70L860 62L930 74L1000 66L1080 78L1140 72L1200 80V120Z" />
+          )}
+          <path className="mast-horizon-line" d="M0 119.5H1200" />
+        </svg>
+        <span className="mast-ring" />
+      </div>
+      {art}
+      <div className="mast-body">
+        <div className="mast-text">
+          {eyebrow && <p className="eyebrow">{eyebrow}</p>}
+          <h1 className={["mast-heading", titleClassName].filter(Boolean).join(" ")}>{title}</h1>
+          {meta && <div className="status-line">{meta}</div>}
+          {lede && <p className="lede">{lede}</p>}
+        </div>
+        {actions && <div className="mast-side">{actions}</div>}
+      </div>
+    </div>
+  );
+}
+
+/** An operational panel with an engraved double-rule head. */
+export function Panel({
+  title,
+  tag,
+  actions,
+  children,
+  id,
+  className,
+  headingLevel = 2,
+  label,
+}: {
+  title: ReactNode;
+  tag?: ReactNode;
+  actions?: ReactNode;
+  children: ReactNode;
+  id?: string;
+  className?: string;
+  headingLevel?: 2 | 3;
+  label?: string;
+}) {
+  const Heading = headingLevel === 2 ? "h2" : "h3";
+  const headingId = id ? `${id}-title` : undefined;
+  return (
+    <section id={id} className={["panel", className].filter(Boolean).join(" ")} aria-labelledby={label ? undefined : headingId} aria-label={label}>
+      <div className="panel-head">
+        <Heading id={headingId}>{title}</Heading>
+        {tag && <span className="panel-tag">{tag}</span>}
+        {actions && <div className="panel-actions">{actions}</div>}
+      </div>
+      <div className="panel-body">{children}</div>
+    </section>
+  );
+}
+
+/** A binary-fade separator (decoration only). */
+export function BinaryRule() {
+  return (
+    <span className="binary-rule" aria-hidden="true">
+      01101000 01100101 01110010 01100101 00100000 01100010 01100101 00100000 01100100 01110010 01100001 01100111 01101111 01101110 01110011
+    </span>
   );
 }
 

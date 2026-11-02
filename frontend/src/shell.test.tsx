@@ -24,11 +24,13 @@ describe("App shell", () => {
     expect(within(nav).getByRole("link", { name: "Projects" }).getAttribute("aria-current")).toBeNull();
   });
 
-  it("keeps the input policy and Bytasm's limits reachable from the status bar", async () => {
+  it("keeps the input policy in the top bar and Bytasm's limits in the status bar", async () => {
     openAt("/", { "GET /api/v1/projects": () => json([]) });
+    const top = screen.getByRole("banner");
+    expect(await within(top).findByText(/Input policy: fixtures only/)).toBeTruthy();
+    expect(await within(top).findByText("API ok")).toBeTruthy();
+    expect(within(top).getByRole("link", { name: "Bytasm home" }).querySelector(".isotipo")).toBeTruthy();
     const bar = screen.getByRole("contentinfo");
-    expect(await within(bar).findByText(/Input policy: fixtures only/)).toBeTruthy();
-    expect(await within(bar).findByText("API ok")).toBeTruthy();
     expect(within(bar).getByText("Limits").closest("details")).toBeTruthy();
     expect(within(bar).getByText(/never runs the files it imports/)).toBeTruthy();
     expect(within(bar).getByText(/Rule matches are observations, not verdicts/)).toBeTruthy();

@@ -1,7 +1,8 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { Arcade, MastScene, Niche } from "../art/MastArt";
+import { Breadcrumbs } from "../shell";
 import { api, type Diagnostic, type RuleSet, type RuleValidation } from "../api";
-import { CopyButton, Empty, ErrorPanel, KeyValues, Loading } from "../components";
-import { Link } from "../router";
+import { CopyButton, Empty, ErrorPanel, KeyValues, Loading, PageMast } from "../components";
 
 /**
  * Bytasm's bundled YARA-X rule set: read-only (the rules ship with the code,
@@ -20,26 +21,34 @@ export function RulesPage({ ruleSetId }: { ruleSetId: string | null }) {
 
   return (
     <>
-      {ruleSetId && (
-        <nav className="breadcrumb" aria-label="Breadcrumb">
-          <Link to="/rules">← Current rule set</Link>
-        </nav>
-      )}
-      <header className="page-header">
-        <h1>
-          YARA-X rules <span className="muted">{rules.label}</span>
-        </h1>
-        <p className="lede">
-          {ruleSetId
+      {ruleSetId && <Breadcrumbs items={[{ to: "/rules", label: "← Current rule set" }]} current={rules.label} />}
+      <PageMast
+        eyebrow={
+          <>
+            <b>∷</b> {ruleSetId ? "Stored rule set" : "Bundled rule set"}
+          </>
+        }
+        title={
+          <>
+            YARA-X rules <span className="muted">{rules.label}</span>
+          </>
+        }
+        // The bundled set has the wizard; a stored set (the exact text an earlier run used) has the
+        // executioner as keeper of the archive: a locked record, never a judgement on a sample.
+        art={ruleSetId
+          ? <MastScene kind="figure" character="executioner" ornament={<Arcade />} />
+          : <MastScene kind="figure" character="wizard" ornament={<Niche />} />}
+        lede={
+          ruleSetId
             ? "The exact rule text an earlier run used, from the copy Bytasm stored with it."
             : "Bytasm matches samples against this small, self-written rule set. The rules ship " +
               "with Bytasm and cannot be edited from the UI; each change produces a new rule-set " +
-              "hash, and earlier runs keep the exact text they used."}
-        </p>
-      </header>
+              "hash, and earlier runs keep the exact text they used."
+        }
+      />
 
       <div className="grid-2">
-        <section className="card" aria-labelledby="ruleset-identity">
+        <section className="card plate frame-bracket" aria-labelledby="ruleset-identity">
           <h2 id="ruleset-identity">Rule set</h2>
           <KeyValues
             items={[
@@ -82,7 +91,7 @@ export function RulesPage({ ruleSetId }: { ruleSetId: string | null }) {
         )}
       </div>
 
-      <section className="card" aria-labelledby="rule-files">
+      <section className="card rules-codex" aria-labelledby="rule-files">
         <h2 id="rule-files">Rules ({rules.files.length})</h2>
         {rules.files.length === 0 ? (
           <Empty>This rule set has no rule files.</Empty>

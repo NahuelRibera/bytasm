@@ -40,17 +40,19 @@ export function ProjectActivity({ projectId }: { projectId: string }) {
   }
 
   return (
-    <section aria-labelledby="activity-heading">
-      <h2 id="activity-heading">Activity</h2>
+    <section aria-labelledby="activity-heading" className="log-rail">
+      <h2 id="activity-heading" className="log-rail-title">
+        Activity <span className="log-rail-tag" aria-hidden="true">oldest first</span>
+      </h2>
       {activity.isPending && <Loading label="Loading activity…" />}
       {activity.isError && <ErrorPanel error={activity.error} />}
       {activity.isSuccess && items.length === 0 && <Empty>No activity recorded yet.</Empty>}
       {items.length > 0 && (
         <ol className="activity-list" ref={list} aria-label="Project activity">
           {items.map((item) => (
-            <li key={item.id} tabIndex={-1}>
-              <p>{LABELS[item.type] ?? "Activity recorded"}</p>
-              <time className="muted" dateTime={item.at}>{formatDate(item.at)}</time>
+            <li key={item.id} tabIndex={-1} data-type={item.type.split(".")[0]}>
+              <time dateTime={item.at}>{formatDate(item.at)}</time>
+              <p className="log-event">{LABELS[item.type] ?? "Activity recorded"}</p>
               {item.reason === "worker_interrupted" && <p className="hint">The analysis worker stopped.</p>}
               {item.reason && item.reason !== "worker_interrupted" && (
                 <p className="hint">Some steps could not finish. Open the run for details.</p>
