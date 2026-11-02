@@ -54,7 +54,10 @@ def test_real_no_sample_health_and_authorized_static_fixture(
         result = outcome.result
         assert result is not None and result.input_sha256 == digest
         assert result.ghidra_version == "12.2"
-        assert result.schema_version == "ghidra-4"
+        assert result.schema_version == "ghidra-5"
+        detailed = [f for f in result.functions if f.pseudocode_status != "not_selected"]
+        assert any(f.basic_block_count for f in detailed)
+        assert all(f.instruction_count is not None for f in detailed)
         assert any(f.body_ranges for f in result.functions if not f.external)
         assert any(f.references for f in result.functions)
         for function in result.functions:
@@ -420,7 +423,7 @@ def test_real_evidence_graph_joins_live_capa_and_live_ghidra(tmp_path: Path) -> 
             summary = client.get(base).json()
             sources = {s["source"]: s["run_id"] for s in summary["scope"]["sources"]}
             assert sources["pattern"] == run_ids[0] and sources["ghidra"] == run_ids[1]
-            assert summary["coverage"]["ghidra_protocol"] == "ghidra-4"
+            assert summary["coverage"]["ghidra_protocol"] == "ghidra-5"
             assert summary["coverage"]["ghidra_memory_map"] == "available"
             edges = client.get(
                 base + "/edges", params={"type": "capa_match_at_function_entry"}
@@ -441,6 +444,14 @@ def test_real_evidence_graph_joins_live_capa_and_live_ghidra(tmp_path: Path) -> 
             claims = [c for c in summary["claims"] if c["kind"] == "capa_rule_at_function"]
             assert [c["title"] for c in claims] == ["Code refers to reading a file"]
             assert claims[0]["evidence"] == [edges[0]["id"]]
+            # v0.11: live LIEF 0.3.0 import slots join live Ghidra pointer slots
+            # exactly; offsets checked against LIEF's own RVA translation.
+            slots = client.get(
+                base + "/edges", params={"type": "external_symbol_import_slot", "limit": 200}
+            ).json()["items"]
+            iat = {binary.rva_to_offset(e.iat_address) for i in binary.imports for e in i.entries}
+            assert len(slots) >= 30
+            assert {s["attributes"]["slot_file_offset"] for s in slots} <= iat
         finally:
             worker.terminate()
             try:

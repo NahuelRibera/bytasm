@@ -21,29 +21,25 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from bytasm.address_map import DeclaredLayout
 from bytasm.api.context import AppContext
 from bytasm.api.ghidra import _read as read_ghidra
 from bytasm.api.problems import problem
 from bytasm.db.imported import ImportRecordMissing, import_record
-from bytasm.db.models import AnalysisRun, Finding, RuleSet, SampleVersion, StringOccurrence
+from bytasm.db.models import AnalysisRun, SampleVersion
 from bytasm.evidence_graph import (
     GRAPH_SCHEMA,
     NODE_ORDER,
     EdgeOut,
-    EvidenceRecord,
-    FindingRecord,
     GhidraSource,
     Graph,
     MetadataSource,
     NodeOut,
     PatternSource,
-    StepRecord,
-    StringRecord,
     build_graph,
     scope_digest,
     sort_key,
 )
+from bytasm.evidence_sources import metadata_source, pattern_for_run
 from bytasm.evidence_understand import (
     ClaimOut,
     CoverageOut,
@@ -52,7 +48,6 @@ from bytasm.evidence_understand import (
     build_coverage,
     build_layout,
 )
-from bytasm.jobs import summary
 from bytasm.storage import IntegrityError
 
 router = APIRouter()
@@ -205,78 +200,91 @@ def _select(
     )
 
 
-def _pattern(session: Session, run: AnalysisRun) -> PatternSource:
-    views = summary.step_views(run)
-    steps = tuple(
-        StepRecord(
-            tool=v.tool,
-            status=v.status,
-            invocation_id=v.invocation.id if v.invocation else None,
-            tool_version=v.invocation.tool_version if v.invocation else None,
-        )
-        for v in views
+class GraphFailure(Exception):
+    """A graph cannot be built for this request; `code` is a problem code."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
+
+
+def cached_graph(
+    version_id: str,
+    sha256: str,
+    metadata: MetadataSource,
+    ghidra_source: GhidraSource | None,
+    pattern: PatternSource | None,
+) -> Graph:
+    scope = scope_digest(version_id, sha256, metadata, ghidra_source, pattern)
+    with _cache_lock:
+        graph = _cache.get(scope)
+        if graph is not None:
+            _cache.move_to_end(scope)
+    if graph is None:
+        graph = build_graph(version_id, sha256, metadata, ghidra_source, pattern)
+        # Only terminal runs reach this point, so the inputs cannot change.
+        with _cache_lock:
+            _cache[scope] = graph
+            while len(_cache) > CACHE_SIZE:
+                _cache.popitem(last=False)
+    return graph
+
+
+def load_graph(
+    ctx: AppContext,
+    session: Session,
+    version: SampleVersion,
+    ghidra_run_id: str | None,
+    analysis_run_id: str | None,
+) -> tuple[Graph, ScopeOut]:
+    """Build (or reuse) the graph of one version; raises GraphFailure."""
+    try:
+        record = import_record(version)
+    except ImportRecordMissing as exc:
+        raise GraphFailure("integrity_error") from exc
+    ghidra_sel = _select(session, version, ghidra_run_id, ghidra=True)
+    pattern_sel = _select(session, version, analysis_run_id, ghidra=False)
+    if ghidra_sel is None or pattern_sel is None:
+        raise GraphFailure("not_found")
+    ghidra_run, ghidra_out = ghidra_sel
+    pattern_run, pattern_out = pattern_sel
+    try:
+        metadata = metadata_source(version, record, ctx.outputs)
+    except IntegrityError as exc:
+        raise GraphFailure("integrity_error") from exc
+    ghidra_source = None
+    if ghidra_run is not None:
+        inv = next(i for i in ghidra_run.invocations if i.tool_name == "ghidra")
+        try:
+            result = read_ghidra(ctx, ghidra_run, inv)
+        except IntegrityError as exc:
+            raise GraphFailure("integrity_error") from exc
+        ghidra_source = GhidraSource(ghidra_run.id, inv.id, inv.raw_output_sha256 or "", result)
+    pattern = pattern_for_run(session, pattern_run) if pattern_run is not None else None
+    graph = cached_graph(version.id, version.sha256, metadata, ghidra_source, pattern)
+    scope_out = ScopeOut(
+        schema_version=GRAPH_SCHEMA,
+        scope_sha256=graph.scope_sha256,
+        project_id=version.sample.project_id,
+        version_id=version.id,
+        sha256=version.sha256,
+        file_format=metadata.file_format,
+        selection_policy=SELECTION_POLICY,
+        sources=[
+            SourceOut(
+                source="metadata",
+                run_id=record.run.id,
+                status=record.run.status,
+                profile_id=None,
+                selected_by="import_record",
+                newer_unselected_run_ids=[],
+                unavailable_reason=None,
+            ),
+            ghidra_out,
+            pattern_out,
+        ],
     )
-    findings: list[FindingRecord] = []
-    for inv in run.invocations:
-        if inv.status != "succeeded":
-            continue
-        rows = session.execute(
-            select(Finding, RuleSet.sha256)
-            .join(RuleSet, RuleSet.id == Finding.rule_set_id, isouter=True)
-            .where(Finding.invocation_id == inv.id)
-            .order_by(Finding.id)
-        ).all()
-        for finding, rule_set_sha256 in rows:
-            findings.append(
-                FindingRecord(
-                    id=finding.id,
-                    tool=str(finding.tool_reported_attributes.get("tool", inv.tool_name)),
-                    tool_version=inv.tool_version,
-                    rule_id=finding.rule_id,
-                    namespace=finding.rule_namespace,
-                    rule_set_sha256=rule_set_sha256 or "",
-                    invocation_id=inv.id,
-                    output_sha256=inv.raw_output_sha256,
-                    match_count=finding.match_count,
-                    evidence_truncated=finding.evidence_truncated,
-                    evidence=tuple(
-                        EvidenceRecord(
-                            id=e.id,
-                            kind=e.kind,
-                            file_offset=e.file_offset,
-                            length=e.length,
-                            virtual_address=e.virtual_address,
-                            pointer=e.raw_json_pointer,
-                        )
-                        for e in finding.evidence
-                    ),
-                )
-            )
-    strings_inv = summary.strings_invocation(run)
-    strings = None
-    truncated = False
-    if strings_inv is not None:
-        occurrences = session.scalars(
-            select(StringOccurrence)
-            .where(StringOccurrence.invocation_id == strings_inv.id)
-            .order_by(StringOccurrence.file_offset, StringOccurrence.encoding)
-        )
-        strings = tuple(
-            StringRecord(r.id, r.file_offset, r.encoding, r.value, r.value_truncated)
-            for r in occurrences
-        )
-        truncated = bool((strings_inv.summary or {}).get("truncated"))
-    return PatternSource(
-        run_id=run.id,
-        status=run.status,
-        profile_id=str(run.profile_snapshot.get("id")),
-        steps=steps,
-        findings=tuple(findings),
-        strings=strings,
-        strings_invocation_id=strings_inv.id if strings_inv else None,
-        strings_output_sha256=strings_inv.raw_output_sha256 if strings_inv else None,
-        strings_truncated=truncated,
-    )
+    return graph, scope_out
 
 
 def _graph(
@@ -292,73 +300,9 @@ def _graph(
         if version is None:
             return _fail(request)
         try:
-            record = import_record(version)
-        except ImportRecordMissing:
-            return _fail(request, "integrity_error")
-        ghidra_sel = _select(session, version, ghidra_run_id, ghidra=True)
-        pattern_sel = _select(session, version, analysis_run_id, ghidra=False)
-        if ghidra_sel is None or pattern_sel is None:
-            return _fail(request)
-        ghidra_run, ghidra_out = ghidra_sel
-        pattern_run, pattern_out = pattern_sel
-        header = record.header
-        metadata = MetadataSource(
-            run_id=record.run.id,
-            invocation_id=record.invocation.id,
-            output_sha256=record.raw_output_sha256,
-            tool_version=record.invocation.tool_version,
-            file_format=str(header.get("format", version.detected_format)),
-            file_size=version.size_bytes,
-            entry_point=header.get("entry_point"),
-            layout=DeclaredLayout.from_import(header, list(record.invocation.sections)),
-            imports=tuple(
-                sorted(s.name for s in record.invocation.symbols if s.direction == "import")
-            ),
-            imported_libraries=tuple(header.get("imported_libraries", [])),
-        )
-        ghidra_source = None
-        if ghidra_run is not None:
-            inv = next(i for i in ghidra_run.invocations if i.tool_name == "ghidra")
-            try:
-                result = read_ghidra(ctx, ghidra_run, inv)
-            except IntegrityError:
-                return _fail(request, "integrity_error")
-            ghidra_source = GhidraSource(ghidra_run.id, inv.id, inv.raw_output_sha256 or "", result)
-        pattern = _pattern(session, pattern_run) if pattern_run is not None else None
-        scope = scope_digest(version.id, version.sha256, metadata, ghidra_source, pattern)
-        with _cache_lock:
-            graph = _cache.get(scope)
-            if graph is not None:
-                _cache.move_to_end(scope)
-        if graph is None:
-            graph = build_graph(version.id, version.sha256, metadata, ghidra_source, pattern)
-            # Only terminal runs reach this point, so the inputs cannot change.
-            with _cache_lock:
-                _cache[scope] = graph
-                while len(_cache) > CACHE_SIZE:
-                    _cache.popitem(last=False)
-        scope_out = ScopeOut(
-            schema_version=GRAPH_SCHEMA,
-            scope_sha256=graph.scope_sha256,
-            project_id=version.sample.project_id,
-            version_id=version.id,
-            sha256=version.sha256,
-            file_format=metadata.file_format,
-            selection_policy=SELECTION_POLICY,
-            sources=[
-                SourceOut(
-                    source="metadata",
-                    run_id=record.run.id,
-                    status=record.run.status,
-                    profile_id=None,
-                    selected_by="import_record",
-                    newer_unselected_run_ids=[],
-                    unavailable_reason=None,
-                ),
-                ghidra_out,
-                pattern_out,
-            ],
-        )
+            graph, scope_out = load_graph(ctx, session, version, ghidra_run_id, analysis_run_id)
+        except GraphFailure as failure:
+            return _fail(request, failure.code)
     return graph, scope_out, int((time.monotonic() - started) * 1000)
 
 
@@ -481,6 +425,8 @@ EDGE_TYPES = (
     "entry_point_is_function",
     "located_in_section",
     "external_symbol_named_as_import",
+    "external_symbol_import_slot",
+    "target_within_string_occurrence",
 )
 
 

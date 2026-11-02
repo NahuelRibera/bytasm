@@ -18,12 +18,14 @@ from bytasm.api import (
     annotations,
     compare,
     evidence,
+    evidence_history,
     function_reviews,
     ghidra,
     imports,
     reports,
     reviews,
     routes,
+    structure,
     tools,
 )
 from bytasm.api.context import AppContext
@@ -122,6 +124,8 @@ def create_app(
     app.include_router(reviews.router, prefix="/api/v1")
     app.include_router(function_reviews.router, prefix="/api/v1")
     app.include_router(evidence.router, prefix="/api/v1")
+    app.include_router(evidence_history.router, prefix="/api/v1")
+    app.include_router(structure.router, prefix="/api/v1")
     add_web_routes(app, settings.web_dist)
 
     @app.exception_handler(RequestValidationError)

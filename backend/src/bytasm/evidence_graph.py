@@ -13,6 +13,14 @@ documented relationship holds:
 * `structural_containment`: a file offset lies inside one declared section.
 * `name_equality`: two tools report the same symbol name. This is a coarse
   association and is labelled as one; it never becomes an address join.
+* `offset_containment` (v0.11): a translated location lies inside the exact
+  file range of another tool's observation (a reference into the middle of
+  an extracted string).
+
+v0.11 (`bytasm-evidence-graph-2`) adds the exact import-slot join: Ghidra's
+pointer slot for an external function and LIEF's import-table (PE) or
+JUMP_SLOT/GLOB_DAT relocation (ELF) slot translate, each through its own
+basis, to the same file offset.
 
 Two observations are never related merely because they occur in the same
 file. Nothing here describes runtime behavior: a reference is not a call that
@@ -36,7 +44,7 @@ from bytasm.address_map import (
 )
 from bytasm.ghidra_protocol import Address, GhidraResult
 
-GRAPH_SCHEMA = "bytasm-evidence-graph-1"
+GRAPH_SCHEMA = "bytasm-evidence-graph-2"
 MAX_LOCATORS_PER_EDGE = 8
 MAX_PREVIEW = 256
 
@@ -61,6 +69,8 @@ EdgeType = Literal[
     "entry_point_is_function",
     "located_in_section",
     "external_symbol_named_as_import",
+    "external_symbol_import_slot",
+    "target_within_string_occurrence",
 ]
 Strength = Literal[
     "exact_reference",
@@ -68,6 +78,7 @@ Strength = Literal[
     "address_containment",
     "structural_containment",
     "name_equality",
+    "offset_containment",
 ]
 STRENGTH: dict[str, Strength] = {
     "calls": "exact_reference",
@@ -80,6 +91,8 @@ STRENGTH: dict[str, Strength] = {
     "entry_point_is_function": "exact_offset_equality",
     "located_in_section": "structural_containment",
     "external_symbol_named_as_import": "name_equality",
+    "external_symbol_import_slot": "exact_offset_equality",
+    "target_within_string_occurrence": "offset_containment",
 }
 NODE_ORDER: tuple[str, ...] = (
     "entry_point",
@@ -113,6 +126,19 @@ class Locator:
 
 
 @dataclass(frozen=True)
+class ImportSlot:
+    """A LIEF-parsed import slot (PE IAT entry or ELF JUMP_SLOT/GLOB_DAT target)."""
+
+    name: str | None
+    library: str | None
+    slot_virtual_address: int
+    slot_file_offset: int | None
+    basis: str
+    relocation_type: str | None
+    pointer: str
+
+
+@dataclass(frozen=True)
 class MetadataSource:
     run_id: str
     invocation_id: str
@@ -124,6 +150,8 @@ class MetadataSource:
     layout: DeclaredLayout
     imports: tuple[str, ...]
     imported_libraries: tuple[str, ...]
+    # metadata_lief 0.3.0 tables; None when the import predates them.
+    import_slots: tuple[ImportSlot, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -157,6 +185,7 @@ class FindingRecord:
     match_count: int
     evidence_truncated: bool
     evidence: tuple[EvidenceRecord, ...]
+    run_id: str = ""  # empty: the pattern source's run
 
 
 @dataclass(frozen=True)
@@ -166,6 +195,7 @@ class StringRecord:
     encoding: str
     value: str
     value_truncated: bool
+    byte_length: int | None = None
 
 
 @dataclass(frozen=True)
@@ -174,6 +204,10 @@ class StepRecord:
     status: str
     invocation_id: str | None
     tool_version: str | None
+    run_id: str | None = None
+    output_sha256: str | None = None
+    adapter_version: str | None = None
+    rule_set_sha256: str | None = None
 
 
 @dataclass(frozen=True)
@@ -187,6 +221,8 @@ class PatternSource:
     strings_invocation_id: str | None
     strings_output_sha256: str | None
     strings_truncated: bool
+    # A review may pin steps from different runs; None means `run_id`.
+    strings_run_id: str | None = None
 
 
 # --------------------------------------------------------------------------- outputs
@@ -498,6 +534,7 @@ def build_graph(
                         kind: sum(r.kind == kind for r in fn.references)
                         for kind in ("string", "data", "external_symbol")
                     },
+                    **_structure_attributes(fn),
                 },
                 sources=[_loc(gloc(f"/functions/{index}"))],
             )
@@ -530,6 +567,26 @@ def build_graph(
                     target,
                     ["ghidra_direct_static_call"],
                     [gloc(f"/functions/{index}/calls/{call_index}")],
+                )
+            for site_index, site in enumerate(fn.call_sites):
+                if site.target is None:
+                    continue  # unresolved indirect call: counted on the node, never guessed
+                calls.candidates += 1
+                target = functions_by_entry.get(addr_key(site.target))
+                if target is None:
+                    calls.unmapped["target_not_in_inventory"] = (
+                        calls.unmapped.get("target_not_in_inventory", 0) + 1
+                    )
+                    continue
+                calls.joined += 1
+                b.edge(
+                    "calls",
+                    fid,
+                    target,
+                    ["ghidra_call_site"]
+                    + (["ghidra_call_reference"] if site.kind == "indirect" else []),
+                    [gloc(f"/functions/{index}/call_sites/{site_index}")],
+                    {"call_kind": site.kind},
                 )
             for ref_index, ref in enumerate(fn.references):
                 references.candidates += 1
@@ -635,6 +692,7 @@ def build_graph(
             [_locator_from(node.sources[0]), meta_locator],
         )
     joins["import_name"] = name_join
+    joins["import_slot"] = _import_slot_join(b, metadata, meta_locator, ghidra, ghidra_map)
 
     def body_functions(file_offset: int) -> tuple[str, list[str]]:
         if ghidra_map is None:
@@ -691,6 +749,12 @@ def build_graph(
         strings_by_offset: dict[int, list[StringRecord]] = defaultdict(list)
         for record in pattern.strings or ():
             strings_by_offset[record.file_offset].append(record)
+        intervals = sorted(
+            (r.file_offset, r.file_offset + r.byte_length, r)
+            for r in pattern.strings or ()
+            if r.byte_length
+        )
+        starts = [start for start, _, _ in intervals]
 
         if pattern.strings is None:
             joins.setdefault(
@@ -709,9 +773,28 @@ def build_graph(
                     continue
                 hits = strings_by_offset.get(node.file_offset, [])
                 if not hits:
-                    join.unmapped["no_string_at_offset"] = (
-                        join.unmapped.get("no_string_at_offset", 0) + 1
-                    )
+                    inside = _containing(intervals, starts, node.file_offset)
+                    if not inside:
+                        join.unmapped["no_string_at_offset"] = (
+                            join.unmapped.get("no_string_at_offset", 0) + 1
+                        )
+                        continue
+                    join.joined += 1
+                    for record in inside:
+                        sid = _string_node(b, pattern, record)
+                        b.edge(
+                            "target_within_string_occurrence",
+                            nid,
+                            sid,
+                            [GHIDRA_BASIS, "strings_step_file_range"],
+                            [_locator_from(node.sources[0]), _string_locator(pattern, record)],
+                            {
+                                "file_offset": node.file_offset,
+                                "string_file_offset": record.file_offset,
+                                "offset_into_string": node.file_offset - record.file_offset,
+                                "encoding": record.encoding,
+                            },
+                        )
                     continue
                 join.joined += 1
                 for record in hits:
@@ -769,7 +852,7 @@ def build_graph(
                             Locator(
                                 finding.tool,
                                 finding.tool_version,
-                                pattern.run_id,
+                                finding.run_id or pattern.run_id,
                                 finding.invocation_id,
                                 finding.output_sha256,
                                 f"row:finding/{finding.id}",
@@ -782,7 +865,7 @@ def build_graph(
                 locator = Locator(
                     finding.tool,
                     finding.tool_version,
-                    pattern.run_id,
+                    finding.run_id or pattern.run_id,
                     finding.invocation_id,
                     finding.output_sha256,
                     ev.pointer,
@@ -829,6 +912,9 @@ def build_graph(
                         yara_join.unmapped[state] = yara_join.unmapped.get(state, 0) + 1
                         continue
                     yara_join.joined += 1
+                    last_hits: list[str] = []
+                    if ev.length:
+                        _, last_hits = body_functions(ev.file_offset + ev.length - 1)
                     for fid in body_hits:
                         b.edge(
                             "yara_match_in_function_body",
@@ -836,7 +922,12 @@ def build_graph(
                             fid,
                             [GHIDRA_BASIS, "ghidra_function_body"],
                             [locator],
-                            {"first_byte_file_offset": ev.file_offset},
+                            {
+                                "first_byte_file_offset": ev.file_offset,
+                                "length": ev.length,
+                                # Both ends of the matched range map into this body.
+                                "last_byte_in_same_body": fid in last_hits if ev.length else None,
+                            },
                         )
         joins["capa_function"] = capa_join
         joins["yara_body"] = yara_join
@@ -864,6 +955,167 @@ def build_graph(
     return graph
 
 
+MAX_STRING_SPAN = 4096
+
+
+def _containing(
+    intervals: list[tuple[int, int, StringRecord]], starts: list[int], offset: int
+) -> list[StringRecord]:
+    """String occurrences whose exact byte range strictly contains `offset`."""
+    from bisect import bisect_right
+
+    found = []
+    index = bisect_right(starts, offset) - 1
+    # Occurrences are bounded in length, so only nearby starts can contain it.
+    while index >= 0 and offset - intervals[index][0] <= MAX_STRING_SPAN:
+        start, end, record = intervals[index]
+        if start < offset < end:
+            found.append(record)
+        index -= 1
+    return sorted(found, key=lambda r: (r.file_offset, r.encoding))
+
+
+def _structure_attributes(fn: Any) -> dict[str, Any]:
+    """ghidra-5 static structure counts of a function; empty for earlier protocols."""
+    out: dict[str, Any] = {}
+    if fn.thunk_target is not None:
+        out["thunk_target"] = f"{fn.thunk_target.space}:{fn.thunk_target.address}"
+    if fn.pointer_slots:
+        out["pointer_slot_count"] = len(fn.pointer_slots)
+        out["pointer_slots_truncated"] = fn.pointer_slots_truncated
+    if fn.basic_block_count is None:
+        return out
+    flows = [flow for block in fn.basic_blocks for flow in block.flows]
+    return out | {
+        "basic_block_count": fn.basic_block_count,
+        "basic_block_count_capped": fn.basic_block_count_capped,
+        "retained_basic_blocks": len(fn.basic_blocks),
+        "basic_blocks_truncated": fn.basic_blocks_truncated,
+        "instruction_count": fn.instruction_count,
+        "instruction_count_capped": fn.instruction_count_capped,
+        # Counted over retained blocks only.
+        "conditional_branch_count": sum(f.kind == "conditional_jump" for f in flows),
+        "computed_jump_count": sum(f.kind == "computed_jump" for f in flows),
+        "call_site_count": len(fn.call_sites),
+        "call_sites_truncated": fn.call_sites_truncated,
+        "indirect_call_count": sum(c.kind == "indirect" for c in fn.call_sites),
+        "unresolved_call_count": sum(c.target is None for c in fn.call_sites),
+    }
+
+
+def _import_slot_join(
+    b: _Builder,
+    metadata: MetadataSource,
+    meta_locator: Locator,
+    ghidra: GhidraSource | None,
+    ghidra_map: GhidraMemoryMap | None,
+) -> JoinCoverage:
+    """Exact join of Ghidra pointer slots and LIEF import slots by file offset."""
+    if metadata.import_slots is None:
+        return JoinCoverage(
+            False,
+            "The import record predates metadata adapter 0.3.0 import-slot tables.",
+        )
+    if ghidra is None:
+        return JoinCoverage(False, "No completed Ghidra run was selected.")
+    if ghidra.result.schema_version != "ghidra-5":
+        return JoinCoverage(
+            False,
+            f"Protocol {ghidra.result.schema_version} does not report pointer slots; "
+            "a new Ghidra run (ghidra-5) is required.",
+        )
+    if ghidra_map is None or not ghidra_map.available:
+        return JoinCoverage(False, "Ghidra memory map unavailable.")
+    join = JoinCoverage(True)
+    by_offset: dict[int, list[ImportSlot]] = defaultdict(list)
+    for slot in metadata.import_slots:
+        if slot.slot_file_offset is not None:
+            by_offset[slot.slot_file_offset].append(slot)
+    result = ghidra.result
+    matched_offsets: set[int] = set()
+    for index, fn in enumerate(result.functions):
+        external = (
+            fn.thunk_target if fn.thunk_target is not None else (fn.entry if fn.external else None)
+        )
+        for slot_index, pointer in enumerate(fn.pointer_slots):
+            join.candidates += 1
+            translation = ghidra_map.to_file_offset(pointer.address)
+            if not translation.mapped or translation.file_offset is None:
+                join.unmapped[translation.state] = join.unmapped.get(translation.state, 0) + 1
+                continue
+            hits = by_offset.get(translation.file_offset, [])
+            if not hits:
+                join.unmapped["no_import_slot_at_offset"] = (
+                    join.unmapped.get("no_import_slot_at_offset", 0) + 1
+                )
+                continue
+            if external is None:
+                join.unmapped["target_not_external"] = (
+                    join.unmapped.get("target_not_external", 0) + 1
+                )
+                continue
+            locator = Locator(
+                "ghidra",
+                result.ghidra_version,
+                ghidra.run_id,
+                ghidra.invocation_id,
+                ghidra.output_sha256,
+                f"/functions/{index}/pointer_slots/{slot_index}",
+            )
+            name = fn.name if fn.namespace in ("", "Global") else f"{fn.namespace}::{fn.name}"
+            sid = b.node(
+                NodeOut(
+                    id=node_id("external_symbol", *addr_key(external)),
+                    kind="external_symbol",
+                    label=name,
+                    identity={"space": external.space, "address": external.address},
+                    address=external,
+                    attributes={"name_truncated": fn.name_truncated},
+                    sources=[_loc(locator)],
+                )
+            )
+            joined = False
+            for slot in hits:
+                if slot.name is None:
+                    continue
+                joined = True
+                iid = b.node(
+                    NodeOut(
+                        id=node_id("import", slot.name),
+                        kind="import",
+                        label=slot.name,
+                        identity={"name": slot.name},
+                        sources=[_loc(meta_locator)],
+                    )
+                )
+                b.edge(
+                    "external_symbol_import_slot",
+                    sid,
+                    iid,
+                    [slot.basis, GHIDRA_BASIS],
+                    [locator, Locator(**{**meta_locator.__dict__, "pointer": slot.pointer})],
+                    {
+                        "slot_file_offset": translation.file_offset,
+                        "lief_slot_virtual_address": slot.slot_virtual_address,
+                        "ghidra_slot": f"{pointer.address.space}:{pointer.address.address}",
+                        "library": slot.library,
+                        "relocation_type": slot.relocation_type,
+                        # Names are recorded, not required: the join is by offset.
+                        "names_equal": slot.name == fn.name,
+                    },
+                )
+            if joined:
+                join.joined += 1
+                matched_offsets.add(translation.file_offset)
+            else:
+                join.unmapped["ordinal_only_slot"] = join.unmapped.get("ordinal_only_slot", 0) + 1
+    # LIEF slots no Ghidra pointer reached (for example beyond retained windows).
+    missing = sum(len(v) for k, v in by_offset.items() if k not in matched_offsets)
+    if missing:
+        join.unmapped["lief_slot_without_ghidra_pointer"] = missing
+    return join
+
+
 def _locator_from(out: LocatorOut) -> Locator:
     return Locator(**out.model_dump())
 
@@ -872,7 +1124,7 @@ def _string_locator(pattern: PatternSource, record: StringRecord) -> Locator:
     return Locator(
         "strings",
         "bytasm",
-        pattern.run_id,
+        pattern.strings_run_id or pattern.run_id,
         pattern.strings_invocation_id or "",
         pattern.strings_output_sha256,
         f"row:string_occurrence/{record.id}",

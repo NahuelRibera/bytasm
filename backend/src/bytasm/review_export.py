@@ -8,7 +8,60 @@ from typing import Any, Literal
 from pydantic import Field
 
 from bytasm.reports.generate import canonical_json
-from bytasm.review_snapshot import Identity, Snapshot, Strict, TextRecord
+from bytasm.review_snapshot import Identity, Snapshot, Strict, TextRecord, evidence_availability
+
+EXPORT_SCHEMAS = {
+    "bytasm-review-1": "bytasm-review-export-1",
+    "bytasm-review-2": "bytasm-review-export-2",
+    "bytasm-review-3": "bytasm-review-export-3",
+}
+
+
+def evidence_export(review: Snapshot, policy: "ExportPolicy") -> dict[str, Any]:
+    """Pinned evidence provenance. Labels need technical details, names and strings."""
+    availability = evidence_availability(review)
+    snapshot = review.evidence
+    if snapshot is None:
+        return {**availability}
+    nodes: dict[str, int] = {}
+    edges: dict[str, int] = {}
+    strengths: dict[str, int] = {}
+    for node in snapshot.nodes:
+        nodes[node.kind] = nodes.get(node.kind, 0) + 1
+    for edge in snapshot.edges:
+        edges[edge.type] = edges.get(edge.type, 0) + 1
+        strengths[edge.strength] = strengths.get(edge.strength, 0) + 1
+    document: dict[str, Any] = {
+        **availability,
+        "schema_version": snapshot.schema_version,
+        "algorithm": snapshot.algorithm,
+        "content_sha256": snapshot.content_sha256,
+        "scope_sha256": snapshot.scope_sha256,
+        "counts": {
+            "nodes": dict(sorted(nodes.items())),
+            "edges": dict(sorted(edges.items())),
+            "strengths": dict(sorted(strengths.items())),
+        },
+        "coverage": [join.model_dump(mode="json") for join in snapshot.coverage],
+        "bounds": snapshot.bounds.model_dump(mode="json"),
+        "limitations": list(snapshot.limitations),
+        "sources": [
+            source.model_dump(mode="json")
+            if policy.technical_details
+            else {
+                key: value
+                for key, value in source.model_dump(mode="json").items()
+                if key in {"source", "state", "unavailable_reason", "tool_version"}
+            }
+            for source in snapshot.sources
+        ],
+    }
+    if policy.technical_details:
+        document["address_mapping"] = snapshot.address_mapping.model_dump(mode="json")
+    if policy.technical_details and policy.original_names and policy.string_values:
+        document["nodes"] = [node.model_dump(mode="json") for node in snapshot.nodes]
+        document["edges"] = [edge.model_dump(mode="json") for edge in snapshot.edges]
+    return document
 
 
 class ExportPolicy(Strict):
@@ -22,7 +75,11 @@ class ExportPolicy(Strict):
 
 
 class ExportDocument(Strict):
-    schema_version: Literal["bytasm-review-export-1", "bytasm-review-export-2"]
+    schema_version: Literal[
+        "bytasm-review-export-1", "bytasm-review-export-2", "bytasm-review-export-3"
+    ]
+    # bytasm-review-export-3: provenance and coverage of the pinned evidence graph.
+    evidence: dict[str, Any] | None = None
     interpretation_version: str | None = None
     answers: list[dict[str, Any]] = Field(default_factory=list, max_length=4)
     structure: dict[str, Any] | None = None
@@ -165,10 +222,14 @@ def derivative(review: Snapshot, source_digest: str, policy: ExportPolicy) -> di
                 for item in answer["observations"]
             ]
             answers.append(copied)
+    modern = review.schema_version in ("bytasm-review-2", "bytasm-review-3")
     document: dict[str, Any] = {
-        "schema_version": "bytasm-review-export-2"
-        if review.schema_version == "bytasm-review-2"
-        else "bytasm-review-export-1",
+        "schema_version": EXPORT_SCHEMAS[review.schema_version],
+        **(
+            {"evidence": evidence_export(review, policy)}
+            if review.schema_version == "bytasm-review-3"
+            else {}
+        ),
         **(
             {
                 "interpretation_version": review.interpretation_version,
@@ -180,7 +241,7 @@ def derivative(review: Snapshot, source_digest: str, policy: ExportPolicy) -> di
                 "source_run_offset": review.source_run_offset,
                 "source_runs_more": review.source_runs_more,
             }
-            if review.schema_version == "bytasm-review-2"
+            if modern
             else {}
         ),
         "review_id": review.id,
@@ -208,6 +269,15 @@ def derivative(review: Snapshot, source_digest: str, policy: ExportPolicy) -> di
                 else ["Structural declaration values (require technical details and string values)"]
             ),
             "Version/finding annotations and previous function revisions are excluded.",
+            *(
+                []
+                if review.evidence is None
+                or (policy.technical_details and policy.original_names and policy.string_values)
+                else [
+                    "Evidence graph nodes and edges (require technical details, original "
+                    "names and string values); counts, coverage and digests remain"
+                ]
+            ),
             *([] if policy.analyst_notes else ["Analyst overlays and notes"]),
             *([] if policy.overview else ["Overview"]),
             *([] if policy.observations else ["Observations"]),
@@ -314,6 +384,37 @@ def export_bytes(document: dict[str, Any], format: Literal["json", "html"]) -> b
                     + "</dd>"
                 )
         sections.append("</dl>")
+    evidence = document.get("evidence")
+    if evidence:
+        sections.append("<h2>Pinned evidence graph</h2>")
+        if evidence["state"] != "captured":
+            sections.append(
+                "<p>No evidence graph is pinned in this review: "
+                + escaped(evidence.get("reason") or evidence["state"])
+                + "</p>"
+            )
+        else:
+            sections.append(
+                "<p>Algorithm <code>"
+                + escaped(evidence["algorithm"])
+                + "</code>; content SHA-256 <code>"
+                + escaped(evidence["content_sha256"])
+                + "</code>. Relationships are static correlations of tool outputs, "
+                "not runtime observations.</p><ul>"
+            )
+            for kind, count in evidence["counts"]["nodes"].items():
+                sections.append("<li>" + escaped(kind) + " nodes: " + escaped(count) + "</li>")
+            for kind, count in evidence["counts"]["edges"].items():
+                sections.append("<li>" + escaped(kind) + " edges: " + escaped(count) + "</li>")
+            sections.append("</ul><h3>Join coverage</h3><ul>")
+            for join in evidence["coverage"]:
+                text = (
+                    f"{join['join']}: {join['joined']} of {join['candidates']} joined"
+                    if join["performed"]
+                    else f"{join['join']}: not performed. {join['reason'] or ''}"
+                )
+                sections.append("<li>" + escaped(text) + "</li>")
+            sections.append("</ul>")
     sections.append("<h2>Actual inspection scope</h2><ul>")
     for source in document["sources"]:
         selected, latest = source["selected"], source["latest_attempt"]

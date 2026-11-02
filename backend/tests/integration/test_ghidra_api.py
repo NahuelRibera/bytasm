@@ -5,6 +5,8 @@ from pathlib import Path
 from api_support import api_client, create_project, do_import, make_settings
 from conftest import ELF_X86_64
 
+from bytasm.ghidra_protocol import V5_FUNCTION_KEYS
+
 
 def test_ghidra_run_requires_verified_provider(tmp_path: Path) -> None:
     with api_client(make_settings(tmp_path)) as client:
@@ -147,6 +149,7 @@ def test_scoped_function_views_summary_export_and_limits(tmp_path: Path) -> None
                 "body_ranges_truncated",
                 "references",
                 "references_truncated",
+                *V5_FUNCTION_KEYS,
             }
         }
         assert exported.content == client.get(base + "/export?format=json").content

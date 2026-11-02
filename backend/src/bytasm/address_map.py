@@ -19,7 +19,7 @@ import re
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from bytasm.ghidra_protocol import Address, GhidraResult
+from bytasm.ghidra_protocol import MEMORY_MAP_PROTOCOLS, Address, GhidraResult
 
 State = Literal[
     "mapped",
@@ -101,11 +101,11 @@ class GhidraMemoryMap:
 
     @classmethod
     def from_result(cls, result: GhidraResult, file_size: int) -> "GhidraMemoryMap":
-        if result.schema_version != "ghidra-4" or result.image_base is None:
+        if result.schema_version not in MEMORY_MAP_PROTOCOLS or result.image_base is None:
             return cls(
                 False,
                 f"Protocol {result.schema_version} does not include Ghidra's memory map; "
-                "a new Ghidra run (ghidra-4) is required for address translation.",
+                "a new Ghidra run (ghidra-4 or later) is required for address translation.",
                 [],
                 [],
                 0,

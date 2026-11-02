@@ -47,6 +47,12 @@ _PROBLEMS: Final[dict[str, tuple[int, str, str]]] = {
         "Start a new Ghidra function review with the current profile "
         "before requesting selected details.",
     ),
+    "evidence_not_captured": (
+        409,
+        "No pinned evidence graph",
+        "This review does not carry an evidence snapshot. Reviews pinned before v0.11 never "
+        "captured one, and none is reconstructed. Pin a new review to capture the evidence.",
+    ),
     # Import
     "invalid_import_metadata": (
         422,

@@ -282,6 +282,14 @@ def test_no_endpoint_can_change_the_input_policy(client: TestClient) -> None:
     assert routes == {
         # Pinned reviews and exact-function analyst overlays cannot alter admission.
         ("/api/v1/reviews/{left_id}/compare/{right_id}", "get"),
+        # v0.11: read-only pinned evidence, structure, function structure and comparison.
+        ("/api/v1/reviews/{review_id}/evidence", "get"),
+        ("/api/v1/reviews/{review_id}/evidence/nodes", "get"),
+        ("/api/v1/reviews/{review_id}/evidence/edges", "get"),
+        ("/api/v1/reviews/{review_id}/evidence/nodes/{node_id}", "get"),
+        ("/api/v1/evidence/compare", "get"),
+        ("/api/v1/sample-versions/{version_id}/structure", "get"),
+        ("/api/v1/runs/{run_id}/ghidra/functions/{index}/structure", "get"),
         ("/api/v1/sample-versions/{version_id}/reviews", "get"),
         ("/api/v1/sample-versions/{version_id}/reviews", "post"),
         ("/api/v1/reviews/{review_id}", "get"),

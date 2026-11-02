@@ -22,6 +22,7 @@ from collections.abc import Sequence
 from importlib.metadata import version
 from typing import TYPE_CHECKING, Any
 
+from bytasm.adapters.deep_structure_lief import extract_deep_structure
 from bytasm.adapters.entropy import METHOD as ENTROPY_METHOD
 from bytasm.adapters.entropy import shannon_entropy
 from bytasm.adapters.structure_lief import extract_structure
@@ -33,7 +34,7 @@ if TYPE_CHECKING:
     import lief
 
 ADAPTER_NAME = "metadata_lief"
-ADAPTER_VERSION = "0.2.0"
+ADAPTER_VERSION = "0.3.0"
 
 # LIEF's architecture names, mapped to the lowercase names Bytasm reports.
 _ARCHITECTURES = {
@@ -71,6 +72,11 @@ def extract_metadata(data: bytes, expected_format: Format) -> dict[str, Any]:
 
     metadata["structure"] = extract_structure(binary, data, expected_format)
     warnings: list[str] = []
+    try:
+        metadata["deep_structure"] = extract_deep_structure(binary, data, expected_format)
+    except Exception:  # A table LIEF cannot decode must not fail the whole import.
+        metadata["deep_structure"] = None
+        warnings.append("Deep structural tables could not be extracted; none are reported.")
     for section in metadata["sections"]:
         _add_entropy(section, data, warnings)
     metadata["warnings"] = warnings
