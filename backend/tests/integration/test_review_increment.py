@@ -73,6 +73,8 @@ def test_historical_snapshot_bytes_are_not_rewritten(tmp_path: Path) -> None:
                 "answers",
                 "interpretation_version",
                 "import_inventory",
+                "evidence",
+                "evidence_status",
             }
         }
         historical["schema_version"] = "bytasm-review-1"

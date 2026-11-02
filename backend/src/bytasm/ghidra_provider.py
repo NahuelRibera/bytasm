@@ -30,12 +30,12 @@ LIMITS = ParserLimits(
     timeout_seconds=180,
     cpu_seconds=120,
     file_size_bytes=16 * MIB,
-    result_bytes=2 * MIB,
+    result_bytes=4 * MIB,
     captured_stream_bytes=64 * 1024,
 )
 OPTIONS: dict[str, Any] = {
     "id": "ghidra-static",
-    "version": 3,
+    "version": 4,
     "name": "Bounded Ghidra static review",
     "ghidra_version": "12.2",
     "analyzers": "Ghidra 12.2 loader defaults, single CPU, fresh project",
@@ -48,9 +48,16 @@ OPTIONS: dict[str, Any] = {
     "max_calls_per_function": 64,
     "max_references_per_function": 64,
     "max_body_ranges_per_function": 64,
+    "max_basic_blocks_per_function": 128,
+    "max_flows_per_block": 8,
+    "max_counted_basic_blocks": 4096,
+    "max_counted_instructions": 65536,
+    "max_call_sites_per_function": 128,
+    "max_scanned_call_instructions": 4096,
+    "max_pointer_slots_per_function": 4,
     "max_pseudocode_characters": 4096,
     "max_decompiler_payload_mib": 1,
-    "max_json_bytes": 2 * MIB,
+    "max_json_bytes": 4 * MIB,
 }
 
 
@@ -78,7 +85,7 @@ def profile_options(selected: list[Address] | None = None) -> dict[str, Any]:
 def profile_snapshot(selected: list[Address] | None = None) -> dict[str, Any]:
     return {
         "id": OPTIONS["id"],
-        "version": 3,
+        "version": 4,
         "name": OPTIONS["name"] if selected is None else "Selected Ghidra function review",
         "steps": [
             {
@@ -179,7 +186,7 @@ def _parse(
     except ValidationError:
         return None
     if (
-        result.schema_version != "ghidra-4"
+        result.schema_version != "ghidra-5"
         or result.input_sha256 != expected_sha256
         or result.script_sha256 != script_digest()
         or result.profile_sha256 != profile_digest(selected)

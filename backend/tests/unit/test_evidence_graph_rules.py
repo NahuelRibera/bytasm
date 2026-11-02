@@ -127,9 +127,14 @@ def test_recorded_real_outputs_match_the_published_v4_schema() -> None:
     import jsonschema
 
     root = Path(__file__).resolve().parents[3]
-    schema = json.loads((root / "schemas/ghidra-analysis-v4.schema.json").read_text())
-    assert schema == GhidraResult.model_json_schema()
+    # The v4 schema is historical (frozen); the current model publishes v5.
+    v4 = json.loads((root / "schemas/ghidra-analysis-v4.schema.json").read_text())
+    v5 = json.loads((root / "schemas/ghidra-analysis-v5.schema.json").read_text())
+    assert v5 == GhidraResult.model_json_schema()
     for path in sorted((root / "backend/tests/recorded").glob("*.ghidra.json")):
         value = json.loads(path.read_text())
-        jsonschema.validate(value, schema)
-        assert GhidraResult.model_validate(value).schema_version == "ghidra-4"
+        version = GhidraResult.model_validate(value).schema_version
+        assert version in ("ghidra-4", "ghidra-5")
+        jsonschema.validate(value, v5)
+        if version == "ghidra-4":
+            jsonschema.validate(value, v4)

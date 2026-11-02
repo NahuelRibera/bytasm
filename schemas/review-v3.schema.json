@@ -1,0 +1,1626 @@
+{
+  "$defs": {
+    "AddressMapping": {
+      "additionalProperties": false,
+      "description": "How addresses were related to file offsets when the graph was built.",
+      "properties": {
+        "declared_basis": {
+          "const": "lief_section_declaration",
+          "default": "lief_section_declaration",
+          "title": "Declared Basis",
+          "type": "string"
+        },
+        "declared_image_base": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Declared Image Base"
+        },
+        "ghidra_basis": {
+          "const": "ghidra_memory_block_file_bytes",
+          "default": "ghidra_memory_block_file_bytes",
+          "title": "Ghidra Basis",
+          "type": "string"
+        },
+        "ghidra_image_base": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SnapshotAddress"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ghidra_map_truncated": {
+          "title": "Ghidra Map Truncated",
+          "type": "boolean"
+        },
+        "ghidra_memory_map": {
+          "enum": [
+            "available",
+            "unavailable",
+            "not_selected"
+          ],
+          "title": "Ghidra Memory Map",
+          "type": "string"
+        },
+        "ghidra_memory_map_reason": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Ghidra Memory Map Reason"
+        },
+        "ghidra_protocol": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Ghidra Protocol"
+        },
+        "ghidra_rejected_file_ranges": {
+          "minimum": 0,
+          "title": "Ghidra Rejected File Ranges",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "declared_image_base",
+        "ghidra_protocol",
+        "ghidra_memory_map",
+        "ghidra_memory_map_reason",
+        "ghidra_image_base",
+        "ghidra_rejected_file_ranges",
+        "ghidra_map_truncated"
+      ],
+      "title": "AddressMapping",
+      "type": "object"
+    },
+    "Attempt": {
+      "additionalProperties": false,
+      "properties": {
+        "invocation_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Invocation Id"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "run_status": {
+          "title": "Run Status",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "invocation_id",
+        "run_status",
+        "status"
+      ],
+      "title": "Attempt",
+      "type": "object"
+    },
+    "EvidenceSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "address_mapping": {
+          "$ref": "#/$defs/AddressMapping"
+        },
+        "algorithm": {
+          "maxLength": 256,
+          "title": "Algorithm",
+          "type": "string"
+        },
+        "bounds": {
+          "$ref": "#/$defs/SnapshotBounds"
+        },
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "coverage": {
+          "items": {
+            "$ref": "#/$defs/SnapshotJoin"
+          },
+          "maxItems": 32,
+          "title": "Coverage",
+          "type": "array"
+        },
+        "edges": {
+          "items": {
+            "$ref": "#/$defs/SnapshotEdge"
+          },
+          "maxItems": 8192,
+          "title": "Edges",
+          "type": "array"
+        },
+        "limitations": {
+          "items": {
+            "maxLength": 1024,
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Limitations",
+          "type": "array"
+        },
+        "nodes": {
+          "items": {
+            "$ref": "#/$defs/SnapshotNode"
+          },
+          "maxItems": 4096,
+          "title": "Nodes",
+          "type": "array"
+        },
+        "sample": {
+          "$ref": "#/$defs/SnapshotSample"
+        },
+        "schema_version": {
+          "const": "bytasm-evidence-snapshot-1",
+          "default": "bytasm-evidence-snapshot-1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "scope_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Scope Sha256",
+          "type": "string"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/SnapshotSource"
+          },
+          "maxItems": 5,
+          "title": "Sources",
+          "type": "array"
+        }
+      },
+      "required": [
+        "algorithm",
+        "sample",
+        "scope_sha256",
+        "content_sha256",
+        "sources",
+        "address_mapping",
+        "coverage",
+        "nodes",
+        "edges",
+        "bounds",
+        "limitations"
+      ],
+      "title": "EvidenceSnapshot",
+      "type": "object"
+    },
+    "EvidenceStatus": {
+      "additionalProperties": false,
+      "description": "Whether a review carries an evidence snapshot, and why not.",
+      "properties": {
+        "reason": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "state": {
+          "enum": [
+            "captured",
+            "unavailable"
+          ],
+          "title": "State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "state"
+      ],
+      "title": "EvidenceStatus",
+      "type": "object"
+    },
+    "Identity": {
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "title": "Format",
+          "type": "string"
+        },
+        "sample_id": {
+          "title": "Sample Id",
+          "type": "string"
+        },
+        "sha256": {
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size_bytes": {
+          "title": "Size Bytes",
+          "type": "integer"
+        },
+        "version_id": {
+          "title": "Version Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "version_id",
+        "sample_id",
+        "sha256",
+        "size_bytes",
+        "format"
+      ],
+      "title": "Identity",
+      "type": "object"
+    },
+    "ImportObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "alternative": {
+          "title": "Alternative",
+          "type": "string"
+        },
+        "catalog_sha256": {
+          "title": "Catalog Sha256",
+          "type": "string"
+        },
+        "catalog_version": {
+          "title": "Catalog Version",
+          "type": "string"
+        },
+        "category": {
+          "title": "Category",
+          "type": "string"
+        },
+        "invocation_id": {
+          "title": "Invocation Id",
+          "type": "string"
+        },
+        "limitation": {
+          "title": "Limitation",
+          "type": "string"
+        },
+        "locations_capped": {
+          "title": "Locations Capped",
+          "type": "boolean"
+        },
+        "matches_retained": {
+          "title": "Matches Retained",
+          "type": "integer"
+        },
+        "next_step": {
+          "title": "Next Step",
+          "type": "string"
+        },
+        "observation": {
+          "title": "Observation",
+          "type": "string"
+        },
+        "output_sha256": {
+          "title": "Output Sha256",
+          "type": "string"
+        },
+        "pointers": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 8,
+          "title": "Pointers",
+          "type": "array"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "supporting_names": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 8,
+          "title": "Supporting Names",
+          "type": "array"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "category",
+        "title",
+        "observation",
+        "alternative",
+        "next_step",
+        "pointers",
+        "supporting_names",
+        "matches_retained",
+        "locations_capped",
+        "catalog_version",
+        "catalog_sha256",
+        "source",
+        "limitation",
+        "run_id",
+        "invocation_id",
+        "output_sha256"
+      ],
+      "title": "ImportObservation",
+      "type": "object"
+    },
+    "Observation": {
+      "additionalProperties": false,
+      "properties": {
+        "alternatives": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Alternatives",
+          "type": "array"
+        },
+        "conditions": {
+          "title": "Conditions",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "evidence_capped": {
+          "title": "Evidence Capped",
+          "type": "boolean"
+        },
+        "finding_id": {
+          "title": "Finding Id",
+          "type": "string"
+        },
+        "hypothesis": {
+          "title": "Hypothesis",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "invocation_id": {
+          "title": "Invocation Id",
+          "type": "string"
+        },
+        "limitations": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Limitations",
+          "type": "array"
+        },
+        "next_step": {
+          "title": "Next Step",
+          "type": "string"
+        },
+        "output_sha256": {
+          "title": "Output Sha256",
+          "type": "string"
+        },
+        "question": {
+          "title": "Question",
+          "type": "string"
+        },
+        "relevance": {
+          "title": "Relevance",
+          "type": "integer"
+        },
+        "reviewed": {
+          "title": "Reviewed",
+          "type": "boolean"
+        },
+        "rule_id": {
+          "title": "Rule Id",
+          "type": "string"
+        },
+        "rule_sha256": {
+          "title": "Rule Sha256",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "selection_reason": {
+          "title": "Selection Reason",
+          "type": "string"
+        },
+        "statement": {
+          "title": "Statement",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "tool": {
+          "title": "Tool",
+          "type": "string"
+        },
+        "why_it_matters": {
+          "title": "Why It Matters",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "question",
+        "statement",
+        "why_it_matters",
+        "alternatives",
+        "hypothesis",
+        "conditions",
+        "limitations",
+        "next_step",
+        "reviewed",
+        "relevance",
+        "selection_reason",
+        "run_id",
+        "invocation_id",
+        "output_sha256",
+        "tool",
+        "rule_id",
+        "rule_sha256",
+        "finding_id",
+        "evidence",
+        "evidence_capped"
+      ],
+      "title": "Observation",
+      "type": "object"
+    },
+    "Selected": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter": {
+          "title": "Adapter",
+          "type": "string"
+        },
+        "adapter_version": {
+          "title": "Adapter Version",
+          "type": "string"
+        },
+        "completeness": {
+          "const": "bounded_retained_output",
+          "default": "bounded_retained_output",
+          "title": "Completeness",
+          "type": "string"
+        },
+        "invocation_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Invocation Id"
+        },
+        "limits": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Limits"
+        },
+        "output_sha256": {
+          "title": "Output Sha256",
+          "type": "string"
+        },
+        "parameters": {
+          "additionalProperties": true,
+          "title": "Parameters",
+          "type": "object"
+        },
+        "profile": {
+          "additionalProperties": true,
+          "title": "Profile",
+          "type": "object"
+        },
+        "retention": {
+          "additionalProperties": true,
+          "title": "Retention",
+          "type": "object"
+        },
+        "rule_sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Rule Sha256"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "run_status": {
+          "title": "Run Status",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "tool_version": {
+          "title": "Tool Version",
+          "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "run_id",
+        "invocation_id",
+        "run_status",
+        "status",
+        "output_sha256",
+        "tool_version",
+        "adapter",
+        "adapter_version",
+        "rule_sha256",
+        "profile",
+        "parameters",
+        "limits",
+        "retention",
+        "warnings"
+      ],
+      "title": "Selected",
+      "type": "object"
+    },
+    "SnapshotAddress": {
+      "additionalProperties": false,
+      "properties": {
+        "address": {
+          "maxLength": 128,
+          "title": "Address",
+          "type": "string"
+        },
+        "space": {
+          "maxLength": 64,
+          "title": "Space",
+          "type": "string"
+        }
+      },
+      "required": [
+        "space",
+        "address"
+      ],
+      "title": "SnapshotAddress",
+      "type": "object"
+    },
+    "SnapshotBounds": {
+      "additionalProperties": false,
+      "properties": {
+        "edges_retained": {
+          "minimum": 0,
+          "title": "Edges Retained",
+          "type": "integer"
+        },
+        "edges_total": {
+          "minimum": 0,
+          "title": "Edges Total",
+          "type": "integer"
+        },
+        "max_bytes": {
+          "title": "Max Bytes",
+          "type": "integer"
+        },
+        "max_edges": {
+          "title": "Max Edges",
+          "type": "integer"
+        },
+        "max_nodes": {
+          "title": "Max Nodes",
+          "type": "integer"
+        },
+        "nodes_retained": {
+          "minimum": 0,
+          "title": "Nodes Retained",
+          "type": "integer"
+        },
+        "nodes_total": {
+          "minimum": 0,
+          "title": "Nodes Total",
+          "type": "integer"
+        },
+        "omitted_edges_by_type": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "propertyNames": {
+            "maxLength": 256
+          },
+          "title": "Omitted Edges By Type",
+          "type": "object"
+        },
+        "omitted_nodes_by_kind": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "propertyNames": {
+            "maxLength": 256
+          },
+          "title": "Omitted Nodes By Kind",
+          "type": "object"
+        },
+        "retention_order": {
+          "items": {
+            "maxLength": 256,
+            "type": "string"
+          },
+          "title": "Retention Order",
+          "type": "array"
+        },
+        "truncated": {
+          "title": "Truncated",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "max_nodes",
+        "max_edges",
+        "max_bytes",
+        "nodes_total",
+        "edges_total",
+        "nodes_retained",
+        "edges_retained",
+        "truncated",
+        "omitted_nodes_by_kind",
+        "omitted_edges_by_type",
+        "retention_order"
+      ],
+      "title": "SnapshotBounds",
+      "type": "object"
+    },
+    "SnapshotEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "attributes": {
+          "additionalProperties": true,
+          "propertyNames": {
+            "maxLength": 256
+          },
+          "title": "Attributes",
+          "type": "object"
+        },
+        "basis": {
+          "items": {
+            "maxLength": 256,
+            "type": "string"
+          },
+          "maxItems": 8,
+          "title": "Basis",
+          "type": "array"
+        },
+        "id": {
+          "maxLength": 64,
+          "title": "Id",
+          "type": "string"
+        },
+        "locator_count": {
+          "minimum": 0,
+          "title": "Locator Count",
+          "type": "integer"
+        },
+        "locators": {
+          "items": {
+            "$ref": "#/$defs/SnapshotLocator"
+          },
+          "maxItems": 4,
+          "title": "Locators",
+          "type": "array"
+        },
+        "locators_truncated": {
+          "title": "Locators Truncated",
+          "type": "boolean"
+        },
+        "source": {
+          "maxLength": 64,
+          "title": "Source",
+          "type": "string"
+        },
+        "strength": {
+          "maxLength": 256,
+          "title": "Strength",
+          "type": "string"
+        },
+        "target": {
+          "maxLength": 64,
+          "title": "Target",
+          "type": "string"
+        },
+        "type": {
+          "maxLength": 256,
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "strength",
+        "source",
+        "target",
+        "basis",
+        "locators",
+        "locator_count",
+        "locators_truncated",
+        "attributes"
+      ],
+      "title": "SnapshotEdge",
+      "type": "object"
+    },
+    "SnapshotJoin": {
+      "additionalProperties": false,
+      "properties": {
+        "candidates": {
+          "minimum": 0,
+          "title": "Candidates",
+          "type": "integer"
+        },
+        "join": {
+          "maxLength": 256,
+          "title": "Join",
+          "type": "string"
+        },
+        "joined": {
+          "minimum": 0,
+          "title": "Joined",
+          "type": "integer"
+        },
+        "not_joined": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "propertyNames": {
+            "maxLength": 256
+          },
+          "title": "Not Joined",
+          "type": "object"
+        },
+        "performed": {
+          "title": "Performed",
+          "type": "boolean"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reason"
+        }
+      },
+      "required": [
+        "join",
+        "performed",
+        "reason",
+        "candidates",
+        "joined",
+        "not_joined"
+      ],
+      "title": "SnapshotJoin",
+      "type": "object"
+    },
+    "SnapshotLocator": {
+      "additionalProperties": false,
+      "properties": {
+        "invocation_id": {
+          "title": "Invocation Id",
+          "type": "string"
+        },
+        "output_sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Output Sha256"
+        },
+        "pointer": {
+          "maxLength": 512,
+          "title": "Pointer",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "tool": {
+          "maxLength": 256,
+          "title": "Tool",
+          "type": "string"
+        },
+        "tool_version": {
+          "maxLength": 256,
+          "title": "Tool Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool",
+        "tool_version",
+        "run_id",
+        "invocation_id",
+        "output_sha256",
+        "pointer"
+      ],
+      "title": "SnapshotLocator",
+      "type": "object"
+    },
+    "SnapshotNode": {
+      "additionalProperties": false,
+      "properties": {
+        "address": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SnapshotAddress"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "propertyNames": {
+            "maxLength": 256
+          },
+          "title": "Attributes",
+          "type": "object"
+        },
+        "file_offset": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "File Offset"
+        },
+        "file_offset_basis": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "File Offset Basis"
+        },
+        "file_offset_state": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "File Offset State"
+        },
+        "id": {
+          "maxLength": 64,
+          "title": "Id",
+          "type": "string"
+        },
+        "identity": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "propertyNames": {
+            "maxLength": 256
+          },
+          "title": "Identity",
+          "type": "object"
+        },
+        "kind": {
+          "maxLength": 256,
+          "title": "Kind",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 256,
+          "title": "Label",
+          "type": "string"
+        },
+        "label_truncated": {
+          "title": "Label Truncated",
+          "type": "boolean"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/SnapshotLocator"
+          },
+          "maxItems": 4,
+          "title": "Sources",
+          "type": "array"
+        },
+        "sources_total": {
+          "minimum": 0,
+          "title": "Sources Total",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "label",
+        "label_truncated",
+        "identity",
+        "address",
+        "file_offset",
+        "file_offset_basis",
+        "file_offset_state",
+        "attributes",
+        "sources",
+        "sources_total"
+      ],
+      "title": "SnapshotNode",
+      "type": "object"
+    },
+    "SnapshotSample": {
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "maxLength": 256,
+          "title": "Format",
+          "type": "string"
+        },
+        "sample_id": {
+          "title": "Sample Id",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size_bytes": {
+          "minimum": 0,
+          "title": "Size Bytes",
+          "type": "integer"
+        },
+        "version_id": {
+          "title": "Version Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "version_id",
+        "sample_id",
+        "sha256",
+        "size_bytes",
+        "format"
+      ],
+      "title": "SnapshotSample",
+      "type": "object"
+    },
+    "SnapshotSource": {
+      "additionalProperties": false,
+      "description": "One tool's contribution, or the exact reason it contributed nothing.",
+      "properties": {
+        "adapter_version": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Adapter Version"
+        },
+        "invocation_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Invocation Id"
+        },
+        "output_sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Output Sha256"
+        },
+        "profile_sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Profile Sha256"
+        },
+        "protocol_version": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Protocol Version"
+        },
+        "retention": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "propertyNames": {
+            "maxLength": 256
+          },
+          "title": "Retention",
+          "type": "object"
+        },
+        "rule_set_sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rule Set Sha256"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Run Id"
+        },
+        "script_sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Script Sha256"
+        },
+        "source": {
+          "enum": [
+            "lief",
+            "ghidra",
+            "strings",
+            "yara-x",
+            "capa"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "available",
+            "unavailable"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Status"
+        },
+        "tool_version": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tool Version"
+        },
+        "unavailable_reason": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unavailable Reason"
+        }
+      },
+      "required": [
+        "source",
+        "state"
+      ],
+      "title": "SnapshotSource",
+      "type": "object"
+    },
+    "Source": {
+      "additionalProperties": false,
+      "properties": {
+        "latest_attempt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Attempt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "selected": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Selected"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tool": {
+          "enum": [
+            "lief",
+            "strings",
+            "yara-x",
+            "capa",
+            "ghidra"
+          ],
+          "title": "Tool",
+          "type": "string"
+        },
+        "unavailable_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Unavailable Reason"
+        }
+      },
+      "required": [
+        "tool",
+        "selected",
+        "latest_attempt",
+        "unavailable_reason"
+      ],
+      "title": "Source",
+      "type": "object"
+    },
+    "TextRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "encoding": {
+          "title": "Encoding",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "invocation_id": {
+          "title": "Invocation Id",
+          "type": "string"
+        },
+        "offset": {
+          "title": "Offset",
+          "type": "integer"
+        },
+        "value": {
+          "title": "Value",
+          "type": "string"
+        },
+        "value_truncated": {
+          "title": "Value Truncated",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "invocation_id",
+        "offset",
+        "encoding",
+        "value",
+        "value_truncated"
+      ],
+      "title": "TextRecord",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "answers": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "maxItems": 4,
+      "title": "Answers",
+      "type": "array"
+    },
+    "catalog_version": {
+      "default": "review-3",
+      "enum": [
+        "review-2",
+        "review-3"
+      ],
+      "title": "Catalog Version",
+      "type": "string"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "declared_filename": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Declared Filename"
+    },
+    "evidence": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EvidenceSnapshot"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "evidence_status": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EvidenceStatus"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "exact_run_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Exact Run Id"
+    },
+    "function_evidence": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "maxItems": 1024,
+      "title": "Function Evidence",
+      "type": "array"
+    },
+    "function_reviews": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "maxItems": 128,
+      "title": "Function Reviews",
+      "type": "array"
+    },
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "import_inventory": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100000,
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Import Inventory"
+    },
+    "import_observations": {
+      "items": {
+        "$ref": "#/$defs/ImportObservation"
+      },
+      "maxItems": 16,
+      "title": "Import Observations",
+      "type": "array"
+    },
+    "integrity": {
+      "const": "verified_at_creation",
+      "default": "verified_at_creation",
+      "title": "Integrity",
+      "type": "string"
+    },
+    "interpretation_version": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Interpretation Version"
+    },
+    "observations": {
+      "items": {
+        "$ref": "#/$defs/Observation"
+      },
+      "maxItems": 48,
+      "title": "Observations",
+      "type": "array"
+    },
+    "observations_capped": {
+      "title": "Observations Capped",
+      "type": "boolean"
+    },
+    "observations_total": {
+      "title": "Observations Total",
+      "type": "integer"
+    },
+    "sample": {
+      "$ref": "#/$defs/Identity"
+    },
+    "schema_version": {
+      "default": "bytasm-review-3",
+      "enum": [
+        "bytasm-review-1",
+        "bytasm-review-2",
+        "bytasm-review-3"
+      ],
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "scope": {
+      "enum": [
+        "combined",
+        "exact_run"
+      ],
+      "title": "Scope",
+      "type": "string"
+    },
+    "selection_explanation": {
+      "title": "Selection Explanation",
+      "type": "string"
+    },
+    "source_run_offset": {
+      "default": 0,
+      "title": "Source Run Offset",
+      "type": "integer"
+    },
+    "source_runs_more": {
+      "default": false,
+      "title": "Source Runs More",
+      "type": "boolean"
+    },
+    "source_selection_policy": {
+      "default": "latest-completed-step-in-window-v2",
+      "enum": [
+        "latest-completed-step-per-tool-v1",
+        "latest-completed-step-in-window-v2"
+      ],
+      "title": "Source Selection Policy",
+      "type": "string"
+    },
+    "sources": {
+      "items": {
+        "$ref": "#/$defs/Source"
+      },
+      "maxItems": 5,
+      "title": "Sources",
+      "type": "array"
+    },
+    "strings": {
+      "items": {
+        "$ref": "#/$defs/TextRecord"
+      },
+      "maxItems": 5000,
+      "title": "Strings",
+      "type": "array"
+    },
+    "structure": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Structure"
+    },
+    "supersedes_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Supersedes Id"
+    },
+    "unknowns": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Unknowns",
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "supersedes_id",
+    "created_at",
+    "sample",
+    "scope",
+    "exact_run_id",
+    "sources",
+    "observations",
+    "observations_total",
+    "observations_capped",
+    "strings",
+    "unknowns",
+    "selection_explanation",
+    "declared_filename"
+  ],
+  "title": "Snapshot",
+  "type": "object"
+}

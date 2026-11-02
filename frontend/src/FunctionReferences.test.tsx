@@ -13,6 +13,7 @@ describe("function references", () => {
     expect(screen.getByText(/No outgoing string/)).toBeTruthy();
     expect(screen.queryByText(/were not captured by this source/)).toBeNull();
     view.rerender(<FunctionReferences fn={fn} protocolVersion="ghidra-4" />);
+    view.rerender(<FunctionReferences fn={fn} protocolVersion="ghidra-5" />);
     expect(screen.getByText(/No outgoing string/)).toBeTruthy();
   });
   it("keeps exact address spaces and inert text with a complete retained table", () => {

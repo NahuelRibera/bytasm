@@ -22,6 +22,7 @@ from bytasm.db.models import (
     ToolInvocation,
     new_id,
 )
+from bytasm.evidence_snapshot import EvidenceSnapshot, EvidenceStatus
 from bytasm.interpretation_catalog import DETAILS
 from bytasm.jobs.summary import step_views
 from bytasm.reports.generate import canonical_json
@@ -143,7 +144,13 @@ class ImportObservation(Strict):
 
 
 class Snapshot(Strict):
-    schema_version: Literal["bytasm-review-1", "bytasm-review-2"] = "bytasm-review-2"
+    schema_version: Literal["bytasm-review-1", "bytasm-review-2", "bytasm-review-3"] = (
+        "bytasm-review-3"
+    )
+    # bytasm-review-3: the immutable evidence graph at pin time. Older reviews
+    # never carried one; readers report that instead of reconstructing it.
+    evidence: EvidenceSnapshot | None = None
+    evidence_status: EvidenceStatus | None = None
     import_inventory: list[str] | None = Field(default=None, max_length=100_000)
     interpretation_version: str | None = None
     answers: list[dict[str, Any]] = Field(default_factory=list, max_length=4)
@@ -706,7 +713,10 @@ def create_snapshot(
             )
     from bytasm.investigation_answers import build_answers
 
+    pinned_graph, pinned_status = pinned_evidence(ctx, session, version, chosen, verified_data)
     result = Snapshot(
+        evidence=pinned_graph,
+        evidence_status=pinned_status,
         import_inventory=verified_data.get("lief", {})
         .get("metadata", {})
         .get("imports", {})
@@ -747,6 +757,19 @@ def create_snapshot(
         function_reviews=function_reviews,
     )
     raw = canonical_json(result.model_dump(mode="json"))
+    if len(raw) > MAX_REVIEW_BYTES and result.evidence is not None:
+        # The review's own content takes precedence; the omission is recorded.
+        result = result.model_copy(
+            update={
+                "evidence": None,
+                "evidence_status": EvidenceStatus(
+                    state="unavailable",
+                    reason="The evidence snapshot was omitted because the review would "
+                    "exceed 4 MiB with it.",
+                ),
+            }
+        )
+        raw = canonical_json(result.model_dump(mode="json"))
     if len(raw) > MAX_REVIEW_BYTES:
         raise ValueError("Review exceeds 4 MiB; nothing was saved")
     session.add(
@@ -760,6 +783,79 @@ def create_snapshot(
         )
     )
     return result
+
+
+def pinned_evidence(
+    ctx: AppContext,
+    session: Session,
+    version: SampleVersion,
+    chosen: dict[ToolName, ToolInvocation],
+    verified_data: dict[str, dict[str, Any]],
+) -> tuple[EvidenceSnapshot | None, EvidenceStatus]:
+    """Build the evidence graph from exactly the sources this review pinned.
+
+    LIEF structure always comes from the version's import record (the only
+    LIEF invocation a version has), also for exact-run reviews; the snapshot
+    lists it as its own source. Ghidra and pattern tools are the pinned
+    invocations, verified above, possibly from different runs.
+    """
+    from bytasm.db.imported import ImportRecordMissing, import_record
+    from bytasm.evidence_graph import GhidraSource, build_graph
+    from bytasm.evidence_snapshot import SnapshotSample, build_snapshot
+    from bytasm.evidence_sources import metadata_source, pattern_for_pinned
+    from bytasm.ghidra_protocol import GhidraResult
+
+    try:
+        record = import_record(version)
+    except ImportRecordMissing:
+        return None, EvidenceStatus(
+            state="unavailable", reason="The version has no complete import record."
+        )
+    ghidra_source = None
+    if "ghidra" in chosen:
+        inv = chosen["ghidra"]
+        ghidra_source = GhidraSource(
+            inv.run_id,
+            inv.id,
+            inv.raw_output_sha256 or "",
+            GhidraResult.model_validate(verified_data["ghidra"]),
+        )
+    pattern = pattern_for_pinned(session, {str(k): v for k, v in chosen.items()})
+    graph = build_graph(
+        version.id,
+        version.sha256,
+        metadata_source(version, record, ctx.outputs),
+        ghidra_source,
+        pattern,
+    )
+    try:
+        snapshot = build_snapshot(
+            graph,
+            SnapshotSample(
+                version_id=version.id,
+                sample_id=version.sample_id,
+                sha256=version.sha256,
+                size_bytes=version.size_bytes,
+                format=version.detected_format,
+            ),
+        )
+    except ValueError:
+        return None, EvidenceStatus(
+            state="unavailable", reason="The evidence graph exceeded the snapshot byte bound."
+        )
+    return snapshot, EvidenceStatus(state="captured")
+
+
+def evidence_availability(review: Snapshot) -> dict[str, str | None]:
+    """Explicit evidence state for any review schema; never reconstructs a graph."""
+    if review.evidence_status is not None:
+        return {"state": review.evidence_status.state, "reason": review.evidence_status.reason}
+    return {
+        "state": "not_captured_historical",
+        "reason": f"This review uses {review.schema_version}, which predates pinned evidence "
+        "snapshots (bytasm-review-3). No graph is reconstructed for it, because current "
+        "sources and algorithms may differ from those at pin time.",
+    }
 
 
 def read_snapshot(session: Session, review_id: str) -> tuple[Snapshot, str]:

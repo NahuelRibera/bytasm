@@ -5,6 +5,7 @@ import ghidra.app.decompiler.DecompInterface;
 import ghidra.app.decompiler.DecompileResults;
 import ghidra.framework.Application;
 import ghidra.program.model.address.*;
+import ghidra.program.model.block.*;
 import ghidra.program.model.listing.*;
 import ghidra.program.model.symbol.*;
 import com.google.gson.stream.JsonWriter;
@@ -43,6 +44,30 @@ public class BytasmExtract extends HeadlessScript {
         out.name("name_truncated").value(fn.getName().length() > 256);
         out.name("namespace").value(bound(fn.getParentNamespace().getName(true), 256));
         out.name("namespace_truncated").value(fn.getParentNamespace().getName(true).length() > 256);
+        // ghidra-5: Ghidra's own thunk resolution, and initialized data that
+        // references this entry (for example IAT or GOT slots). Never inferred.
+        Function thunked = fn.isThunk() ? fn.getThunkedFunction(true) : null;
+        out.name("thunk_target");
+        if (thunked == null) out.nullValue(); else address(thunked.getEntryPoint());
+        out.name("pointer_slots").beginArray();
+        int slots = 0, slotScan = 0;
+        boolean slotsCapped = false;
+        ReferenceIterator incoming = currentProgram.getReferenceManager().getReferencesTo(fn.getEntryPoint());
+        while (incoming.hasNext() && slotScan++ < 4096) {
+            monitor.checkCancelled();
+            Reference reference = incoming.next();
+            Address from = reference.getFromAddress();
+            if (reference.getReferenceType().isFlow() || !from.isMemoryAddress()) continue;
+            if (currentProgram.getListing().getInstructionAt(from) != null) continue;
+            ghidra.program.model.mem.MemoryBlock block = currentProgram.getMemory().getBlock(from);
+            if (block == null || !block.isInitialized()) continue;
+            if (slots >= 4) { slotsCapped = true; break; }
+            out.beginObject(); out.name("address"); address(from);
+            out.name("reference_type").value(bound(reference.getReferenceType().toString(), 256));
+            out.name("provenance").value("ghidra_reference_to_entry"); out.endObject(); slots++;
+        }
+        out.endArray();
+        out.name("pointer_slots_truncated").value(slotsCapped || incoming.hasNext() && slotScan > 4096);
         out.name("body_size").value(fn.getBody().getNumAddresses());
         out.name("body_ranges").beginArray();
         AddressRangeIterator ranges = fn.getBody().getAddressRanges(true);
@@ -144,7 +169,96 @@ public class BytasmExtract extends HeadlessScript {
         }
         out.endArray();
         out.name("references_truncated").value(selected && (refsCapped || instructions.hasNext()));
+        structure(fn, selected);
         out.endObject();
+    }
+    // ghidra-5: static structure of a selected function from Ghidra's
+    // BasicBlockModel and instruction flow types. Unresolved destinations stay
+    // unresolved; nothing here describes execution.
+    private void structure(Function fn, boolean selected) throws Exception {
+        Listing listing = currentProgram.getListing();
+        out.name("basic_blocks").beginArray();
+        int blockCount = 0, retained = 0;
+        boolean countCapped = false;
+        if (selected) {
+            BasicBlockModel model = new BasicBlockModel(currentProgram);
+            CodeBlockIterator blocks = model.getCodeBlocksContaining(fn.getBody(), monitor);
+            while (blocks.hasNext()) {
+                monitor.checkCancelled();
+                if (blockCount >= 4096) { countCapped = true; break; }
+                CodeBlock block = blocks.next(); blockCount++;
+                if (retained >= 128) continue;
+                retained++;
+                out.beginObject();
+                out.name("start"); address(block.getMinAddress());
+                out.name("end"); address(block.getMaxAddress());
+                int count = 0; Instruction last = null;
+                InstructionIterator inside = listing.getInstructions(block, true);
+                while (inside.hasNext() && count < 4096) { last = inside.next(); count++; }
+                out.name("instruction_count").value(count);
+                out.name("terminal").value(last != null && last.getFlowType().isTerminal());
+                out.name("flows").beginArray();
+                int flows = 0; boolean flowsCapped = false;
+                CodeBlockReferenceIterator destinations = block.getDestinations(monitor);
+                while (destinations.hasNext()) {
+                    CodeBlockReference ref = destinations.next();
+                    FlowType flow = ref.getFlowType();
+                    if (flow.isCall()) continue;
+                    String kind = flow.isFallthrough() ? "fallthrough" : flow.isComputed() ? "computed_jump"
+                        : flow.isConditional() ? "conditional_jump" : flow.isJump() ? "unconditional_jump" : null;
+                    if (kind == null) continue;
+                    if (flows >= 8) { flowsCapped = true; break; }
+                    Address target = ref.getDestinationAddress();
+                    out.beginObject(); out.name("target");
+                    if (target == null) out.nullValue(); else address(target);
+                    out.name("kind").value(kind);
+                    out.name("internal").value(target != null && fn.getBody().contains(target));
+                    out.name("provenance").value("ghidra_basic_block_model"); out.endObject(); flows++;
+                }
+                out.endArray();
+                out.name("flows_truncated").value(flowsCapped);
+                out.endObject();
+            }
+        }
+        out.endArray();
+        out.name("basic_blocks_truncated").value(selected && blockCount > retained);
+        out.name("basic_block_count"); if (selected) out.value(blockCount); else out.nullValue();
+        out.name("basic_block_count_capped").value(countCapped);
+        int total = 0; boolean totalCapped = false;
+        if (selected) {
+            InstructionIterator all = listing.getInstructions(fn.getBody(), true);
+            while (all.hasNext()) {
+                if (total >= 65536) { totalCapped = true; break; }
+                all.next(); total++;
+            }
+        }
+        out.name("instruction_count"); if (selected) out.value(total); else out.nullValue();
+        out.name("instruction_count_capped").value(totalCapped);
+        out.name("call_sites").beginArray();
+        int sites = 0, scanned = 0;
+        boolean sitesCapped = false;
+        if (selected) {
+            InstructionIterator calls = listing.getInstructions(fn.getBody(), true);
+            while (calls.hasNext()) {
+                monitor.checkCancelled();
+                if (scanned >= 4096) { sitesCapped = true; break; }
+                Instruction ins = calls.next(); scanned++;
+                FlowType flow = ins.getFlowType();
+                if (!flow.isCall()) continue;
+                if (sites >= 128) { sitesCapped = true; break; }
+                Address target = null;
+                for (Reference reference : ins.getReferencesFrom()) {
+                    if (reference.getReferenceType().isCall()) { target = reference.getToAddress(); break; }
+                }
+                out.beginObject(); out.name("source"); address(ins.getAddress());
+                out.name("kind").value(flow.isComputed() ? "indirect" : "direct");
+                out.name("target"); if (target == null) out.nullValue(); else address(target);
+                out.name("target_basis"); if (target == null) out.nullValue(); else out.value("ghidra_call_reference");
+                out.name("provenance").value("ghidra_instruction_flow"); out.endObject(); sites++;
+            }
+        }
+        out.endArray();
+        out.name("call_sites_truncated").value(sitesCapped);
     }
     // Ghidra's own address-to-file-bytes mapping. Python never derives a file
     // offset for a Ghidra address without one of these tool-reported ranges.
@@ -206,7 +320,7 @@ public class BytasmExtract extends HeadlessScript {
         try (Writer file = Files.newBufferedWriter(Path.of(args[0]), StandardCharsets.UTF_8)) {
             out = new JsonWriter(file); out.setSerializeNulls(true);
             out.beginObject();
-            out.name("schema_version").value("ghidra-4");
+            out.name("schema_version").value("ghidra-5");
             out.name("input_sha256").value(args[1]);
             out.name("ghidra_version").value(Application.getApplicationVersion());
             out.name("provider_host").value(bound(System.getProperty("os.name") + " " + System.getProperty("os.arch"), 256));
@@ -239,6 +353,8 @@ public class BytasmExtract extends HeadlessScript {
             out.value("Names and namespaces are limited to 256 characters; instruction bytes to 32 bytes.");
             out.value("References cover at most 64 listing instructions and 64 exact targets per selected function; body ranges retain at most 64 inclusive ranges. References to undefined memory, code or the interior of a data item are omitted, not reported as unresolved.");
             out.value("Memory blocks retain at most 64 blocks and 16 file-backed ranges per block; uninitialized or synthetic blocks have no file range.");
+            out.value("Selected functions retain at most 128 basic blocks (8 flows each) and 128 call sites; counts stop at 4096 blocks and 65536 instructions. Unresolved indirect calls and computed jumps are reported without a target.");
+            out.value("Pointer slots are at most 4 initialized data references to each function entry; thunk targets are Ghidra's own thunk resolution.");
             out.endArray(); out.endObject(); out.flush();
         } finally { decompiler.dispose(); }
     }

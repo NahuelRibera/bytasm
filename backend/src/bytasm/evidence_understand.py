@@ -237,7 +237,8 @@ def build_claims(graph: Graph, version_id: str) -> tuple[list[ClaimOut], int]:
             alternatives=None,
             limitations=[
                 "References come from at most 64 retained instructions.",
-                "Indirect calls through computed pointers are not extracted.",
+                "Indirect calls are listed as call sites only from protocol ghidra-5; "
+                "a call without a Ghidra call reference stays unresolved.",
             ],
             completeness=_completeness(fn, graph),
             navigate=NavigateOut(node_id=fid, href=_href(version_id, fid)),
@@ -280,6 +281,46 @@ def build_claims(graph: Graph, version_id: str) -> tuple[list[ClaimOut], int]:
             completeness=_completeness(fn, graph),
             navigate=NavigateOut(node_id=fid, href=_href(version_id, fid)),
             reading_weight=6,
+        )
+
+    # 6. Import slots: exact file-offset join of Ghidra and LIEF slots -------------
+    slot_edges = sorted(
+        by_type["external_symbol_import_slot"],
+        key=lambda e: (e.attributes.get("slot_file_offset") or 0, e.id),
+    )
+    if slot_edges:
+        anchor = slot_edges[0].source
+        named = sum(bool(e.attributes.get("names_equal")) for e in slot_edges)
+        claim(
+            kind="import_slots_match_ghidra_pointers",
+            title=f"{len(slot_edges)} import slot"
+            + ("s" if len(slot_edges) != 1 else "")
+            + " confirmed by two tools",
+            summary=(
+                f"For {len(slot_edges)} imported names, the slot that the file's import "
+                "table or relocations designate is the same file location that Ghidra "
+                f"reports as a pointer to an external function. {named} of these also "
+                "carry the same name in both tools. This links declared imports to "
+                "Ghidra's external symbols exactly; it does not show that any import is "
+                "called."
+            ),
+            technical=(
+                "LIEF import-address-table (PE) or JUMP_SLOT/GLOB_DAT relocation (ELF) slot "
+                "offsets, translated through declared sections or PT_LOAD headers, equal "
+                "Ghidra pointer-slot offsets translated through Ghidra's memory map."
+            ),
+            subjects=sorted({e.source for e in slot_edges} | {e.target for e in slot_edges}),
+            evidence=[e.id for e in slot_edges],
+            sources=_sources(slot_edges),
+            interpretation=None,
+            alternatives=None,
+            limitations=[
+                "Ghidra retains at most 4 pointer slots per function.",
+                "A slot is a data location; references to it are reported separately.",
+            ],
+            completeness=CompletenessOut(state="complete_within_retained_windows", notes=[]),
+            navigate=NavigateOut(node_id=anchor, href=_href(version_id, anchor)),
+            reading_weight=7,
         )
 
     claims.sort(
@@ -498,7 +539,7 @@ def build_layout(graph: Graph) -> LayoutOut:
             )
         )
     blocks = None
-    if graph.ghidra is not None and graph.ghidra.result.schema_version == "ghidra-4":
+    if graph.ghidra is not None and graph.ghidra.result.schema_version in ("ghidra-4", "ghidra-5"):
         blocks = [
             LayoutBlockOut(
                 name=b.name,

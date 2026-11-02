@@ -162,7 +162,7 @@ def test_entropy_measurement_on_the_high_entropy_fixture(client: TestClient) -> 
         "value": None,
         "unit": "bits_per_byte",
         "method": "shannon-bits-per-byte",
-        "computed_by": "bytasm metadata_lief 0.2.0",
+        "computed_by": "bytasm metadata_lief 0.3.0",
         "measured_over": "section_bytes_in_file",
         "note": "no file data",
     }

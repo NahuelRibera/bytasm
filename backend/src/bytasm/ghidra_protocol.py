@@ -71,6 +71,77 @@ class FunctionReference(Record):
         return self
 
 
+class BlockFlow(Record):
+    """A static control-flow edge Ghidra's BasicBlockModel reports from a block."""
+
+    target: Address | None  # None: a computed destination Ghidra did not resolve
+    kind: Literal["fallthrough", "conditional_jump", "unconditional_jump", "computed_jump"]
+    internal: bool  # target lies inside this function's body
+    provenance: Literal["ghidra_basic_block_model"] = "ghidra_basic_block_model"
+
+    @model_validator(mode="after")
+    def resolved_unless_computed(self) -> "BlockFlow":
+        if self.target is None and self.kind != "computed_jump":
+            raise ValueError("Only computed flows may lack a target")
+        if self.target is None and self.internal:
+            raise ValueError("An unresolved flow cannot be internal")
+        return self
+
+
+class BasicBlock(Record):
+    start: Address
+    end: Address  # inclusive
+    instruction_count: Annotated[int, Field(ge=0, le=4096)]
+    terminal: bool  # the last instruction's flow is terminal (for example a return)
+    flows: Annotated[list[BlockFlow], Field(max_length=8)]
+    flows_truncated: bool
+
+    @model_validator(mode="after")
+    def same_space(self) -> "BasicBlock":
+        if self.start.space != self.end.space:
+            raise ValueError("Basic block crosses address spaces")
+        return self
+
+
+class CallSite(Record):
+    source: Address
+    kind: Literal["direct", "indirect"]
+    # A target exists only where Ghidra recorded a call reference; indirect
+    # calls without one stay unresolved and are never guessed.
+    target: Address | None
+    target_basis: Literal["ghidra_call_reference"] | None
+    provenance: Literal["ghidra_instruction_flow"] = "ghidra_instruction_flow"
+
+    @model_validator(mode="after")
+    def target_has_basis(self) -> "CallSite":
+        if (self.target is None) != (self.target_basis is None):
+            raise ValueError("Call target basis mismatch")
+        return self
+
+
+class PointerSlot(Record):
+    """Initialized memory that Ghidra reports as a data reference to a function entry."""
+
+    address: Address
+    reference_type: Text
+    provenance: Literal["ghidra_reference_to_entry"] = "ghidra_reference_to_entry"
+
+
+V5_FUNCTION_KEYS = (
+    "thunk_target",
+    "pointer_slots",
+    "pointer_slots_truncated",
+    "basic_blocks",
+    "basic_blocks_truncated",
+    "basic_block_count",
+    "basic_block_count_capped",
+    "instruction_count",
+    "instruction_count_capped",
+    "call_sites",
+    "call_sites_truncated",
+)
+
+
 class Function(Record):
     entry: Address
     name: Text
@@ -93,6 +164,46 @@ class Function(Record):
         default_factory=list
     )
     references_truncated: bool = False
+
+    # ghidra-5 only. Inventory level: exact thunk resolution and pointer slots.
+    thunk_target: Address | None = None
+    pointer_slots: Annotated[list[PointerSlot], Field(max_length=4)] = Field(default_factory=list)
+    pointer_slots_truncated: bool = False
+    # ghidra-5 only, selected functions: static structure (None when not collected).
+    basic_blocks: Annotated[list[BasicBlock], Field(max_length=128)] = Field(default_factory=list)
+    basic_blocks_truncated: bool = False
+    basic_block_count: Annotated[int, Field(ge=0, le=4096)] | None = None
+    basic_block_count_capped: bool = False
+    instruction_count: Annotated[int, Field(ge=0, le=65536)] | None = None
+    instruction_count_capped: bool = False
+    call_sites: Annotated[list[CallSite], Field(max_length=128)] = Field(default_factory=list)
+    call_sites_truncated: bool = False
+
+    @model_validator(mode="after")
+    def consistent_structure(self) -> "Function":
+        selected = self.pseudocode_status != "not_selected"
+        structure = (
+            self.basic_blocks
+            or self.basic_blocks_truncated
+            or self.basic_block_count is not None
+            or self.instruction_count is not None
+            or self.call_sites
+            or self.call_sites_truncated
+        )
+        if structure and not selected:
+            raise ValueError("Inventory-only function contains structure")
+        if self.basic_block_count is not None and len(self.basic_blocks) > self.basic_block_count:
+            raise ValueError("Basic block count is below retained blocks")
+        if (
+            self.basic_blocks_truncated
+            and self.basic_block_count is not None
+            and (
+                len(self.basic_blocks) >= self.basic_block_count
+                and not self.basic_block_count_capped
+            )
+        ):
+            raise ValueError("Basic block truncation mismatch")
+        return self
 
     @model_validator(mode="after")
     def consistent_pseudocode(self) -> "Function":
@@ -153,6 +264,8 @@ class MemoryBlock(Record):
 
 
 V4_KEYS = ("image_base", "memory_blocks", "memory_blocks_truncated")
+REFERENCE_PROTOCOLS = ("ghidra-3", "ghidra-4", "ghidra-5")
+MEMORY_MAP_PROTOCOLS = ("ghidra-4", "ghidra-5")
 
 
 class GhidraResult(Record):
@@ -168,7 +281,7 @@ class GhidraResult(Record):
             ],
         },
     )
-    schema_version: Literal["ghidra-1", "ghidra-2", "ghidra-3", "ghidra-4"]
+    schema_version: Literal["ghidra-1", "ghidra-2", "ghidra-3", "ghidra-4", "ghidra-5"]
     input_sha256: Digest
     ghidra_version: Literal["12.2"]
     language_id: Text
@@ -181,7 +294,7 @@ class GhidraResult(Record):
     functions_truncated: bool
     analysis_timed_out: bool
     limitations: Annotated[list[Text], Field(max_length=32)]
-    # ghidra-4 only: Ghidra's program image base and memory map.
+    # ghidra-4 and later: Ghidra's program image base and memory map.
     image_base: Address | None = None
     memory_blocks: Annotated[list[MemoryBlock], Field(max_length=64)] = Field(default_factory=list)
     memory_blocks_truncated: bool = False
@@ -189,10 +302,14 @@ class GhidraResult(Record):
     @model_serializer(mode="wrap")
     def preserve_historical_shape(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
         result: dict[str, Any] = handler(self)
-        if self.schema_version != "ghidra-4":
+        if self.schema_version not in MEMORY_MAP_PROTOCOLS:
             for key in V4_KEYS:
                 result.pop(key, None)
-        if self.schema_version not in ("ghidra-3", "ghidra-4"):
+        if self.schema_version != "ghidra-5":
+            for function in result.get("functions", []):
+                for key in V5_FUNCTION_KEYS:
+                    function.pop(key, None)
+        if self.schema_version not in REFERENCE_PROTOCOLS:
             for function in result.get("functions", []):
                 for key in (
                     "body_ranges",
@@ -211,13 +328,28 @@ class GhidraResult(Record):
             raise ValueError("Invalid function count")
         if self.functions_truncated != (self.function_count > len(self.functions)):
             raise ValueError("Inventory truncation mismatch")
-        if self.schema_version == "ghidra-4" and self.image_base is None:
-            raise ValueError("Protocol version 4 requires an image base")
-        if self.schema_version != "ghidra-4" and (
+        if self.schema_version in MEMORY_MAP_PROTOCOLS and self.image_base is None:
+            raise ValueError("Protocol version 4 and later require an image base")
+        if self.schema_version not in MEMORY_MAP_PROTOCOLS and (
             self.image_base is not None or self.memory_blocks or self.memory_blocks_truncated
         ):
             raise ValueError("Legacy protocol contains version 4 memory map")
-        if self.schema_version not in ("ghidra-3", "ghidra-4") and any(
+        if self.schema_version != "ghidra-5" and any(
+            f.thunk_target is not None
+            or f.pointer_slots
+            or f.pointer_slots_truncated
+            or f.basic_blocks
+            or f.basic_blocks_truncated
+            or f.basic_block_count is not None
+            or f.basic_block_count_capped
+            or f.instruction_count is not None
+            or f.instruction_count_capped
+            or f.call_sites
+            or f.call_sites_truncated
+            for f in self.functions
+        ):
+            raise ValueError("Legacy protocol contains version 5 structure")
+        if self.schema_version not in REFERENCE_PROTOCOLS and any(
             f.body_ranges or f.body_ranges_truncated or f.references or f.references_truncated
             for f in self.functions
         ):

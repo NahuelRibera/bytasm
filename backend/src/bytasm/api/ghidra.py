@@ -4,7 +4,7 @@ import hashlib
 import json
 import os
 import stat
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Query, Request
 from fastapi.concurrency import run_in_threadpool
@@ -23,7 +23,7 @@ from bytasm.reports.ghidra import canonical_json, html_export
 from bytasm.storage import IntegrityError
 
 router = APIRouter()
-MAX_DOCUMENT_BYTES = 2 * 1024 * 1024
+MAX_DOCUMENT_BYTES = 4 * 1024 * 1024  # ghidra-5; earlier protocols stay below 2 MiB
 MAX_EXPORT_BYTES = 16 * 1024 * 1024
 
 
@@ -472,7 +472,7 @@ def export(
         document = {
             "schema_version": (
                 "bytasm-ghidra-report-2"
-                if result.schema_version in ("ghidra-2", "ghidra-3", "ghidra-4")
+                if result.schema_version in ("ghidra-2", "ghidra-3", "ghidra-4", "ghidra-5")
                 else "bytasm-ghidra-report-1"
             ),
             "overview": _overview(run, inv, result).model_dump(mode="json"),
@@ -552,3 +552,137 @@ def function_relationships(
             return _failure(request, "integrity_error")
         except ValueError:
             return _failure(request)
+
+
+class CallSiteOut(BaseModel):
+    source: Address
+    kind: Literal["direct", "indirect"]
+    target: Address | None
+    target_basis: str | None
+    target_function_index: int | None
+    target_function_name: str | None
+    resolution: Literal["inventory_function", "outside_inventory", "unresolved"]
+
+
+class FunctionStructureOut(BaseModel):
+    run_id: str
+    invocation_id: str
+    index: int
+    protocol_version: str
+    state: Literal["available", "not_selected", "not_captured"]
+    reason: str | None
+    entry: Address
+    name: str
+    body_size: int | None
+    body_ranges: list[dict[str, Any]]
+    basic_block_count: int | None
+    basic_block_count_capped: bool
+    instruction_count: int | None
+    instruction_count_capped: bool
+    basic_blocks: list[dict[str, Any]]
+    basic_blocks_truncated: bool
+    flow_counts: dict[str, int]
+    call_sites: list[CallSiteOut]
+    call_sites_truncated: bool
+    thunk_target: Address | None
+    pointer_slots: list[dict[str, Any]]
+    citation: str
+    limitations: list[str]
+
+
+@router.get(
+    "/runs/{run_id}/ghidra/functions/{index}/structure", response_model=FunctionStructureOut
+)
+def function_structure(
+    request: Request, run_id: str, index: int
+) -> FunctionStructureOut | JSONResponse:
+    """Static basic blocks, flows and call sites of one function (protocol ghidra-5)."""
+    if not 0 <= index < 1024:
+        return _failure(request)
+    ctx = _ctx(request)
+    with ctx.sessions() as session:
+        run = _run(session, run_id)
+        inv = _invocation(run) if run else None
+        if run is None or inv is None or inv.status != "succeeded":
+            return _failure(request)
+        try:
+            result = _read(ctx, run, inv)
+        except IntegrityError:
+            return _failure(request, "integrity_error")
+        invocation_id = inv.id
+    if index >= len(result.functions):
+        return _failure(request)
+    fn = result.functions[index]
+    by_entry = {(f.entry.space, f.entry.address): i for i, f in enumerate(result.functions)}
+    if result.schema_version != "ghidra-5":
+        state: Literal["available", "not_selected", "not_captured"] = "not_captured"
+        reason: str | None = (
+            f"Protocol {result.schema_version} does not record basic blocks or call sites; "
+            "a new Ghidra run (ghidra-5) is required. Nothing is reconstructed."
+        )
+    elif fn.pseudocode_status == "not_selected":
+        state, reason = (
+            "not_selected",
+            "Only inventory data was retained for this function; select it for detail.",
+        )
+    else:
+        state, reason = "available", None
+    flow_counts: dict[str, int] = {}
+    for block in fn.basic_blocks:
+        for flow in block.flows:
+            key = f"{flow.kind}:{'internal' if flow.internal else 'external'}"
+            flow_counts[key] = flow_counts.get(key, 0) + 1
+    sites = []
+    for site in fn.call_sites:
+        target_index = (
+            None if site.target is None else by_entry.get((site.target.space, site.target.address))
+        )
+        sites.append(
+            CallSiteOut(
+                source=site.source,
+                kind=site.kind,
+                target=site.target,
+                target_basis=site.target_basis,
+                target_function_index=target_index,
+                target_function_name=None
+                if target_index is None
+                else result.functions[target_index].name,
+                resolution="unresolved"
+                if site.target is None
+                else "inventory_function"
+                if target_index is not None
+                else "outside_inventory",
+            )
+        )
+    return FunctionStructureOut(
+        run_id=run_id,
+        invocation_id=invocation_id,
+        index=index,
+        protocol_version=result.schema_version,
+        state=state,
+        reason=reason,
+        entry=fn.entry,
+        name=fn.name,
+        body_size=fn.body_size,
+        body_ranges=[r.model_dump(mode="json") for r in fn.body_ranges],
+        basic_block_count=fn.basic_block_count,
+        basic_block_count_capped=fn.basic_block_count_capped,
+        instruction_count=fn.instruction_count,
+        instruction_count_capped=fn.instruction_count_capped,
+        basic_blocks=[b.model_dump(mode="json") for b in fn.basic_blocks],
+        basic_blocks_truncated=fn.basic_blocks_truncated,
+        flow_counts=dict(sorted(flow_counts.items())),
+        call_sites=sites,
+        call_sites_truncated=fn.call_sites_truncated,
+        thunk_target=fn.thunk_target,
+        pointer_slots=[p.model_dump(mode="json") for p in fn.pointer_slots],
+        citation=f"/api/v1/invocations/{invocation_id}/raw#/functions/{index}",
+        limitations=[
+            "Basic blocks, flows and call sites are Ghidra's static analysis; they do not "
+            "show which paths execute.",
+            "Indirect calls without a Ghidra call reference and unresolved computed jumps "
+            "are listed without a target; no target is guessed.",
+            "At most 128 basic blocks (8 flows each) and 128 call sites are retained; "
+            "counts stop at 4096 blocks and 65536 instructions.",
+        ],
+    )
